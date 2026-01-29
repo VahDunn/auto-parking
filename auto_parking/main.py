@@ -2,13 +2,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from auto_parking.db.engine import engine
+
 
 @asynccontextmanager
 async def lifespan(app_main: FastAPI):
     # startup
     yield
     # shutdown
-    # await engine.dispose()
+    await engine.dispose()
 
 
 def create_app() -> FastAPI:

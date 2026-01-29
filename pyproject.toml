@@ -9,6 +9,8 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi (>=0.128.0,<0.129.0)",
     "uvicorn (>=0.40.0,<0.41.0)",
+    "sqlalchemy (>=2.0.46,<3.0.0)",
+    "pydantic-settings (>=2.12.0,<3.0.0)",
 ]
 
 
@@ -34,3 +36,6 @@ ignore = ["E501"]  # длину строки контролируем line-lengt
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
