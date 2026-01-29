@@ -1,0 +1,36 @@
+[project]
+name = "auto-parking"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Vladislav Morozov",email = "landaren11@gmail.com"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi (>=0.128.0,<0.129.0)",
+    "uvicorn (>=0.40.0,<0.41.0)",
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "mypy (>=1.19.1,<2.0.0)",
+    "ruff (>=0.14.14,<0.15.0)"
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv", "__pycache__", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]  # длину строки контролируем line-length, а не E501
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
