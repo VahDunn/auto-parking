@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from auto_parking.config import settings
+from auto_parking.core.config import settings
 
 engine = create_async_engine(
     settings.database_url,

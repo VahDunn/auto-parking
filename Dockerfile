@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
+COPY alembic.ini .
+COPY alembic ./alembic
 COPY auto_parking ./auto_parking
 
 RUN pip install --upgrade pip \
