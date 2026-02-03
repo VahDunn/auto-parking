@@ -24,7 +24,6 @@ def create_app() -> FastAPI:
     setup_admin(main_app)
     # register_exception_handlers(main_app)
     main_app.include_router(api_router, prefix="/api")
-
     return main_app
 
 

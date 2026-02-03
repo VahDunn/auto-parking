@@ -2,7 +2,13 @@ from fastapi import FastAPI
 from sqladmin import Admin, ModelView
 
 from auto_parking.db.engine import engine
-from auto_parking.db.models import Vehicle, VehicleModel
+from auto_parking.db.models import (
+    Driver,
+    Enterprise,
+    Vehicle,
+    VehicleDriverAssignment,
+    VehicleModel,
+)
 
 
 class VehicleAdmin(ModelView, model=Vehicle):
@@ -45,8 +51,104 @@ class VehicleModelAdmin(ModelView, model=VehicleModel):
     icon = "fa-solid fa-list"
 
 
+class EnterpriseAdmin(ModelView, model=Enterprise):
+    column_list = [
+        Enterprise.id,
+        Enterprise.name,
+        Enterprise.settlement,
+        Enterprise.drivers,
+        Enterprise.vehicles,
+        Enterprise.created_at,
+    ]
+    column_searchable_list = [
+        Enterprise.name,
+        Enterprise.settlement,
+        Enterprise.id,
+    ]
+    form_excluded_columns = ["created_at"]
+    name = "Enterprise"
+    name_plural = "Enterprises"
+    icon = "fa-solid fa-building"
+
+
+class DriverAdmin(ModelView, model=Driver):
+    column_list = [
+        Driver.id,
+        Driver.name,
+        Driver.salary_rub,
+        Driver.enterprise,
+        Driver.active_vehicle,
+        Driver.created_at,
+    ]
+    column_searchable_list = [
+        Driver.name,
+        Driver.id,
+    ]
+    column_filters = [
+        Driver.enterprise_id,
+    ]
+    form_excluded_columns = ["created_at"]
+    name = "Driver"
+    name_plural = "Drivers"
+    icon = "fa-solid fa-id-card"
+
+
+class VehicleDriverAssignmentAdmin(ModelView, model=VehicleDriverAssignment):
+    column_list = [
+        VehicleDriverAssignment.vehicle_id,
+        VehicleDriverAssignment.driver_id,
+    ]
+    column_searchable_list = [
+        VehicleDriverAssignment.vehicle_id,
+        VehicleDriverAssignment.driver_id,
+    ]
+    name = "Vehicle–Driver Assignment"
+    name_plural = "Vehicle–Driver Assignments"
+    icon = "fa-solid fa-link"
+
+
 def setup_admin(app: FastAPI) -> Admin:
     admin = Admin(app, engine)
+
     admin.add_view(VehicleAdmin)
     admin.add_view(VehicleModelAdmin)
+
+    admin.add_view(EnterpriseAdmin)
+    admin.add_view(DriverAdmin)
+    admin.add_view(VehicleDriverAssignmentAdmin)
+
     return admin
+
+
+# Отладочная админка для всех моделей подряд со всеми колонками подряд
+# from fastapi import FastAPI
+# from sqladmin import Admin, ModelView
+# from sqlalchemy import inspect
+#
+# from auto_parking.db.engine import engine
+# from auto_parking.db.models import ADMIN_MODELS
+#
+#
+# def setup_admin(app: FastAPI) -> Admin:
+#     admin = Admin(app, engine)
+#
+#     for model_cls in ADMIN_MODELS:
+#         mapper = inspect(model_cls)
+#
+#         cols = [c.key for c in mapper.columns]
+#
+#         view_cls = type(
+#             f"{model_cls.__name__}Admin",
+#             (ModelView,),
+#             {
+#                 "name": model_cls.__name__,
+#                 "name_plural": f"{model_cls.__name__}s",
+#                 "column_list": cols,
+#                 "form_columns": cols,
+#             },
+#             model=model_cls,
+#         )
+#
+#         admin.add_view(view_cls)
+#
+#     return admin
