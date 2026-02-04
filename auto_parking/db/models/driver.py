@@ -31,3 +31,16 @@ class Driver(BaseORM):
         foreign_keys="Vehicle.active_driver_id",
         lazy="selectin",
     )
+
+    vehicles: Mapped[list["Vehicle"]] = relationship(
+        "Vehicle",
+        secondary="vehicle_driver_assignment",
+        lazy="selectin",
+        back_populates="drivers",
+    )
+
+    def __str__(self):
+        return f"{self.name}"
+
+    def __repr__(self):
+        return f"{self.name}"

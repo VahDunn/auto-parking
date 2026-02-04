@@ -1,7 +1,12 @@
+from typing import TYPE_CHECKING
+
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from auto_parking.db.models import Base
+
+if TYPE_CHECKING:
+    from auto_parking.db.models import Driver, Vehicle
 
 
 class VehicleDriverAssignment(Base):
@@ -15,3 +20,14 @@ class VehicleDriverAssignment(Base):
         sa.ForeignKey("driver.id", ondelete="CASCADE"),
         primary_key=True,
     )
+    vehicle: Mapped["Vehicle"] = relationship(
+        "Vehicle",
+        lazy="selectin",
+    )
+    driver: Mapped["Driver"] = relationship(
+        "Driver",
+        lazy="selectin",
+    )
+
+    def __str__(self) -> str:
+        return f"{self.vehicle} — {self.driver}"

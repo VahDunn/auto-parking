@@ -3,12 +3,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from auto_parking.api.router import api_router
-from auto_parking.core.admin import setup_admin
+from auto_parking.db.admin import setup_admin
 from auto_parking.db.engine import engine
+from auto_parking.db.events import register_listeners
 
 
 @asynccontextmanager
 async def lifespan(app_main: FastAPI):
+    register_listeners()
     # startup
     yield
     # shutdown

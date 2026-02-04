@@ -19,12 +19,14 @@ class VehicleAdmin(ModelView, model=Vehicle):
         Vehicle.accident_number,
         Vehicle.price,
         Vehicle.created_at,
+        Vehicle.enterprise_id,
     ]
+    column_details_list = column_list
     column_searchable_list = [
         Vehicle.vehicle_number,
         Vehicle.id,
     ]
-    form_excluded_columns = ["created_at"]
+    form_excluded_columns = ["created_at", "drivers"]
     name = "Vehicle"
     name_plural = "Vehicles"
     icon = "fa-solid fa-car"
@@ -56,8 +58,6 @@ class EnterpriseAdmin(ModelView, model=Enterprise):
         Enterprise.id,
         Enterprise.name,
         Enterprise.settlement,
-        Enterprise.drivers,
-        Enterprise.vehicles,
         Enterprise.created_at,
     ]
     column_searchable_list = [
@@ -79,15 +79,14 @@ class DriverAdmin(ModelView, model=Driver):
         Driver.enterprise,
         Driver.active_vehicle,
         Driver.created_at,
+        Driver.enterprise_id,
     ]
+    column_details_list = column_list
     column_searchable_list = [
         Driver.name,
         Driver.id,
     ]
-    column_filters = [
-        Driver.enterprise_id,
-    ]
-    form_excluded_columns = ["created_at"]
+    form_excluded_columns = ["created_at", "vehicles"]
     name = "Driver"
     name_plural = "Drivers"
     icon = "fa-solid fa-id-card"
@@ -95,13 +94,14 @@ class DriverAdmin(ModelView, model=Driver):
 
 class VehicleDriverAssignmentAdmin(ModelView, model=VehicleDriverAssignment):
     column_list = [
-        VehicleDriverAssignment.vehicle_id,
-        VehicleDriverAssignment.driver_id,
+        VehicleDriverAssignment.vehicle,
+        VehicleDriverAssignment.driver,
     ]
     column_searchable_list = [
         VehicleDriverAssignment.vehicle_id,
         VehicleDriverAssignment.driver_id,
     ]
+    form_columns = ["vehicle", "driver"]
     name = "Vehicle–Driver Assignment"
     name_plural = "Vehicle–Driver Assignments"
     icon = "fa-solid fa-link"

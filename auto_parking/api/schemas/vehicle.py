@@ -12,3 +12,5 @@ class VehicleOut(BaseModel):
     accident_number: int
     manufacture_year: int
     model_id: int
+    enterprise_id: int
+    active_driver_id: int | None = None

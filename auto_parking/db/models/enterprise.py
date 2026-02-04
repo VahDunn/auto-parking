@@ -15,8 +15,14 @@ class Enterprise(BaseORM):
     name: Mapped[str] = mapped_column(sa.String, nullable=False)
     settlement: Mapped[str] = mapped_column(sa.String, nullable=False)
     drivers: Mapped[list["Driver"]] = relationship(
-        back_populates="enterprise", cascade="all, delete-orphan", lazy="selectin"
+        back_populates="enterprise", cascade="save-update, merge", lazy="selectin"
     )
     vehicles: Mapped[list["Vehicle"]] = relationship(
-        back_populates="enterprise", cascade="all, delete-orphan", lazy="selectin"
+        back_populates="enterprise", cascade="save-update, merge", lazy="selectin"
     )
+
+    def __str__(self):
+        return f"{self.name}"
+
+    def __repr__(self):
+        return f"{self.name}"

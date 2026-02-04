@@ -48,3 +48,16 @@ class Vehicle(BaseORM):
         back_populates="active_vehicle",
         lazy="selectin",
     )
+
+    drivers: Mapped[list["Driver"]] = relationship(
+        "Driver",
+        secondary="vehicle_driver_assignment",
+        lazy="selectin",
+        back_populates="vehicles",
+    )
+
+    def __str__(self):
+        return f"{self.vehicle_number}"
+
+    def __repr__(self):
+        return f"{self.vehicle_number}"
