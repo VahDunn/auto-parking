@@ -14,7 +14,7 @@ class Vehicle(BaseORM):
     __tablename__ = "vehicle"
     price: Mapped[int] = mapped_column(sa.BigInteger)
     mileage: Mapped[int] = mapped_column(sa.BigInteger)
-    vehicle_number: Mapped[int] = mapped_column(sa.String, unique=True)
+    vehicle_number: Mapped[str] = mapped_column(sa.String, unique=True)
     owners_count: Mapped[int] = mapped_column(sa.Integer)
     accident_number: Mapped[int] = mapped_column(sa.Integer)
     manufacture_year = mapped_column(sa.SmallInteger)

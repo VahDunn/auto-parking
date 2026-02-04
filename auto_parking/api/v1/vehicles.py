@@ -2,9 +2,9 @@ import sqlalchemy as sa
 from fastapi import APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auto_parking.api.deps import depends_db
 from auto_parking.api.schemas.vehicle import VehicleOut
 from auto_parking.db.models import Vehicle
+from auto_parking.deps.commons import depends_db
 
 router = APIRouter()
 
