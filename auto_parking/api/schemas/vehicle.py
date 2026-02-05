@@ -12,11 +12,11 @@ class VehicleOut(BaseModel):
     manufacture_year: int
     model_id: int
     enterprise_id: int
-    drivers: list[int] | None = None
-    active_driver_id: int | None = None
+    drivers: list[int] = []
+    active_driver_id: int = -1
 
 
-class VehicleShort(BaseModel):
-    id: int
-    drivers_ids: list[int] | None = None
-    active_driver_id: int | None = None
+class VehicleFilter(BaseModel):
+    id: list[int] | None = None
+    enterprise_id: int | None = None
+    driver_id: int | None = None

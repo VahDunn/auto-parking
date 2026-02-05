@@ -6,11 +6,11 @@ class DriverOut(BaseModel):
     name: str
     salary_rub: int
     enterprise_id: int
-    vehicles: list[int] | None = None
-    active_vehicle_id: int | None = None
+    vehicles: list[int] = []
+    active_vehicle_id: int = -1
 
 
-class DriverShort(BaseModel):
-    id: int
-    name: str
-    enterprise_id: int
+class DriverFilter(BaseModel):
+    id: list[int] | None = None
+    enterprise_id: int | None = None
+    vehicle_id: int | None = None
