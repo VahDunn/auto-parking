@@ -10,7 +10,6 @@ class DriverOut(BaseModel):
     active_vehicle_id: int | None = None
 
 
-class DriverShort(BaseModel):
-    id: int
-    name: str
-    enterprise_id: int
+class DriverFilter(BaseModel):
+    ids: list[int] | None = None
+    enterprise_id: int | None = None

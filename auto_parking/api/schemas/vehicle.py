@@ -16,7 +16,6 @@ class VehicleOut(BaseModel):
     active_driver_id: int | None = None
 
 
-class VehicleShort(BaseModel):
-    id: int
-    drivers_ids: list[int] | None = None
-    active_driver_id: int | None = None
+class VehicleFilter(BaseModel):
+    ids: list[int] | None = None
+    enterprise_id: int | None = None

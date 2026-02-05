@@ -25,6 +25,6 @@ def get_driver_repo(
     return DriverRepository(db)
 
 
-depends_enterprise_repo = Depends(get_enterprise_repo)
-depends_vehicle_repo = Depends(get_vehicle_repo)
-depends_driver_repo = Depends(get_driver_repo)
+dep_enterprise_repo = Depends(get_enterprise_repo)
+dep_vehicle_repo = Depends(get_vehicle_repo)
+dep_driver_repo = Depends(get_driver_repo)

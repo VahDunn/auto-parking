@@ -1,4 +1,4 @@
-from auto_parking.api.schemas.vehicle import VehicleOut
+from auto_parking.api.schemas.vehicle import VehicleFilter, VehicleOut
 from auto_parking.repo.vehicle import VehicleRepository
 
 
@@ -6,8 +6,8 @@ class VehicleService:
     def __init__(self, repo: VehicleRepository) -> None:
         self._repo = repo
 
-    async def get(self) -> list[VehicleOut]:
-        vehicles = await self._repo.get()
+    async def get(self, filter: VehicleFilter) -> list[VehicleOut]:
+        vehicles = await self._repo.get(filter)
         return [
             VehicleOut(
                 id=v.id,
