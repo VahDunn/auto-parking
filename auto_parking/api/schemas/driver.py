@@ -6,6 +6,8 @@ class DriverOut(BaseModel):
     name: str
     salary_rub: int
     enterprise_id: int
+    vehicles: list[int] | None = None
+    active_vehicle_id: int | None = None
 
 
 class DriverShort(BaseModel):

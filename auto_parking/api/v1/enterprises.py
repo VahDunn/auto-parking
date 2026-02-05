@@ -14,7 +14,7 @@ router = APIRouter()
 async def get_enterprises(
     service: EnterpriseService = depends_enterprise_service,
 ):
-    return await service.get_enterprises()
+    return await service.get()
 
 
 @router.get(
@@ -25,4 +25,4 @@ async def get_enterprise(
     id: int,
     service: EnterpriseService = depends_enterprise_service,
 ):
-    return await service.get_enterprise_by_id(id)
+    return await service.get_by_id(id)

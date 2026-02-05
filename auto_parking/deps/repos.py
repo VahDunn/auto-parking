@@ -2,7 +2,9 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auto_parking.deps.commons import depends_db
+from auto_parking.repo.driver import DriverRepository
 from auto_parking.repo.enterprise import EnterpriseRepository
+from auto_parking.repo.vehicle import VehicleRepository
 
 
 def get_enterprise_repo(
@@ -11,4 +13,18 @@ def get_enterprise_repo(
     return EnterpriseRepository(db)
 
 
+def get_vehicle_repo(
+    db: AsyncSession = depends_db,
+) -> VehicleRepository:
+    return VehicleRepository(db)
+
+
+def get_driver_repo(
+    db: AsyncSession = depends_db,
+) -> DriverRepository:
+    return DriverRepository(db)
+
+
 depends_enterprise_repo = Depends(get_enterprise_repo)
+depends_vehicle_repo = Depends(get_vehicle_repo)
+depends_driver_repo = Depends(get_driver_repo)
