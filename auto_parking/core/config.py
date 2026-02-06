@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, alias="DEBUG")
 
     database_url: str = Field(..., alias="DATABASE_URL")
-
+    test_admin_login: str = Field(alias="TEST_ADMIN_NAME")
+    test_admin_pass: str = Field(alias="TEST_ADMIN_PASS")
     model_config = {
         "env_file": str(ENV_FILE),
         "env_file_encoding": "utf-8",
@@ -26,4 +27,4 @@ def get_settings() -> Settings:
     return Settings()
 
 
-settings = get_settings()
+settings: Settings = get_settings()

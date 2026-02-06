@@ -21,13 +21,9 @@ class VehicleDriverAssignment(Base):
         primary_key=True,
     )
     vehicle: Mapped["Vehicle"] = relationship(
-        "Vehicle",
-        lazy="selectin",
+        "Vehicle", lazy="selectin", overlaps="drivers,vehicles"
     )
-    driver: Mapped["Driver"] = relationship(
-        "Driver",
-        lazy="selectin",
-    )
+    driver: Mapped["Driver"] = relationship("Driver", lazy="selectin", overlaps="drivers,vehicles")
 
     def __str__(self) -> str:
         return f"{self.vehicle} — {self.driver}"
