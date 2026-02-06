@@ -12,7 +12,7 @@ class DriverRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get(self, filter: DriverFilter) -> Sequence[Driver]:
+    async def get(self, filter_obj: DriverFilter) -> Sequence[Driver]:
         stmt = select(Driver).options(
             selectinload(Driver.vehicles).options(
                 load_only(Vehicle.id),
@@ -22,11 +22,13 @@ class DriverRepository:
             ),
         )
 
-        if filter:
-            if filter.ids:
-                stmt = stmt.where(Driver.id.in_(filter.ids))
-            if filter.enterprise_id is not None:
-                stmt = stmt.where(Driver.enterprise_id == filter.enterprise_id)
+        if filter_obj:
+            if filter_obj.id:
+                stmt = stmt.where(Driver.id.in_(filter_obj.id))
+            if filter_obj.enterprise_id is not None:
+                stmt = stmt.where(Driver.enterprise_id == filter_obj.enterprise_id)
+            if filter_obj.vehicle_id is not None:
+                stmt = stmt.where(Driver.vehicles.any(Driver.id == filter_obj.vehicle_id))
         result = await self.db.execute(stmt)
         return result.unique().scalars().all()
 

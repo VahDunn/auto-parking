@@ -19,10 +19,12 @@ class VehicleRepository:
             ),
         )
         if filter:
-            if filter.ids:
-                stmt = stmt.where(Vehicle.id.in_(filter.ids))
+            if filter.id:
+                stmt = stmt.where(Vehicle.id.in_(filter.id))
             if filter.enterprise_id is not None:
                 stmt = stmt.where(Vehicle.enterprise_id == filter.enterprise_id)
+            if filter.driver_id is not None:
+                stmt = stmt.where(Vehicle.drivers.any(Driver.id == filter.driver_id))
         result = await self.db.execute(stmt)
         return result.unique().scalars().all()
 

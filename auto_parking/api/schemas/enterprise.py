@@ -5,5 +5,5 @@ class EnterpriseOut(BaseModel):
     id: int
     name: str
     settlement: str
-    vehicles: list[int] | None = None
-    drivers: list[int] | None = None
+    vehicles: list[int] = []
+    drivers: list[int] = []
