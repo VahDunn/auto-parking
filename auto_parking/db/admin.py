@@ -1,10 +1,14 @@
 from fastapi import FastAPI
 from sqladmin import Admin, ModelView
+from wtforms.fields.simple import PasswordField
+from wtforms.validators import DataRequired, Length
 
+from auto_parking.core.security.passwords import hash_password
 from auto_parking.db.engine import engine
 from auto_parking.db.models import (
     Driver,
     Enterprise,
+    Manager,
     Vehicle,
     VehicleDriverAssignment,
     VehicleModel,
@@ -16,10 +20,7 @@ class VehicleAdmin(ModelView, model=Vehicle):
         Vehicle.id,
         Vehicle.vehicle_number,
         Vehicle.model,
-        Vehicle.accident_number,
-        Vehicle.price,
-        Vehicle.created_at,
-        Vehicle.enterprise_id,
+        Driver.enterprise,
     ]
     column_details_list = column_list
     column_searchable_list = [
@@ -107,6 +108,36 @@ class VehicleDriverAssignmentAdmin(ModelView, model=VehicleDriverAssignment):
     icon = "fa-solid fa-link"
 
 
+class ManagerAdmin(ModelView, model=Manager):
+    column_list = [Manager.id, Manager.username]
+    column_searchable_list = [Manager.username, Manager.id]
+    column_details_list = [Manager.id, Manager.username, Manager.enterprises]
+
+    form_excluded_columns = ["created_at", "password_hash"]
+
+    async def scaffold_form(self, rules=None):
+        Form = await super().scaffold_form(rules)
+        Form.password = PasswordField(
+            "Password",
+            validators=[
+                DataRequired(message="Password is required"),
+                Length(min=6, message="Min 6 characters"),
+            ],
+        )
+        return Form
+
+    async def on_model_change(self, data, model, is_created, request):
+        raw_password = data.get("password")
+        if is_created and not raw_password:
+            raise ValueError("Password is required")
+
+        if raw_password:
+            model.password_hash = hash_password(raw_password)
+
+        data.pop("password", None)
+        return await super().on_model_change(data, model, is_created, request)
+
+
 def setup_admin(app: FastAPI) -> Admin:
     admin = Admin(app, engine)
 
@@ -116,6 +147,7 @@ def setup_admin(app: FastAPI) -> Admin:
     admin.add_view(EnterpriseAdmin)
     admin.add_view(DriverAdmin)
     admin.add_view(VehicleDriverAssignmentAdmin)
+    admin.add_view(ManagerAdmin)
 
     return admin
 

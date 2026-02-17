@@ -12,19 +12,19 @@ class VehicleRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get(self, filter: VehicleFilter) -> Sequence[Vehicle]:
+    async def get(self, filter_obj: VehicleFilter) -> Sequence[Vehicle]:
         stmt = select(Vehicle).options(
-            selectinload(Vehicle.drivers).options(
-                load_only(Driver.id),
-            ),
+            selectinload(Vehicle.drivers).options(load_only(Driver.id)),
         )
-        if filter:
-            if filter.id:
-                stmt = stmt.where(Vehicle.id.in_(filter.id))
-            if filter.enterprise_id is not None:
-                stmt = stmt.where(Vehicle.enterprise_id == filter.enterprise_id)
-            if filter.driver_id is not None:
-                stmt = stmt.where(Vehicle.drivers.any(Driver.id == filter.driver_id))
+
+        if filter_obj:
+            if filter_obj.id:
+                stmt = stmt.where(Vehicle.id.in_(filter_obj.id))
+            if filter_obj.enterprise_ids:
+                stmt = stmt.where(Vehicle.enterprise_id.in_(filter_obj.enterprise_ids))
+            if filter_obj.driver_id is not None:
+                stmt = stmt.where(Vehicle.drivers.any(Driver.id == filter_obj.driver_id))
+
         result = await self.db.execute(stmt)
         return result.unique().scalars().all()
 

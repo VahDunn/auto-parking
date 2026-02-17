@@ -33,7 +33,6 @@ def register_listeners() -> None:
     @event.listens_for(Session, "before_flush")
     def enforce_enterprise_rules(session: Session, flush_context, instances):
         for obj in session.new.union(session.dirty):
-            # Правила для машин
             if isinstance(obj, Vehicle):
                 state = inspect(obj)
                 ad_hist = state.attrs.active_driver_id.history
@@ -56,7 +55,6 @@ def register_listeners() -> None:
                             "Нельзя менять предприятие автомобиля, пока назначен активный водитель."
                         )
 
-            # Правила для водителей
             if isinstance(obj, Driver):
                 state = inspect(obj)
 
@@ -74,6 +72,9 @@ def register_listeners() -> None:
                             )
 
                 if state.attrs.enterprise_id.history.has_changes():
+                    if state.transient or state.pending:
+                        continue
+
                     vehicle = (
                         session.query(Vehicle).filter(Vehicle.active_driver_id == obj.id).first()
                     )

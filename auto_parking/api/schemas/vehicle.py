@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class VehicleOut(BaseModel):
@@ -12,11 +12,11 @@ class VehicleOut(BaseModel):
     manufacture_year: int
     model_id: int
     enterprise_id: int
-    drivers: list[int] = []
+    drivers: list[int] = Field(default_factory=list)
     active_driver_id: int = -1
 
 
 class VehicleFilter(BaseModel):
     id: list[int] | None = None
-    enterprise_id: int | None = None
+    enterprise_ids: list[int] | None = None
     driver_id: int | None = None

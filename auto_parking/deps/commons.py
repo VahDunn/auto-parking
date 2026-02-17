@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator
 from fastapi import Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auto_parking.core.security import verify_user
+from auto_parking.core.security.basic_auth import verify_user
 from auto_parking.db.engine import AsyncSessionLocal
 
 

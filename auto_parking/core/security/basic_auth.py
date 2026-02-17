@@ -5,13 +5,14 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from auto_parking.core.config import settings
 
-security = HTTPBasic()  # ← ВАЖНО
+security = HTTPBasic()
+sec_dep = Depends(security)
 
 USERNAME = settings.test_admin_login
 PASSWORD = settings.test_admin_pass
 
 
-def verify_user(credentials: HTTPBasicCredentials = Depends(security)):  # noqa
+def verify_user(credentials: HTTPBasicCredentials = sec_dep):
     correct_username = secrets.compare_digest(credentials.username, USERNAME)
     correct_password = secrets.compare_digest(credentials.password, PASSWORD)
 

@@ -14,21 +14,18 @@ class DriverRepository:
 
     async def get(self, filter_obj: DriverFilter) -> Sequence[Driver]:
         stmt = select(Driver).options(
-            selectinload(Driver.vehicles).options(
-                load_only(Vehicle.id),
-            ),
-            selectinload(Driver.active_vehicle).options(
-                load_only(Vehicle.id),
-            ),
+            selectinload(Driver.vehicles).options(load_only(Vehicle.id)),
+            selectinload(Driver.active_vehicle).options(load_only(Vehicle.id)),
         )
 
         if filter_obj:
             if filter_obj.id:
                 stmt = stmt.where(Driver.id.in_(filter_obj.id))
-            if filter_obj.enterprise_id is not None:
-                stmt = stmt.where(Driver.enterprise_id == filter_obj.enterprise_id)
+            if filter_obj.enterprise_ids:
+                stmt = stmt.where(Driver.enterprise_id.in_(filter_obj.enterprise_ids))
             if filter_obj.vehicle_id is not None:
-                stmt = stmt.where(Driver.vehicles.any(Driver.id == filter_obj.vehicle_id))
+                stmt = stmt.where(Driver.vehicles.any(Vehicle.id == filter_obj.vehicle_id))
+
         result = await self.db.execute(stmt)
         return result.unique().scalars().all()
 

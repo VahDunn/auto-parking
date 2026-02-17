@@ -1,3 +1,5 @@
+import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,6 +18,30 @@ async def lifespan(app_main: FastAPI):
     yield
     # shutdown
     await engine.dispose()
+
+
+def setup_logger(log_level="INFO"):
+    log_format = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
+
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(log_format)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, log_level.upper()))
+
+    root_logger.handlers.clear()
+    root_logger.addHandler(console_handler)
+
+    uvicorn_logger = logging.getLogger("uvicorn")
+    uvicorn_logger.handlers.clear()
+    uvicorn_logger.addHandler(console_handler)
+
+    if log_level.upper() == "DEBUG":
+        sqlalchemy_logger = logging.getLogger("sqlalchemy.engine")
+        sqlalchemy_logger.setLevel(logging.INFO)
+        sqlalchemy_logger.addHandler(console_handler)
 
 
 def create_app() -> FastAPI:
