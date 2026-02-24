@@ -1,14 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 
 from auto_parking.api.schemas.vehicle import VehicleFilter, VehicleOut
-from auto_parking.core.security.auth import get_actor
+from auto_parking.core.security.auth import actor_dep
 from auto_parking.db.models import Manager
 from auto_parking.deps.commons import dep_query
 from auto_parking.deps.services import dep_manager_service, dep_vehicle_service
 from auto_parking.service.vehicle import VehicleService
 
 router = APIRouter()
-actor_dep = Depends(get_actor)
 
 
 @router.get("", response_model=list[VehicleOut])

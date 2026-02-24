@@ -1,10 +1,10 @@
 import logging
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 
 from auto_parking.api.schemas.enterprise import EnterpriseFilter, EnterpriseOut
-from auto_parking.core.security.auth import get_actor
+from auto_parking.core.security.auth import actor_dep
 from auto_parking.db.models import Manager
 from auto_parking.deps.services import dep_enterprise_service, dep_manager_service
 
@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from auto_parking.service.enterprise import EnterpriseService
 
 router = APIRouter()
-actor_dep = Depends(get_actor)
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from auto_parking.api.v1.csrf import router as csrf_router
 from auto_parking.api.v1.drivers import router as drivers_router
 from auto_parking.api.v1.enterprises import router as enterprises_router
 from auto_parking.api.v1.vehicle_models import router as vehicle_models_router
@@ -14,6 +15,7 @@ api_router.include_router(
     prefix="/enterprises",
     tags=["enterprises"],
 )
+api_router.include_router(csrf_router, tags=["security"])
 
 
 @api_router.get("/health")

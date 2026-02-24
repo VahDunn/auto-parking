@@ -2,7 +2,7 @@ import logging
 import secrets
 from typing import TYPE_CHECKING
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBasicCredentials
 
 from auto_parking.api.schemas.manager import ManagerFilter
@@ -40,3 +40,6 @@ async def get_actor(
         "type": "manager",
         "id": manager.id,
     }
+
+
+actor_dep = Depends(get_actor)
