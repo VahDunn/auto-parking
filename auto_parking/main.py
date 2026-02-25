@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from auto_parking.api.router import api_router
 from auto_parking.core.handlers import register_exception_handlers
+from auto_parking.core.security.admin_basic import AdminBasicAuthMiddleware
 from auto_parking.db.admin import setup_admin
 from auto_parking.db.engine import engine
 from auto_parking.db.events import register_listeners
@@ -54,6 +55,7 @@ def create_app() -> FastAPI:
     setup_admin(main_app)
     # register_exception_handlers(main_app)
     main_app.include_router(api_router, prefix="/api")
+    main_app.add_middleware(AdminBasicAuthMiddleware)
     return main_app
 
 

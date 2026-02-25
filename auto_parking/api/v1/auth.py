@@ -1,0 +1,65 @@
+import secrets
+
+from fastapi import APIRouter, HTTPException, Response, status
+from pydantic import BaseModel
+
+from auto_parking.api.schemas.manager import ManagerFilter
+from auto_parking.core.config import settings
+from auto_parking.core.security.jwt import create_access_token
+from auto_parking.core.security.passwords import verify_password
+from auto_parking.deps.services import dep_manager_service
+
+router = APIRouter()
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    data: LoginRequest,
+    response: Response,
+    manager_service=dep_manager_service,
+):
+    if secrets.compare_digest(data.username, settings.test_admin_login) and secrets.compare_digest(
+        data.password, settings.test_admin_pass
+    ):
+        token = create_access_token(actor_type="admin", actor_id=0)
+
+        response.set_cookie(
+            key="access_token",
+            value=token,
+            httponly=True,
+            samesite="lax",
+            secure=False,
+        )
+
+        return TokenResponse(access_token=token)
+
+    managers = await manager_service.get(ManagerFilter(username=data.username))
+    manager = managers[0] if managers else None
+
+    if not manager or not verify_password(data.password, manager.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Wrong login or password",
+        )
+
+    token = create_access_token(actor_type="manager", actor_id=manager.id)
+
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+    )
+
+    return TokenResponse(access_token=token)

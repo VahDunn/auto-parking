@@ -3,7 +3,11 @@ from collections.abc import AsyncGenerator
 from fastapi import Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auto_parking.core.security.basic_auth import verify_user
+from auto_parking.core.security.actor import get_current_actor
+from auto_parking.core.security.roles import (
+    require_admin,
+    require_manager,
+)
 from auto_parking.db.engine import AsyncSessionLocal
 
 
@@ -22,6 +26,8 @@ def parse_ids(ids: str | None = Query(default=None)) -> list[int] | None:
 
 
 dep_parse_ids = Depends(parse_ids)
-
 dep_query = Query(default=None)
-dep_verify_user = Depends(verify_user)
+
+dep_actor = Depends(get_current_actor)
+dep_admin = Depends(require_admin)
+dep_manager = Depends(require_manager)
