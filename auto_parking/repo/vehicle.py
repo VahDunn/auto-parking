@@ -39,3 +39,11 @@ class VehicleRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def create(self, data: dict) -> Vehicle:
+        vehicle = Vehicle(**data)
+
+        self.db.add(vehicle)
+        await self.db.flush()
+        await self.db.commit()
+        return vehicle
