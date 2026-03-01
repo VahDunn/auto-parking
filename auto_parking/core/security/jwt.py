@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from jose import JWTError, jwt
 
 from auto_parking.core.config import settings
+from auto_parking.core.domain.user_role import UserRole
 
 SECRET_KEY = settings.jwt_secret_key
 ALGORITHM = settings.jwt_algorithm
@@ -65,7 +66,12 @@ def decode_access_token(token: str) -> dict[str, Any]:
     actor_type = payload.get("actor_type")
     actor_id = payload.get("actor_id")
 
-    if actor_type not in ("admin", "manager") or not isinstance(actor_id, int):
+    if not isinstance(actor_type, str) or not isinstance(actor_id, int):
         raise _unauthorized("Invalid token payload")
 
-    return {"type": actor_type, "id": actor_id}
+    try:
+        role = UserRole(actor_type)
+    except ValueError:
+        raise _unauthorized("Invalid token payload") from None
+
+    return {"role": role, "id": actor_id}

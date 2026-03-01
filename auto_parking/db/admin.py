@@ -8,7 +8,7 @@ from auto_parking.db.engine import engine
 from auto_parking.db.models import (
     Driver,
     Enterprise,
-    Manager,
+    User,
     Vehicle,
     VehicleDriverAssignment,
     VehicleModel,
@@ -108,10 +108,10 @@ class VehicleDriverAssignmentAdmin(ModelView, model=VehicleDriverAssignment):
     icon = "fa-solid fa-link"
 
 
-class ManagerAdmin(ModelView, model=Manager):
-    column_list = [Manager.id, Manager.username]
-    column_searchable_list = [Manager.username, Manager.id]
-    column_details_list = [Manager.id, Manager.username, Manager.enterprises]
+class UserAdmin(ModelView, model=User):
+    column_list = [User.id, User.username]
+    column_searchable_list = [User.username, User.id]
+    column_details_list = [User.id, User.username, User.enterprises]
 
     form_excluded_columns = ["created_at", "password_hash"]
 
@@ -147,7 +147,7 @@ def setup_admin(app: FastAPI) -> Admin:
     admin.add_view(EnterpriseAdmin)
     admin.add_view(DriverAdmin)
     admin.add_view(VehicleDriverAssignmentAdmin)
-    admin.add_view(ManagerAdmin)
+    admin.add_view(UserAdmin)
 
     return admin
 

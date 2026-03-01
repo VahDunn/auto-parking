@@ -3,11 +3,11 @@ import secrets
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 
-from auto_parking.api.schemas.manager import ManagerFilter
+from auto_parking.api.schemas.user import UserFilter
 from auto_parking.core.config import settings
 from auto_parking.core.security.jwt import create_access_token
 from auto_parking.core.security.passwords import verify_password
-from auto_parking.deps.services import dep_manager_service
+from auto_parking.deps.services import dep_user_service
 
 router = APIRouter()
 
@@ -26,40 +26,28 @@ class TokenResponse(BaseModel):
 async def login(
     data: LoginRequest,
     response: Response,
-    manager_service=dep_manager_service,
+    user_service=dep_user_service,
 ):
     if secrets.compare_digest(data.username, settings.test_admin_login) and secrets.compare_digest(
         data.password, settings.test_admin_pass
     ):
         token = create_access_token(actor_type="admin", actor_id=0)
-
         response.set_cookie(
-            key="access_token",
-            value=token,
-            httponly=True,
-            samesite="lax",
-            secure=False,
+            key="access_token", value=token, httponly=True, samesite="lax", secure=False
         )
-
         return TokenResponse(access_token=token)
 
-    managers = await manager_service.get(ManagerFilter(username=data.username))
-    manager = managers[0] if managers else None
+    users = await user_service.get(UserFilter(username=data.username))
+    user = users[0] if users else None
 
-    if not manager or not verify_password(data.password, manager.password_hash):
+    if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Wrong login or password",
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Wrong login or password"
         )
 
-    token = create_access_token(actor_type="manager", actor_id=manager.id)
+    token = create_access_token(actor_type=user.role.value, actor_id=user.id)
 
     response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        samesite="lax",
-        secure=False,
+        key="access_token", value=token, httponly=True, samesite="lax", secure=False
     )
-
     return TokenResponse(access_token=token)

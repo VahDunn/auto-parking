@@ -45,5 +45,41 @@ class VehicleRepository:
 
         self.db.add(vehicle)
         await self.db.flush()
-        await self.db.commit()
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+        await self.db.refresh(vehicle)
+        return await self.get_by_id(vehicle.id)  # type: ignore[return-value]
+
+    async def update(self, vehicle_id: int, data: dict) -> Vehicle | None:
+        vehicle = await self.get_by_id(vehicle_id)
+        if not vehicle:
+            return None
+
+        for k, v in data.items():
+            setattr(vehicle, k, v)
+
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        await self.db.refresh(vehicle)
         return vehicle
+
+    async def delete(self, vehicle_id: int) -> bool:
+        vehicle = await self.get_by_id(vehicle_id)
+        if not vehicle:
+            return False
+
+        await self.db.delete(vehicle)
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        return True

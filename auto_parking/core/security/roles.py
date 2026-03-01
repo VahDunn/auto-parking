@@ -6,12 +6,12 @@ get_current_actor_dep = Depends(get_current_actor)
 
 
 def require_admin(actor: Actor = get_current_actor_dep) -> Actor:
-    if actor.type != "admin":
+    if actor.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
     return actor
 
 
 def require_manager(actor: Actor = get_current_actor_dep) -> Actor:
-    if actor.type != "manager":
+    if actor.role != "manager":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Manager only")
     return actor

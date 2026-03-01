@@ -7,7 +7,7 @@ from auto_parking.db.models.base import BaseORM
 
 if TYPE_CHECKING:
     from auto_parking.db.models.driver import Driver
-    from auto_parking.db.models.manager import Manager
+    from auto_parking.db.models.user import User
     from auto_parking.db.models.vehicle import Vehicle
 
 
@@ -22,8 +22,8 @@ class Enterprise(BaseORM):
         back_populates="enterprise", cascade="save-update, merge", lazy="selectin"
     )
 
-    managers: Mapped[list["Manager"]] = relationship(
-        secondary="manager_enterprise",
+    users: Mapped[list["User"]] = relationship(
+        secondary="user_enterprise",
         back_populates="enterprises",
         lazy="selectin",
     )
@@ -35,12 +35,12 @@ class Enterprise(BaseORM):
         return f"{self.name}"
 
 
-manager_enterprise = sa.Table(
-    "manager_enterprise",
+user_enterprise = sa.Table(
+    "user_enterprise",
     BaseORM.metadata,
-    sa.Column("manager_id", sa.ForeignKey("manager.id", ondelete="CASCADE"), primary_key=True),
+    sa.Column("user_id", sa.ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
     sa.Column(
         "enterprise_id", sa.ForeignKey("enterprise.id", ondelete="CASCADE"), primary_key=True
     ),
-    sa.UniqueConstraint("manager_id", "enterprise_id", name="uq_manager_enterprise"),
+    sa.UniqueConstraint("user_id", "enterprise_id", name="uq_user_enterprise"),
 )

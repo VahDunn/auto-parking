@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
 
-class ManagerFilter(BaseModel):
+class UserFilter(BaseModel):
     ids: list[int] = Field(default_factory=list)
     username: str = Field(default_factory=str)

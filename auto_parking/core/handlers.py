@@ -1,7 +1,9 @@
 from collections.abc import Callable
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 from auto_parking.core.errors import (
     AppError,
@@ -39,11 +41,27 @@ async def conflict_handler(_: Request, exc: ConflictError):
     )
 
 
+async def validation_error_handler(_: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": exc.errors()},
+    )
+
+
+async def integrity_error_handler(_: Request, exc: IntegrityError):
+    return JSONResponse(
+        status_code=409,
+        content={"message": "Conflict"},
+    )
+
+
 EXCEPTION_HANDLERS: list[tuple[type[Exception], Callable]] = [
     (AppError, app_error_handler),
     (NotFoundError, not_found_handler),
     (ForbiddenError, forbidden_handler),
     (ConflictError, conflict_handler),
+    (RequestValidationError, validation_error_handler),
+    (IntegrityError, integrity_error_handler),
 ]
 
 

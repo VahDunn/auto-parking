@@ -52,3 +52,16 @@ class VehicleCreate(BaseModel):
     model_id: int
     enterprise_id: int
 
+
+class VehicleUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    price: int | None = None
+    mileage: int | None = None
+    vehicle_number: str | None = None
+    owners_count: int | None = None
+    accident_number: int | None = None
+    manufacture_year: int | None = None
+    model_id: int | None = None
+    enterprise_id: int | None = None
+    active_driver_id: int | None = None
