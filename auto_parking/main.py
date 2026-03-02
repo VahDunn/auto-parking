@@ -55,7 +55,6 @@ def create_app() -> FastAPI:
     )
     register_exception_handlers(main_app)
     setup_admin(main_app)
-    # register_exception_handlers(main_app)
     main_app.include_router(api_router, prefix="/api")
     main_app.add_middleware(AdminBasicAuthMiddleware)
     return main_app

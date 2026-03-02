@@ -17,6 +17,13 @@ from auto_parking.main import app as fastapi_app
 pytestmark = pytest.mark.asyncio
 
 
+def show_response(r):
+    print("\n--- RESPONSE ---")
+    print("STATUS:", r.status_code)
+    print("BODY:", r.json())
+    print("---------------\n")
+
+
 class FakeActor:
     def __init__(self, role: UserRole, id: int = 1):
         self.role = role
@@ -65,8 +72,8 @@ def make_enterprise_service_mock():
 
 async def test_all_required_status_codes(client, overrides):
     fastapi_app.dependency_overrides.clear()
-    r = await client.get("/api/vehicles")
-    assert r.status_code == 401
+    req = await client.get("/api/vehicles")
+    assert req.status_code == 401
     actor_manager = FakeActor(UserRole.manager, id=1)
 
     async def _guard_manager():
@@ -89,14 +96,14 @@ async def test_all_required_status_codes(client, overrides):
     overrides[dep_callable(dep_vehicle_service)] = _dep_vehicle_service
     overrides[dep_callable(dep_enterprise_service)] = _dep_enterprise_service
     overrides[require_manager_or_higher] = _guard_403
-    r = await client.get("/api/vehicles")
-    assert r.status_code == 403
+    req = await client.get("/api/vehicles")
+    assert req.status_code == 403
 
     overrides[require_manager_or_higher] = _guard_manager
 
     vehicle_svc.get_by_id.return_value = None
-    r = await client.get("/api/vehicles/999")
-    assert r.status_code == 404
+    req = await client.get("/api/vehicles/999")
+    assert req.status_code == 404
 
     created_dict = {
         "id": 5,
@@ -132,15 +139,46 @@ async def test_all_required_status_codes(client, overrides):
         "enterprise_id": 4,
     }
 
-    r = await client.post("/api/vehicles", json=post_payload)
-    assert r.status_code == 201
+    req = await client.post("/api/vehicles", json=post_payload)
+    assert req.status_code == 201
 
-    r = await client.patch("/api/vehicles/5", json={"price": 999})
-    assert r.status_code == 200
+    req = await client.patch("/api/vehicles/5", json={"price": 999})
+    assert req.status_code == 200
 
-    r = await client.delete("/api/vehicles/5")
-    assert r.status_code == 204
+    req = await client.delete("/api/vehicles/5")
+    assert req.status_code == 204
 
     enterprise_svc.delete.side_effect = ConflictError("Enterprise is visible to other managers")
-    r = await client.delete("/api/enterprises/4")
-    assert r.status_code == 409
+    req = await client.delete("/api/enterprises/4")
+    assert req.status_code == 409
+
+    req = await client.post(
+        "/api/vehicles",
+        json={
+            "price": 100,
+            "mileage": 10,
+            "vehicle_number": "А123ВС77",
+            "owners_count": 1,
+            "accident_number": 0,
+            "manufacture_year": 2020,
+            "model_id": 1,
+        },
+    )
+    show_response(req)
+    assert req.status_code == 400
+
+    req = await client.post(
+        "/api/vehicles",
+        json={
+            "price": "abc",
+            "mileage": 10,
+            "vehicle_number": "А123ВС77",
+            "owners_count": 1,
+            "accident_number": 0,
+            "manufacture_year": 2020,
+            "model_id": 1,
+            "enterprise_id": 4,
+        },
+    )
+    show_response(req)
+    assert req.status_code == 400

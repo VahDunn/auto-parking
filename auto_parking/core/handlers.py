@@ -15,7 +15,7 @@ from auto_parking.core.errors import (
 
 async def app_error_handler(_: Request, exc: AppError):
     return JSONResponse(
-        status_code=400,
+        status_code=500,
         content={"message": str(exc)},
     )
 
