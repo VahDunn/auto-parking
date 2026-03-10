@@ -1,14 +1,17 @@
 import re
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-PLATE_RE = re.compile(r'^(?i:[АВЕКМНОРСТУХ])\d{3}(?i:[АВЕКМНОРСТУХ]){2}\d{2,3}$')
+PLATE_RE = re.compile(r"^(?i:[АВЕКМНОРСТУХ])\d{3}(?i:[АВЕКМНОРСТУХ]){2}\d{2,3}$")
+
 
 def is_valid_plate(s: str) -> bool:
     return bool(PLATE_RE.fullmatch(s.strip()))
 
+
 class VehicleOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id: int
     price: int
     mileage: int
@@ -40,9 +43,13 @@ class VehicleFilter(BaseModel):
     id: list[int] | None = None
     enterprise_ids: list[int] | None = None
     driver_id: int | None = None
+    limit: int = Field(default=50, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
 
 class VehicleCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     price: int
     mileage: int
     vehicle_number: str

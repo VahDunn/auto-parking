@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from auto_parking.api.schemas.vehicle import VehicleCreate, VehicleFilter, VehicleOut, VehicleUpdate
 from auto_parking.deps.access import require_manager_or_higher
@@ -35,6 +35,8 @@ async def get_vehicles(
     id: list[int] | None = dep_query,
     enterprise_ids: list[int] | None = dep_query,
     driver_id: int | None = dep_query,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     _actor=dep_actor_guard,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
@@ -44,7 +46,13 @@ async def get_vehicles(
         return []
 
     return await service.get(
-        VehicleFilter(id=id, enterprise_ids=enterprise_ids, driver_id=driver_id)
+        VehicleFilter(
+            id=id,
+            enterprise_ids=enterprise_ids,
+            driver_id=driver_id,
+            limit=limit,
+            offset=offset,
+        )
     )
 
 
