@@ -181,7 +181,7 @@ def generate(
     ] = None,
 ) -> None:
     if not enterprise_ids:
-        raise
+        raise ValueError("Укажите enterprise id")
     asyncio.run(
         generate_vehicles(
             total_count=count,

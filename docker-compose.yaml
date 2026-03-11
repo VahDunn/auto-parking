@@ -10,11 +10,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -36,7 +36,7 @@ services:
       TEST_ADMIN_PASS: ${TEST_ADMIN_PASS}
     command: uvicorn auto_parking.main:app --host 0.0.0.0 --port 8000
     ports:
-      - "8000:8000"
+      - "8001:8000"
 
 volumes:
   db_data:
