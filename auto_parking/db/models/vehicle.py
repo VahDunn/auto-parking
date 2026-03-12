@@ -56,6 +56,8 @@ class Vehicle(BaseORM):
         back_populates="vehicles",
     )
 
+    color: Mapped[str] = mapped_column(sa.String)
+
     def __str__(self):
         return f"{self.vehicle_number}"
 

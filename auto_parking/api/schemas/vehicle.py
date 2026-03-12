@@ -20,6 +20,7 @@ class VehicleOut(BaseModel):
     accident_number: int
     manufacture_year: int
     model_id: int
+    color: str
     enterprise_id: int
     drivers: list[int] = Field(default_factory=list)
     active_driver_id: int = -1
@@ -45,6 +46,7 @@ class VehicleFilter(BaseModel):
     driver_id: int | None = None
     limit: int = Field(default=50, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
+    sort_by: str | None = None
 
 
 class VehicleCreate(BaseModel):
@@ -72,3 +74,4 @@ class VehicleUpdate(BaseModel):
     model_id: int | None = None
     enterprise_id: int | None = None
     active_driver_id: int | None = None
+    color: str | None = None

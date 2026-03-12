@@ -37,6 +37,7 @@ async def get_vehicles(
     driver_id: int | None = dep_query,
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    sort_by: str | None = Query(None),
     _actor=dep_actor_guard,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
@@ -52,6 +53,7 @@ async def get_vehicles(
             driver_id=driver_id,
             limit=limit,
             offset=offset,
+            sort_by=sort_by,
         )
     )
 

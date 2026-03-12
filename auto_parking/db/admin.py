@@ -20,12 +20,14 @@ class VehicleAdmin(ModelView, model=Vehicle):
         Vehicle.id,
         Vehicle.vehicle_number,
         Vehicle.model,
-        Driver.enterprise,
+        Vehicle.enterprise,
+        Vehicle.color,
     ]
     column_details_list = column_list
     column_searchable_list = [
         Vehicle.vehicle_number,
         Vehicle.id,
+        Vehicle.color,
     ]
     form_excluded_columns = ["created_at", "drivers"]
     name = "Vehicle"
@@ -112,7 +114,6 @@ class UserAdmin(ModelView, model=User):
     column_list = [User.id, User.username]
     column_searchable_list = [User.username, User.id]
     column_details_list = [User.id, User.username, User.enterprises]
-
     form_excluded_columns = ["created_at", "password_hash"]
 
     async def scaffold_form(self, rules=None):
