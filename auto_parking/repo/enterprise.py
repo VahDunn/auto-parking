@@ -34,7 +34,7 @@ class EnterpriseRepository:
                     load_only(Driver.id, Driver.enterprise_id),
                 ),
                 selectinload(Enterprise.users).options(
-                    load_only(User.id),
+                    load_only(User.id, User.role),
                 ),
             )
             .order_by(Enterprise.id)

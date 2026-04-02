@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.middleware.cors import CORSMiddleware
 
 from auto_parking.api.router import api_router
 from auto_parking.core.handlers import register_exception_handlers
@@ -52,6 +53,15 @@ def create_app() -> FastAPI:
         title="Receptor API",
         version="1.0.0",
         lifespan=lifespan,
+    )
+    main_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:8080",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     register_exception_handlers(main_app)
     setup_admin(main_app)
