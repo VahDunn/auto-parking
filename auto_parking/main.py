@@ -50,7 +50,7 @@ def setup_logger(log_level="INFO"):
 
 def create_app() -> FastAPI:
     main_app = FastAPI(
-        title="Receptor API",
+        title="Auto- API",
         version="1.0.0",
         lifespan=lifespan,
     )
