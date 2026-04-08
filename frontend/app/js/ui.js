@@ -22,6 +22,7 @@ function renderEnterpriseInfo(enterprise) {
         <div><strong>ID:</strong> ${enterprise.id}</div>
         <div><strong>Название:</strong> ${enterprise.name}</div>
         <div><strong>Населённый пункт:</strong> ${enterprise.settlement}</div>
+        <div><strong>Таймзона:</strong> ${enterprise.timezone || "UTC"}</div>
         <div><strong>Менеджеры:</strong> ${enterprise.managers?.join(", ") || "—"}</div>
         <div><strong>Машины:</strong> ${enterprise.vehicles?.length || 0}</div>
     `;
@@ -81,7 +82,7 @@ function renderVehiclesTable(vehicles, modelsMap, onEdit, onDelete) {
     if (!vehicles || vehicles.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-muted">У этого предприятия нет машин</td>
+                <td colspan="8" class="text-muted">У этого предприятия нет машин</td>
             </tr>
         `;
         return;
@@ -98,6 +99,7 @@ function renderVehiclesTable(vehicles, modelsMap, onEdit, onDelete) {
             <td>${vehicle.manufacture_year}</td>
             <td>${vehicle.mileage}</td>
             <td>${vehicle.price}</td>
+            <td>${formatDateTime(vehicle.purchased_at_enterprise)}</td>
             <td>
                 <div class="d-flex gap-2">
                     <button class="btn btn-sm btn-primary edit-btn">Редактировать</button>
@@ -129,6 +131,9 @@ function fillVehicleForm(vehicle) {
     document.getElementById("manufactureYear").value = vehicle.manufacture_year ?? "";
     document.getElementById("modelId").value = vehicle.model_id ?? "";
     document.getElementById("color").value = vehicle.color ?? "";
+    document.getElementById("purchasedAt").value = toDateTimeLocalValue(
+        vehicle.purchased_at_enterprise || vehicle.purchased_at_utc
+    );
     document.getElementById("vehicleFormTitle").textContent = "Редактирование машины";
 }
 
@@ -138,4 +143,18 @@ function showVehicleForm() {
 
 function hideVehicleForm() {
     document.getElementById("vehicleFormCard").classList.add("d-none");
+}
+
+function formatDateTime(value) {
+    if (!value) return "—";
+    return new Date(value).toLocaleString("ru-RU");
+}
+
+function toDateTimeLocalValue(value) {
+    if (!value) return "";
+
+    const d = new Date(value);
+    const pad = (n) => String(n).padStart(2, "0");
+
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

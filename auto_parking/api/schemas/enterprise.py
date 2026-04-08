@@ -8,6 +8,7 @@ class EnterpriseOut(BaseModel):
     vehicles: list[int] = Field(default_factory=list)
     drivers: list[int] = Field(default_factory=list)
     managers: list[int] = Field(default_factory=list)
+    timezone: str | None = None  # 👈 вот это
 
 
 class EnterpriseFilter(BaseModel):

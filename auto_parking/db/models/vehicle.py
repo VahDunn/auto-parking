@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -57,6 +58,11 @@ class Vehicle(BaseORM):
     )
 
     color: Mapped[str] = mapped_column(sa.String)
+
+    purchased_at_utc: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True),
+        nullable=True,
+    )
 
     def __str__(self):
         return f"{self.vehicle_number}"

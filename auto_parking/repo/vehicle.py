@@ -5,16 +5,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
 
 from auto_parking.api.schemas.vehicle import VehicleFilter
-from auto_parking.db.models import Driver, Vehicle
+from auto_parking.db.models import Driver, Enterprise, Vehicle
 
 
 class VehicleRepository:
     def __init__(self, db: AsyncSession):
-        self.db = db
+        self.db: AsyncSession = db
 
     async def get(self, filter_obj: VehicleFilter) -> Sequence[Vehicle]:
         stmt = select(Vehicle).options(
             selectinload(Vehicle.drivers).options(load_only(Driver.id)),
+            selectinload(Vehicle.enterprise).options(load_only(Enterprise.id, Enterprise.timezone)),
         )
 
         if filter_obj.id:
@@ -61,8 +62,9 @@ class VehicleRepository:
             select(Vehicle)
             .where(Vehicle.id == vehicle_id)
             .options(
-                selectinload(Vehicle.drivers).options(
-                    load_only(Driver.id),
+                selectinload(Vehicle.drivers).options(load_only(Driver.id)),
+                selectinload(Vehicle.enterprise).options(
+                    load_only(Enterprise.id, Enterprise.timezone)
                 ),
             )
         )

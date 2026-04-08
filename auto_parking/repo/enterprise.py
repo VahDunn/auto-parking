@@ -23,7 +23,12 @@ class EnterpriseRepository:
         stmt = (
             select(Enterprise)
             .options(
-                load_only(Enterprise.id, Enterprise.name, Enterprise.settlement),
+                load_only(
+                    Enterprise.id,
+                    Enterprise.name,
+                    Enterprise.settlement,
+                    Enterprise.timezone,
+                ),
                 selectinload(Enterprise.vehicles).options(
                     load_only(Vehicle.id, Vehicle.enterprise_id, Vehicle.active_driver_id),
                     selectinload(Vehicle.drivers).options(
@@ -51,7 +56,12 @@ class EnterpriseRepository:
             select(Enterprise)
             .where(Enterprise.id == enterprise_id)
             .options(
-                load_only(Enterprise.id, Enterprise.name, Enterprise.settlement),
+                load_only(
+                    Enterprise.id,
+                    Enterprise.name,
+                    Enterprise.settlement,
+                    Enterprise.timezone,
+                ),
                 selectinload(Enterprise.vehicles).options(
                     load_only(Vehicle.id, Vehicle.enterprise_id, Vehicle.active_driver_id),
                     selectinload(Vehicle.drivers).options(
@@ -61,7 +71,9 @@ class EnterpriseRepository:
                 selectinload(Enterprise.drivers).options(
                     load_only(Driver.id, Driver.enterprise_id),
                 ),
-                selectinload(Enterprise.users).options(load_only(User.id, User.role)),
+                selectinload(Enterprise.users).options(
+                    load_only(User.id, User.role),
+                ),
             )
         )
         return result.scalar_one_or_none()

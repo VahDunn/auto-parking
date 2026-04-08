@@ -24,7 +24,7 @@ async function loadVehicleModels() {
 }
 
 async function getVehiclesByEnterpriseRequest(enterpriseId) {
-    return await apiRequest(`/vehicles?enterprise_ids=${enterpriseId}`, {
+    return await apiRequest(`/vehicles?enterprise_ids=${enterpriseId}&sort_by=-id`, {
         method: "GET"
     });
 }
@@ -98,6 +98,7 @@ function startCreateVehicle() {
 
     clearMessage(vehicleMessage);
     resetVehicleForm();
+    document.getElementById("purchasedAt").value = toDateTimeLocalValue(new Date().toISOString());
     renderVehicleModelOptions(vehicleModels);
     showVehicleForm();
 }
@@ -230,6 +231,8 @@ vehicleForm.addEventListener("submit", async (e) => {
     }
 
     const vehicleId = document.getElementById("vehicleId").value.trim();
+    const colorValue = document.getElementById("color").value.trim();
+    const purchasedAtValue = document.getElementById("purchasedAt").value;
 
     const basePayload = {
         price: Number(document.getElementById("price").value),
@@ -239,10 +242,14 @@ vehicleForm.addEventListener("submit", async (e) => {
         accident_number: Number(document.getElementById("accidentNumber").value),
         manufacture_year: Number(document.getElementById("manufactureYear").value),
         model_id: Number(document.getElementById("modelId").value),
-        enterprise_id: Number(selectedEnterprise.id)
+        enterprise_id: Number(selectedEnterprise.id),
+        color: colorValue
     };
 
-    const colorValue = document.getElementById("color").value.trim();
+    if (purchasedAtValue) {
+        basePayload.purchased_at = new Date(purchasedAtValue).toISOString();
+    }
+
 
     try {
         if (vehicleId) {

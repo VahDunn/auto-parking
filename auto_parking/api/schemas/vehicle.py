@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -24,6 +25,10 @@ class VehicleOut(BaseModel):
     enterprise_id: int
     drivers: list[int] = Field(default_factory=list)
     active_driver_id: int = -1
+
+    purchased_at_utc: datetime | None = None
+    purchased_at_enterprise: datetime | None = None
+    enterprise_timezone: str = "UTC"
 
     @field_validator("drivers", mode="before")
     @classmethod
@@ -60,6 +65,15 @@ class VehicleCreate(BaseModel):
     manufacture_year: int
     model_id: int
     enterprise_id: int
+    color: str
+    purchased_at: datetime
+
+    @field_validator("purchased_at")
+    @classmethod
+    def validate_datetime(cls, v: datetime):
+        if v.tzinfo is None or v.utcoffset() is None:
+            raise ValueError("Datetime must be timezone-aware (with timezone)")
+        return v
 
 
 class VehicleUpdate(BaseModel):
@@ -75,3 +89,13 @@ class VehicleUpdate(BaseModel):
     enterprise_id: int | None = None
     active_driver_id: int | None = None
     color: str | None = None
+    purchased_at: datetime | None = None
+
+    @field_validator("purchased_at")
+    @classmethod
+    def validate_datetime(cls, v: datetime | None) -> datetime | None:
+        if v is None:
+            return v
+        if v.tzinfo is None or v.utcoffset() is None:
+            raise ValueError("Datetime must be timezone-aware (with timezone)")
+        return v

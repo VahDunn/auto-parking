@@ -60,4 +60,5 @@ class EnterpriseService:
             vehicles=[v.id for v in enterprise.vehicles],
             drivers=[d.id for d in enterprise.drivers],
             managers=managers,
+            timezone=enterprise.timezone,
         )

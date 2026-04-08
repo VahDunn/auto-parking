@@ -81,7 +81,8 @@ def register_listeners() -> None:
 
                     if vehicle is not None:
                         raise ValueError(
-                            "Нельзя менять предприятие водителя, пока он назначен активным водителем автомобиля."
+                            "Нельзя менять предприятие водителя,"
+                            " пока он назначен активным водителем автомобиля."
                         )
 
     @event.listens_for(Session, "before_flush")

@@ -3,7 +3,7 @@ name = "auto-parking"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Vladislav Morozov",email = "landaren11@gmail.com"}
+    { name = "Vladislav Morozov", email = "landaren11@gmail.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -45,7 +45,7 @@ extend-exclude = [".venv", "__pycache__", "build", "dist"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
-ignore = ["E501"]  # длину строки контролируем line-length, а не E501
+ignore = ["B008"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -53,3 +53,20 @@ indent-style = "space"
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]
+
+[tool.pyright]
+typeCheckingMode = 'standard'
+reportMissingImports = true
+exclude = [
+    '.*',
+    '.venv',
+    'venv',
+    'build',
+    'dist',
+    '**/node_modules',
+    '**/__pycache__',
+    'auto_parking/db/admin.py'
+]
+ignore = [
+    'tests/**',
+]

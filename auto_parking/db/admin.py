@@ -1,3 +1,6 @@
+# pyright: ignore
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from fastapi import FastAPI
 from sqladmin import Admin, ModelView
 from wtforms.fields.simple import PasswordField
@@ -22,6 +25,7 @@ class VehicleAdmin(ModelView, model=Vehicle):
         Vehicle.model,
         Vehicle.enterprise,
         Vehicle.color,
+        Vehicle.purchased_at_utc,
     ]
     column_details_list = column_list
     column_searchable_list = [
@@ -61,17 +65,36 @@ class EnterpriseAdmin(ModelView, model=Enterprise):
         Enterprise.id,
         Enterprise.name,
         Enterprise.settlement,
+        Enterprise.timezone,
         Enterprise.created_at,
     ]
     column_searchable_list = [
         Enterprise.name,
         Enterprise.settlement,
         Enterprise.id,
+        Enterprise.timezone,
     ]
-    form_excluded_columns = ["created_at"]
+    form_columns = [
+        Enterprise.name,
+        Enterprise.settlement,
+        Enterprise.timezone,
+    ]
     name = "Enterprise"
     name_plural = "Enterprises"
     icon = "fa-solid fa-building"
+
+    async def on_model_change(self, data, model, is_created, request):
+        tz = data.get("timezone")
+
+        if tz == "":
+            model.timezone = None
+        elif tz:
+            try:
+                ZoneInfo(tz)
+            except ZoneInfoNotFoundError:
+                raise ValueError("Invalid timezone")
+
+        return await super().on_model_change(data, model, is_created, request)
 
 
 class DriverAdmin(ModelView, model=Driver):
@@ -144,44 +167,9 @@ def setup_admin(app: FastAPI) -> Admin:
 
     admin.add_view(VehicleAdmin)
     admin.add_view(VehicleModelAdmin)
-
     admin.add_view(EnterpriseAdmin)
     admin.add_view(DriverAdmin)
     admin.add_view(VehicleDriverAssignmentAdmin)
     admin.add_view(UserAdmin)
 
     return admin
-
-
-# Отладочная админка для всех моделей подряд со всеми колонками подряд
-# from fastapi import FastAPI
-# from sqladmin import Admin, ModelView
-# from sqlalchemy import inspect
-#
-# from auto_parking.db.engine import engine
-# from auto_parking.db.models import ADMIN_MODELS
-#
-#
-# def setup_admin(app: FastAPI) -> Admin:
-#     admin = Admin(app, engine)
-#
-#     for model_cls in ADMIN_MODELS:
-#         mapper = inspect(model_cls)
-#
-#         cols = [c.key for c in mapper.columns]
-#
-#         view_cls = type(
-#             f"{model_cls.__name__}Admin",
-#             (ModelView,),
-#             {
-#                 "name": model_cls.__name__,
-#                 "name_plural": f"{model_cls.__name__}s",
-#                 "column_list": cols,
-#                 "form_columns": cols,
-#             },
-#             model=model_cls,
-#         )
-#
-#         admin.add_view(view_cls)
-#
-#     return admin

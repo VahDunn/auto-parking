@@ -27,6 +27,7 @@ class Enterprise(BaseORM):
         back_populates="enterprises",
         lazy="selectin",
     )
+    timezone: Mapped[str | None] = mapped_column(sa.String, nullable=True)
 
     def __str__(self):
         return f"{self.name}"
