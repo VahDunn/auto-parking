@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings  # pyright: ignore[reportMissingImports]
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 ENV_FILE = BASE_DIR / ".env"
@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = Field(alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_access_ttl_minutes: int = Field(default=30, alias="JWT_ACCESS_TTL_MINUTES")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     model_config = {
         "env_file": str(ENV_FILE),
         "env_file_encoding": "utf-8",
