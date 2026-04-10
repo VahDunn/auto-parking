@@ -24,8 +24,6 @@ class VehicleService:
 
     async def create(self, vehicle_payload: "VehicleCreate") -> VehicleOut:
         data = vehicle_payload.model_dump()
-
-        # 👉 забираем и конвертируем время
         purchased_at = data.pop("purchased_at")
         data["purchased_at_utc"] = to_utc(purchased_at)
 
@@ -35,7 +33,6 @@ class VehicleService:
     async def update(self, id: int, payload: "VehicleUpdate") -> VehicleOut | None:
         data = payload.model_dump(exclude_unset=True)
 
-        # 👉 если обновляют время
         if "purchased_at" in data:
             data["purchased_at_utc"] = to_utc(data.pop("purchased_at"))
 
