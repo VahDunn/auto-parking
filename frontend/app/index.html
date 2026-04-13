@@ -13,7 +13,7 @@
 <body class="bg-light">
 <div class="container py-5">
     <div class="row justify-content-center">
-        <div class="col-12 col-lg-10">
+        <div class="col-12 col-xl-11">
 
             <div class="card shadow-sm mb-4" id="loginCard">
                 <div class="card-body p-4">
@@ -68,14 +68,27 @@
 
             <div class="card shadow-sm d-none mb-4" id="vehicleCard">
                 <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                         <div>
                             <h2 class="card-title mb-0">Машины предприятия</h2>
                             <div id="vehicleEnterpriseTitle" class="text-muted small mt-1"></div>
                         </div>
-                        <button class="btn btn-success btn-sm" id="showCreateFormBtn">
-                            Добавить машину
-                        </button>
+
+                        <div class="d-flex gap-2 align-items-center flex-wrap">
+                            <select
+                                    id="trackFormat"
+                                    class="form-select form-select-sm"
+                                    style="width: 140px;"
+                                    aria-label="Формат трека"
+                            >
+                                <option value="geojson" selected>GeoJSON</option>
+                                <option value="json">JSON</option>
+                            </select>
+
+                            <button class="btn btn-success btn-sm" id="showCreateFormBtn">
+                                Добавить машину
+                            </button>
+                        </div>
                     </div>
 
                     <div id="vehicleMessage"></div>
@@ -126,11 +139,11 @@
                                         <label for="color" class="form-label">Цвет</label>
                                         <input type="text" class="form-control" id="color"/>
                                     </div>
+
                                     <div class="col-md-6">
                                         <label for="purchasedAt" class="form-label">Дата и время покупки</label>
                                         <input type="datetime-local" class="form-control" id="purchasedAt" required/>
                                     </div>
-
                                 </div>
 
                                 <div class="d-flex gap-2 mt-4">
@@ -145,26 +158,43 @@
                         </div>
                     </div>
 
-                    <div class="table-responsive">
-                        <table class="table table-striped align-middle">
-                            <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Номер</th>
-                                <th>Модель</th>
-                                <th>Год</th>
-                                <th>Пробег</th>
-                                <th>Цена</th>
-                                <th>Дата покупки</th>
-                                <th>Действия</th>
-                            </tr>
-                            </thead>
-                            <tbody id="vehicleTableBody">
-                            <tr>
-                                <td colspan="7" class="text-muted">Выберите предприятие</td>
-                            </tr>
-                            </tbody>
-                        </table>
+                    <div class="row g-4 align-items-start">
+                        <div class="col-lg-7">
+                            <div class="table-responsive">
+                                <table class="table table-striped align-middle">
+                                    <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Номер</th>
+                                        <th>Модель</th>
+                                        <th>Год</th>
+                                        <th>Пробег</th>
+                                        <th>Цена</th>
+                                        <th>Дата покупки</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="vehicleTableBody">
+                                    <tr>
+                                        <td colspan="8" class="text-muted">Выберите предприятие</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-5">
+                            <div id="trackContainer" class="card border-0 bg-body-tertiary d-none">
+                                <div class="card-body">
+                                    <h5 id="trackTitle" class="mb-3">Трек</h5>
+                                    <pre
+                                            id="trackOutput"
+                                            class="mb-0"
+                                            style="max-height: 420px; overflow:auto; white-space: pre-wrap;"
+                                    ></pre>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

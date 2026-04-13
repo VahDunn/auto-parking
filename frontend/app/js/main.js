@@ -29,6 +29,33 @@ async function getVehiclesByEnterpriseRequest(enterpriseId) {
     });
 }
 
+async function handleShowTrack(vehicle) {
+    try {
+        clearMessage(vehicleMessage);
+
+        const dateFrom = "2026-04-10T00:00:00+03:00";
+        const dateTo = "2026-04-10T23:59:59+03:00";
+        const format = document.getElementById("trackFormat").value;
+
+        const track = await getVehicleTrackRequest(
+            vehicle.id,
+            dateFrom,
+            dateTo,
+            format
+        );
+
+        const container = document.getElementById("trackContainer");
+        const output = document.getElementById("trackOutput");
+        const title = document.getElementById("trackTitle");
+
+        title.textContent = `Трек машины ${vehicle.vehicle_number} (${format})`;
+        container.classList.remove("d-none");
+        output.textContent = JSON.stringify(track, null, 2);
+    } catch (error) {
+        showMessage(vehicleMessage, "danger", error.message);
+    }
+}
+
 async function loadEnterprises() {
     clearMessage(enterpriseMessage);
     renderEnterpriseInfo(null);
@@ -67,7 +94,8 @@ async function loadVehiclesForEnterprise(enterprise) {
             vehicles,
             vehicleModelsMap,
             startEditVehicle,
-            handleDeleteVehicle
+            handleDeleteVehicle,
+            handleShowTrack
         );
     } catch (error) {
         showMessage(vehicleMessage, "danger", error.message);
@@ -275,3 +303,4 @@ vehicleForm.addEventListener("submit", async (e) => {
         showMessage(vehicleMessage, "danger", error.message);
     }
 });
+

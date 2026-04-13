@@ -75,7 +75,7 @@ function renderVehicleModelOptions(models, selectedId = null) {
     });
 }
 
-function renderVehiclesTable(vehicles, modelsMap, onEdit, onDelete) {
+function renderVehiclesTable(vehicles, modelsMap, onEdit, onDelete, onTrack) {
     const tbody = document.getElementById("vehicleTableBody");
     tbody.innerHTML = "";
 
@@ -100,16 +100,18 @@ function renderVehiclesTable(vehicles, modelsMap, onEdit, onDelete) {
             <td>${vehicle.mileage}</td>
             <td>${vehicle.price}</td>
             <td>${formatDateTime(vehicle.purchased_at_enterprise)}</td>
-            <td>
+           <td>
                 <div class="d-flex gap-2">
                     <button class="btn btn-sm btn-primary edit-btn">Редактировать</button>
                     <button class="btn btn-sm btn-danger delete-btn">Удалить</button>
+                    <button class="btn btn-sm btn-outline-secondary track-btn">Трек</button>
                 </div>
-            </td>
+           </td>
         `;
 
         tr.querySelector(".edit-btn").addEventListener("click", () => onEdit(vehicle));
         tr.querySelector(".delete-btn").addEventListener("click", () => onDelete(vehicle));
+        tr.querySelector(".track-btn").addEventListener("click", () => onTrack(vehicle));
 
         tbody.appendChild(tr);
     });

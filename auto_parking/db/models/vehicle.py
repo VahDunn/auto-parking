@@ -8,7 +8,7 @@ from auto_parking.db.models.base import BaseORM
 from auto_parking.db.models.vehicle_model import VehicleModel
 
 if TYPE_CHECKING:
-    from auto_parking.db.models import Driver, Enterprise
+    from auto_parking.db.models import Driver, Enterprise, VehicleGpsPoint
 
 
 class Vehicle(BaseORM):
@@ -62,6 +62,12 @@ class Vehicle(BaseORM):
     purchased_at_utc: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True),
         nullable=True,
+    )
+
+    points: Mapped[list["VehicleGpsPoint"]] = relationship(
+        "VehicleGpsPoint",
+        lazy="noload",
+        back_populates="vehicle",
     )
 
     def __str__(self):

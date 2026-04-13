@@ -1,11 +1,19 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from auto_parking.api.schemas.vehicle import VehicleCreate, VehicleFilter, VehicleOut, VehicleUpdate
+from auto_parking.api.schemas.vehicle_track import (
+    GeoJSONFeatureCollection,
+    TrackFormat,
+    VehicleTrackPointOut,
+)
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.commons import dep_query
-from auto_parking.deps.services import dep_vehicle_service
+from auto_parking.deps.services import dep_vehicle_service, dep_vehicle_track_service
 from auto_parking.deps.visibility import get_visible_enterprise_ids
 from auto_parking.service.vehicle import VehicleService
+from auto_parking.service.vehicle_track import VehicleTrackService
 
 router = APIRouter()
 
@@ -23,6 +31,14 @@ def _apply_enterprise_visibility(
 
 def _ensure_vehicle_visible(vehicle: VehicleOut, visible_enterprise_ids: set[int] | None) -> None:
     if visible_enterprise_ids is not None and vehicle.enterprise_id not in visible_enterprise_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
+def _ensure_enterprise_visible(
+    enterprise_id: int,
+    visible_enterprise_ids: set[int] | None,
+) -> None:
+    if visible_enterprise_ids is not None and enterprise_id not in visible_enterprise_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
 
@@ -128,3 +144,45 @@ async def delete_vehicle(
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
     return
+
+
+@router.get(
+    "/{id}/track",
+    response_model=list[VehicleTrackPointOut] | GeoJSONFeatureCollection,
+)
+async def get_vehicle_track(
+    id: int,
+    date_from: datetime = Query(..., description="Timezone-aware datetime"),
+    date_to: datetime = Query(..., description="Timezone-aware datetime"),
+    format: TrackFormat = Query(TrackFormat.json),
+    _actor=dep_actor_guard,
+    visible_enterprise_ids: set[int] | None = dep_visible_ids,
+    service: VehicleTrackService = dep_vehicle_track_service,
+):
+    if date_to < date_from:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="date_to must be >= date_from",
+        )
+
+    try:
+        result, vehicle = await service.get_track(
+            vehicle_id=id,
+            date_from=date_from,
+            date_to=date_to,
+            format=format,
+        )
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+
+    if vehicle is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vehicle not found",
+        )
+
+    _ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
+    return result

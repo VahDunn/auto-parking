@@ -5,6 +5,7 @@ from auto_parking.db.models.enterprise import Enterprise as Enterprise
 from auto_parking.db.models.enterprise import user_enterprise as user_enterprise
 from auto_parking.db.models.user import User as User
 from auto_parking.db.models.vehicle import Vehicle as Vehicle
+from auto_parking.db.models.vehicle_gps_point import VehicleGpsPoint as VehicleGpsPoint
 from auto_parking.db.models.vehicle_model import VehicleModel as VehicleModel
 from auto_parking.db.models.vehicle_to_driver import (
     VehicleDriverAssignment as VehicleDriverAssignment,

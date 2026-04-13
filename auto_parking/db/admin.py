@@ -92,7 +92,7 @@ class EnterpriseAdmin(ModelView, model=Enterprise):
             try:
                 ZoneInfo(tz)
             except ZoneInfoNotFoundError:
-                raise ValueError("Invalid timezone")
+                raise ValueError("Invalid timezone") from None
 
         return await super().on_model_change(data, model, is_created, request)
 

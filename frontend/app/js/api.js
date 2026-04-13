@@ -67,3 +67,15 @@ async function deleteVehicleRequest(id) {
         method: "DELETE"
     });
 }
+
+async function getVehicleTrackRequest(id, dateFrom, dateTo, format = "geojson") {
+    const params = new URLSearchParams({
+        date_from: dateFrom,
+        date_to: dateTo,
+        format
+    });
+
+    return await apiRequest(`/vehicles/${id}/track?${params.toString()}`, {
+        method: "GET"
+    });
+}
