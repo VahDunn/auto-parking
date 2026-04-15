@@ -17,24 +17,25 @@ let selectedEnterpriseVehicles = [];
 let vehicleModels = [];
 let vehicleModelsMap = new Map();
 
+let vehiclePage = 1;
+const vehiclePageSize = 10;
+
 async function loadVehicleModels() {
     vehicleModels = await getVehicleModelsRequest();
     vehicleModelsMap = new Map(vehicleModels.map(model => [model.id, model]));
     renderVehicleModelOptions(vehicleModels);
 }
 
-async function getVehiclesByEnterpriseRequest(enterpriseId) {
-    return await apiRequest(`/vehicles?enterprise_ids=${enterpriseId}&sort_by=-id`, {
-        method: "GET"
-    });
-}
-
 async function handleShowTrack(vehicle) {
     try {
         clearMessage(vehicleMessage);
 
-        const dateFrom = "2026-04-10T00:00:00+03:00";
-        const dateTo = "2026-04-10T23:59:59+03:00";
+        const now = new Date();
+        const dateTo = now.toISOString();
+
+        const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const dateFrom = dayAgo.toISOString();
+
         const format = document.getElementById("trackFormat").value;
 
         const track = await getVehicleTrackRequest(
@@ -48,7 +49,7 @@ async function handleShowTrack(vehicle) {
         const output = document.getElementById("trackOutput");
         const title = document.getElementById("trackTitle");
 
-        title.textContent = `Трек машины ${vehicle.vehicle_number} (${format})`;
+        title.textContent = `Трек машины ${vehicle.vehicle_number} за последние 24 часа (${format})`;
         container.classList.remove("d-none");
         output.textContent = JSON.stringify(track, null, 2);
     } catch (error) {
@@ -80,13 +81,17 @@ async function loadVehiclesForEnterprise(enterprise) {
     clearMessage(vehicleMessage);
     vehicleEnterpriseTitle.textContent = `${enterprise.name} (ID: ${enterprise.id})`;
     document.getElementById("vehicleTableBody").innerHTML = `
-        <tr><td colspan="7">Загрузка...</td></tr>
+        <tr><td colspan="8">Загрузка...</td></tr>
     `;
 
     try {
-        const vehicleIds = enterprise.vehicles || [];
+        const offset = (vehiclePage - 1) * vehiclePageSize;
 
-        const vehicles = await getVehiclesByEnterpriseRequest(enterprise.id);
+        const vehicles = await getVehiclesByEnterpriseRequest(
+            enterprise.id,
+            vehiclePageSize,
+            offset
+        );
 
         selectedEnterpriseVehicles = vehicles;
 
@@ -97,6 +102,18 @@ async function loadVehiclesForEnterprise(enterprise) {
             handleDeleteVehicle,
             handleShowTrack
         );
+
+        renderVehiclePagination(vehicles, vehiclePage, vehiclePageSize, async (direction) => {
+            if (direction === "prev" && vehiclePage > 1) {
+                vehiclePage -= 1;
+                await loadVehiclesForEnterprise(selectedEnterprise);
+            }
+
+            if (direction === "next" && vehicles.length === vehiclePageSize) {
+                vehiclePage += 1;
+                await loadVehiclesForEnterprise(selectedEnterprise);
+            }
+        });
     } catch (error) {
         showMessage(vehicleMessage, "danger", error.message);
     }
@@ -104,6 +121,8 @@ async function loadVehiclesForEnterprise(enterprise) {
 
 async function handleEnterpriseSelect(enterprise) {
     selectedEnterprise = enterprise;
+    vehiclePage = 1;
+
     renderEnterpriseInfo(enterprise);
     renderEnterprises(
         enterprisesState,
@@ -151,6 +170,11 @@ async function handleDeleteVehicle(vehicle) {
     try {
         await deleteVehicleRequest(vehicle.id);
         showMessage(vehicleMessage, "success", "Машина удалена");
+
+        if (selectedEnterpriseVehicles.length === 1 && vehiclePage > 1) {
+            vehiclePage -= 1;
+        }
+
         await refreshSelectedEnterpriseData();
     } catch (error) {
         showMessage(vehicleMessage, "danger", error.message);
@@ -242,6 +266,7 @@ reloadBtn.addEventListener("click", async () => {
         showMessage(enterpriseMessage, "danger", error.message);
     }
 });
+
 showCreateFormBtn.addEventListener("click", startCreateVehicle);
 
 cancelVehicleFormBtn.addEventListener("click", () => {
@@ -278,7 +303,6 @@ vehicleForm.addEventListener("submit", async (e) => {
         basePayload.purchased_at = new Date(purchasedAtValue).toISOString();
     }
 
-
     try {
         if (vehicleId) {
             const updatePayload = {
@@ -303,4 +327,3 @@ vehicleForm.addEventListener("submit", async (e) => {
         showMessage(vehicleMessage, "danger", error.message);
     }
 });
-

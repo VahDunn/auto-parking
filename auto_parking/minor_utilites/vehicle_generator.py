@@ -1,5 +1,6 @@
 import asyncio
 import random
+from datetime import UTC, datetime
 from typing import Annotated
 
 import typer
@@ -8,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auto_parking.api.schemas.vehicle import VehicleCreate, is_valid_plate
-from auto_parking.db.engine import AsyncSessionLocal  # замени на свой путь
+from auto_parking.db.engine import AsyncSessionLocal
 from auto_parking.db.models import Driver, Enterprise, Vehicle, VehicleModel
 
 app = typer.Typer(help="Утилита генерации тестовых машин и водителей")
@@ -41,6 +42,21 @@ async def generate_unique_plate(db: AsyncSession) -> str:
             return plate
 
 
+colors = [
+    "red",
+    "orange",
+    "yellow",
+    "green",
+    "blue",
+    "purple",
+    "красный",
+    "оранжевый",
+    "желтый",
+    "зеленый",
+    "синий",
+]
+
+
 def build_vehicle_payload(*, enterprise_id: int, model_id: int) -> VehicleCreate:
     return VehicleCreate(
         price=random.randint(500_000, 7_000_000),
@@ -51,6 +67,8 @@ def build_vehicle_payload(*, enterprise_id: int, model_id: int) -> VehicleCreate
         manufacture_year=random.randint(2000, 2026),
         model_id=model_id,
         enterprise_id=enterprise_id,
+        color=colors[random.randint(0, len(colors) - 1)],
+        purchased_at=datetime.now(UTC),
     )
 
 

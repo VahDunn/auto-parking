@@ -160,3 +160,31 @@ function toDateTimeLocalValue(value) {
 
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+function renderVehiclePagination(vehicles, currentPage, pageSize, onPageChange) {
+    const container = document.getElementById("vehiclePagination");
+    if (!container) return;
+
+    const hasPrev = currentPage > 1;
+    const hasNext = vehicles.length === pageSize;
+
+    container.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <button class="btn btn-outline-secondary btn-sm" id="vehiclePrevBtn" ${hasPrev ? "" : "disabled"}>
+                Назад
+            </button>
+            <span class="text-muted small">Страница ${currentPage}</span>
+            <button class="btn btn-outline-secondary btn-sm" id="vehicleNextBtn" ${hasNext ? "" : "disabled"}>
+                Вперёд
+            </button>
+        </div>
+    `;
+
+    document.getElementById("vehiclePrevBtn")?.addEventListener("click", async () => {
+        await onPageChange("prev");
+    });
+
+    document.getElementById("vehicleNextBtn")?.addEventListener("click", async () => {
+        await onPageChange("next");
+    });
+}

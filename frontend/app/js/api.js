@@ -42,6 +42,15 @@ async function getVehicleRequest(id) {
     });
 }
 
+async function getVehiclesByEnterpriseRequest(enterpriseId, limit = 10, offset = 0) {
+    return await apiRequest(
+        `/vehicles?enterprise_ids=${enterpriseId}&sort_by=-id&limit=${limit}&offset=${offset}`,
+        {
+            method: "GET"
+        }
+    );
+}
+
 async function getVehicleModelsRequest() {
     return await apiRequest("/vehicle-models", {
         method: "GET"

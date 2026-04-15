@@ -33,6 +33,7 @@ async def test_get_vehicle_track_json_success(
     vehicle_track_service_mock.get_track.return_value = (
         [
             {
+                "id": 1,
                 "recorded_at_utc": "2026-04-10T08:00:00+00:00",
                 "recorded_at_enterprise": "2026-04-10T11:00:00+03:00",
                 "latitude": 55.75,
@@ -55,9 +56,10 @@ async def test_get_vehicle_track_json_success(
     body = response.json()
     assert isinstance(body, list)
     assert len(body) == 1
+    assert body[0]["id"] == 1
     assert body[0]["latitude"] == 55.75
     assert body[0]["longitude"] == 37.61
-    assert body[0]["recorded_at_utc"] == "2026-04-10T08:00:00+00:00"
+    assert body[0]["recorded_at_utc"] == "2026-04-10T08:00:00Z"
     assert body[0]["recorded_at_enterprise"] == "2026-04-10T11:00:00+03:00"
 
     vehicle_track_service_mock.get_track.assert_awaited_once()
@@ -205,9 +207,6 @@ async def test_get_vehicle_track_returns_422_for_naive_datetime(
         },
     )
 
-    # FastAPI/Pydantic чаще всего пропускают такие значения как naive datetime,
-    # а уже сервис может вернуть 400 через ValueError.
-    # Но если endpoint/validator режет раньше, может быть и 422.
     assert response.status_code in {400, 422}
 
 
