@@ -6,6 +6,8 @@ from sqladmin import Admin, ModelView
 from wtforms.fields.simple import PasswordField
 from wtforms.validators import DataRequired, Length
 
+from auto_parking.core.config import settings
+from auto_parking.core.security.admin_sqladmin import AdminJWTAuthBackend
 from auto_parking.core.security.passwords import hash_password
 from auto_parking.db.engine import engine
 from auto_parking.db.models import (
@@ -163,7 +165,14 @@ class UserAdmin(ModelView, model=User):
 
 
 def setup_admin(app: FastAPI) -> Admin:
-    admin = Admin(app, engine)
+    admin = Admin(
+        app,
+        engine,
+        authentication_backend=AdminJWTAuthBackend(
+            secret_key=settings.jwt_secret_key,
+            login_path="/",
+        ),
+    )
 
     admin.add_view(VehicleAdmin)
     admin.add_view(VehicleModelAdmin)

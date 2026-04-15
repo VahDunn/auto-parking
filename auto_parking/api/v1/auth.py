@@ -28,15 +28,6 @@ async def login(
     response: Response,
     user_service=dep_user_service,
 ):
-    if secrets.compare_digest(data.username, settings.test_admin_login) and secrets.compare_digest(
-        data.password, settings.test_admin_pass
-    ):
-        token = create_access_token(actor_type="admin", actor_id=0)
-        response.set_cookie(
-            key="access_token", value=token, httponly=True, samesite="lax", secure=False
-        )
-        return TokenResponse(access_token=token)
-
     users = await user_service.get(UserFilter(username=data.username))
     user = users[0] if users else None
 
@@ -48,6 +39,11 @@ async def login(
     token = create_access_token(actor_type=user.role.value, actor_id=user.id)
 
     response.set_cookie(
-        key="access_token", value=token, httponly=True, samesite="lax", secure=False
+        path="/",
+        key="access_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=False,
     )
     return TokenResponse(access_token=token)
