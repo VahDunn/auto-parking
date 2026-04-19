@@ -6,9 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from auto_parking.db.models.base import BaseORM
 
 if TYPE_CHECKING:
-    from auto_parking.db.models.driver import Driver
-    from auto_parking.db.models.user import User
-    from auto_parking.db.models.vehicle import Vehicle
+    from auto_parking.db.models import Driver, User, Vehicle
 
 
 class Enterprise(BaseORM):

@@ -2,6 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from auto_parking.api.schemas.trip_track import TripTrackGroupOut
 from auto_parking.api.schemas.vehicle import VehicleCreate, VehicleFilter, VehicleOut, VehicleUpdate
 from auto_parking.api.schemas.vehicle_track import (
     GeoJSONFeatureCollection,
@@ -10,8 +11,13 @@ from auto_parking.api.schemas.vehicle_track import (
 )
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.commons import dep_query
-from auto_parking.deps.services import dep_vehicle_service, dep_vehicle_track_service
+from auto_parking.deps.services import (
+    dep_trip_track_service,
+    dep_vehicle_service,
+    dep_vehicle_track_service,
+)
 from auto_parking.deps.visibility import get_visible_enterprise_ids
+from auto_parking.service.trip_track import TripTrackService
 from auto_parking.service.vehicle import VehicleService
 from auto_parking.service.vehicle_track import VehicleTrackService
 
@@ -42,11 +48,15 @@ def _ensure_enterprise_visible(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
 
-dep_actor_guard = Depends(require_manager_or_higher)  # TODO здесь осторожно
+dep_actor_guard = Depends(require_manager_or_higher)
 dep_visible_ids = Depends(get_visible_enterprise_ids)
 
 
-@router.get("", response_model=list[VehicleOut])
+@router.get(
+    "",
+    response_model=list[VehicleOut],
+    dependencies=[dep_actor_guard],
+)
 async def get_vehicles(
     id: list[int] | None = dep_query,
     enterprise_ids: list[int] | None = dep_query,
@@ -54,7 +64,6 @@ async def get_vehicles(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     sort_by: str | None = Query(None),
-    _actor=dep_actor_guard,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
 ):
@@ -74,10 +83,13 @@ async def get_vehicles(
     )
 
 
-@router.get("/{id}", response_model=VehicleOut)
+@router.get(
+    "/{id}",
+    response_model=VehicleOut,
+    dependencies=[dep_actor_guard],
+)
 async def get_vehicle(
     id: int,
-    _actor=dep_actor_guard,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
 ):
@@ -89,10 +101,14 @@ async def get_vehicle(
     return vehicle
 
 
-@router.post("", response_model=VehicleOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=VehicleOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[dep_actor_guard],
+)
 async def create_vehicle(
     payload: VehicleCreate,
-    _actor=dep_actor_guard,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
 ):
@@ -102,11 +118,14 @@ async def create_vehicle(
     return await service.create(payload)
 
 
-@router.patch("/{id}", response_model=VehicleOut)
+@router.patch(
+    "/{id}",
+    response_model=VehicleOut,
+    dependencies=[dep_actor_guard],
+)
 async def update_vehicle(
     id: int,
     payload: VehicleUpdate,
-    _actor=dep_actor_guard,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
 ):
@@ -127,10 +146,13 @@ async def update_vehicle(
     return updated
 
 
-@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[dep_actor_guard],
+)
 async def delete_vehicle(
     id: int,
-    actor=dep_actor_guard,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
 ):
@@ -149,13 +171,13 @@ async def delete_vehicle(
 @router.get(
     "/{id}/track",
     response_model=list[VehicleTrackPointOut] | GeoJSONFeatureCollection,
+    dependencies=[dep_actor_guard],
 )
 async def get_vehicle_track(
     id: int,
     date_from: datetime = Query(..., description="Timezone-aware datetime"),
     date_to: datetime = Query(..., description="Timezone-aware datetime"),
     format: TrackFormat = Query(TrackFormat.json),
-    _actor=dep_actor_guard,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleTrackService = dep_vehicle_track_service,
 ):
@@ -171,6 +193,46 @@ async def get_vehicle_track(
             date_from=date_from,
             date_to=date_to,
             format=format,
+        )
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+
+    if vehicle is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vehicle not found",
+        )
+
+    _ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
+    return result
+
+
+@router.get(
+    "/{id}/track-by-trips",
+    response_model=list[TripTrackGroupOut],
+    dependencies=[dep_actor_guard],
+)
+async def get_vehicle_track_by_trips(
+    id: int,
+    date_from: datetime = Query(..., description="Timezone-aware datetime"),
+    date_to: datetime = Query(..., description="Timezone-aware datetime"),
+    visible_enterprise_ids: set[int] | None = dep_visible_ids,
+    service: TripTrackService = dep_trip_track_service,
+):
+    if date_to < date_from:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="date_to must be >= date_from",
+        )
+
+    try:
+        result, vehicle = await service.get_grouped_track(
+            vehicle_id=id,
+            date_from=date_from,
+            date_to=date_to,
         )
     except ValueError as err:
         raise HTTPException(

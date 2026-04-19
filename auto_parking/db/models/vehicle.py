@@ -8,7 +8,7 @@ from auto_parking.db.models.base import BaseORM
 from auto_parking.db.models.vehicle_model import VehicleModel
 
 if TYPE_CHECKING:
-    from auto_parking.db.models import Driver, Enterprise, VehicleGpsPoint
+    from auto_parking.db.models import Driver, Enterprise, Trip, VehicleGpsPoint
 
 
 class Vehicle(BaseORM):
@@ -18,7 +18,7 @@ class Vehicle(BaseORM):
     vehicle_number: Mapped[str] = mapped_column(sa.String, unique=True)
     owners_count: Mapped[int] = mapped_column(sa.Integer)
     accident_number: Mapped[int] = mapped_column(sa.Integer)
-    manufacture_year = mapped_column(sa.SmallInteger)
+    manufacture_year: Mapped[int] = mapped_column(sa.SmallInteger)
     model_id: Mapped[int] = mapped_column(
         sa.ForeignKey("vehicle_model.id"),
         nullable=False,
@@ -68,6 +68,13 @@ class Vehicle(BaseORM):
         "VehicleGpsPoint",
         lazy="noload",
         back_populates="vehicle",
+    )
+
+    trips: Mapped[list["Trip"]] = relationship(
+        "Trip",
+        lazy="noload",
+        back_populates="vehicle",
+        cascade="all, delete-orphan",
     )
 
     def __str__(self):

@@ -58,6 +58,7 @@ plugins = ["pydantic.mypy"]
 [tool.pyright]
 typeCheckingMode = 'standard'
 reportMissingImports = true
+reportMissingTypeArgument = false
 exclude = [
     '.*',
     '.venv',
