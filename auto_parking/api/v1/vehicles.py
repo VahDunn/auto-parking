@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -9,6 +10,7 @@ from auto_parking.api.schemas.vehicle_track import (
     TrackFormat,
     VehicleTrackPointOut,
 )
+from auto_parking.core.errors import NotFoundError
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.commons import dep_query
 from auto_parking.deps.services import (
@@ -212,14 +214,19 @@ async def get_vehicle_track(
 
 @router.get(
     "/{id}/track-by-trips",
-    response_model=list[TripTrackGroupOut],
+    response_model=list[TripTrackGroupOut]
+    | list[VehicleTrackPointOut]
+    | GeoJSONFeatureCollection
+    | list[dict[str, Any]],
     dependencies=[dep_actor_guard],
 )
 async def get_vehicle_track_by_trips(
     id: int,
     date_from: datetime = Query(..., description="Timezone-aware datetime"),
     date_to: datetime = Query(..., description="Timezone-aware datetime"),
+    format: TrackFormat = Query(TrackFormat.json),
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
+    vehicle_service: VehicleService = dep_vehicle_service,
     service: TripTrackService = dep_trip_track_service,
 ):
     if date_to < date_from:
@@ -228,23 +235,32 @@ async def get_vehicle_track_by_trips(
             detail="date_to must be >= date_from",
         )
 
-    try:
-        result, vehicle = await service.get_grouped_track(
-            vehicle_id=id,
-            date_from=date_from,
-            date_to=date_to,
-        )
-    except ValueError as err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(err),
-        ) from err
-
-    if vehicle is None:
+    vehicle = await vehicle_service.get_by_id(id)
+    if not vehicle:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Vehicle not found",
         )
 
     _ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
+
+    try:
+        result = await service.get_track(
+            vehicle_id=id,
+            date_from=date_from,
+            date_to=date_to,
+            format=format,
+        )
+
+    except NotFoundError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=err.message,
+        ) from err
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
+
     return result
