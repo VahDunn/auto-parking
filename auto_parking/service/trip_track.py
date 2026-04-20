@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from auto_parking.api.schemas.trip_track import TripTrackGroupOut, TripTrackPointOut
+from auto_parking.api.schemas.trip_track import TripTrackGroupOut
 from auto_parking.api.schemas.vehicle_track import (
     GeoJSONFeature,
     GeoJSONFeatureCollection,
@@ -53,13 +53,17 @@ class TripTrackService:
             date_to_utc=date_to_utc,
         )
 
-        intervals = [(trip.started_at_utc, trip.ended_at_utc) for trip in trips]
+        flat_rows: list[tuple[Any, int]] = []
 
-        rows = await self._track_repo.get_points_by_intervals(
-            vehicle_id=vehicle_id,
-            intervals=intervals,
-        )
-        rows = sorted(rows, key=lambda row: row.recorded_at_utc)
+        for trip in trips:
+            rows = await self._track_repo.get_points(
+                vehicle_id=vehicle_id,
+                date_from_utc=trip.started_at_utc,
+                date_to_utc=trip.ended_at_utc,
+            )
+            flat_rows.extend((row, trip.id) for row in rows)
+
+        flat_rows.sort(key=lambda item: item[0].recorded_at_utc)
 
         if format == TrackFormat.geojson:
             return GeoJSONFeatureCollection(
@@ -68,9 +72,10 @@ class TripTrackService:
                     self._row_to_geojson_feature(
                         row=row,
                         vehicle_id=vehicle_id,
+                        trip_id=trip_id,
                         enterprise_tz=enterprise_tz,
                     )
-                    for row in rows
+                    for row, trip_id in flat_rows
                 ],
             )
 
@@ -78,9 +83,10 @@ class TripTrackService:
             self._row_to_track_point_out(
                 row=row,
                 vehicle_id=vehicle_id,
+                trip_id=trip_id,
                 enterprise_tz=enterprise_tz,
             )
-            for row in rows
+            for row, trip_id in flat_rows
         ]
 
     async def get_grouped_track(
@@ -138,6 +144,7 @@ class TripTrackService:
                                 self._row_to_geojson_feature(
                                     row=row,
                                     vehicle_id=vehicle_id,
+                                    trip_id=trip.id,
                                     enterprise_tz=enterprise_tz,
                                 )
                                 for row in rows
@@ -159,8 +166,10 @@ class TripTrackService:
             rows = sorted(rows, key=lambda row: row.recorded_at_utc)
 
             points = [
-                self._row_to_grouped_point_out(
+                self._row_to_track_point_out(
                     row=row,
+                    vehicle_id=vehicle_id,
+                    trip_id=trip.id,
                     enterprise_tz=enterprise_tz,
                 )
                 for row in rows
@@ -192,26 +201,12 @@ class TripTrackService:
         *,
         row: Any,
         vehicle_id: int,
+        trip_id: int | None,
         enterprise_tz: str,
     ) -> VehicleTrackPointOut:
         return VehicleTrackPointOut(
             id=vehicle_id,
-            recorded_at_utc=row.recorded_at_utc,
-            recorded_at_enterprise=to_enterprise_tz(
-                row.recorded_at_utc,
-                enterprise_tz,
-            ),
-            latitude=row.latitude,
-            longitude=row.longitude,
-        )
-
-    def _row_to_grouped_point_out(
-        self,
-        *,
-        row: Any,
-        enterprise_tz: str,
-    ) -> TripTrackPointOut:
-        return TripTrackPointOut(
+            trip_id=trip_id,
             recorded_at_utc=row.recorded_at_utc,
             recorded_at_enterprise=to_enterprise_tz(
                 row.recorded_at_utc,
@@ -226,6 +221,7 @@ class TripTrackService:
         *,
         row: Any,
         vehicle_id: int,
+        trip_id: int | None,
         enterprise_tz: str,
     ) -> GeoJSONFeature:
         raw_geometry = json.loads(row.geojson)
@@ -238,6 +234,7 @@ class TripTrackService:
             ),
             properties={
                 "vehicle_id": vehicle_id,
+                "trip_id": trip_id,
                 "recorded_at_utc": row.recorded_at_utc.isoformat(),
                 "recorded_at_enterprise": to_enterprise_tz(
                     row.recorded_at_utc,

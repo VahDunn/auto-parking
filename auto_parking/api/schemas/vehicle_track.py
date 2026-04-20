@@ -19,6 +19,7 @@ def _ensure_aware(dt: datetime) -> datetime:
 class VehicleTrackPointOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    trip_id: int | None = None
     recorded_at_utc: datetime
     recorded_at_enterprise: datetime
     latitude: float

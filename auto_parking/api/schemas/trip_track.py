@@ -2,25 +2,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from auto_parking.api.schemas.vehicle_track import VehicleTrackPointOut
+
 
 def _ensure_aware(dt: datetime) -> datetime:
     if dt.tzinfo is None or dt.utcoffset() is None:
         raise ValueError("Datetime must be timezone-aware (with timezone)")
     return dt
-
-
-class TripTrackPointOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    recorded_at_utc: datetime
-    recorded_at_enterprise: datetime
-    latitude: float
-    longitude: float
-
-    @field_validator("recorded_at_utc", "recorded_at_enterprise")
-    @classmethod
-    def validate_datetime(cls, v: datetime) -> datetime:
-        return _ensure_aware(v)
 
 
 class TripTrackGroupOut(BaseModel):
@@ -36,7 +24,7 @@ class TripTrackGroupOut(BaseModel):
     ended_at_enterprise: datetime
     enterprise_timezone: str = "UTC"
 
-    points: list[TripTrackPointOut]
+    points: list[VehicleTrackPointOut]
 
     @field_validator(
         "started_at_utc",
