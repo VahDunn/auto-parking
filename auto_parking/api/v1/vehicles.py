@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from auto_parking.api.schemas.trip import TripOut
 from auto_parking.api.schemas.trip_track import TripTrackGroupOut
 from auto_parking.api.schemas.vehicle import VehicleCreate, VehicleFilter, VehicleOut, VehicleUpdate
 from auto_parking.api.schemas.vehicle_track import (
@@ -14,11 +15,13 @@ from auto_parking.core.errors import NotFoundError
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.commons import dep_query
 from auto_parking.deps.services import (
+    dep_trip_service,
     dep_trip_track_service,
     dep_vehicle_service,
     dep_vehicle_track_service,
 )
 from auto_parking.deps.visibility import get_visible_enterprise_ids
+from auto_parking.service.trip import TripService
 from auto_parking.service.trip_track import TripTrackService
 from auto_parking.service.vehicle import VehicleService
 from auto_parking.service.vehicle_track import VehicleTrackService
@@ -168,6 +171,47 @@ async def delete_vehicle(
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
     return
+
+
+@router.get(
+    "/{id}/trips",
+    response_model=list[TripOut],
+    dependencies=[dep_actor_guard],
+)
+async def get_vehicle_trips(
+    id: int,
+    date_from: datetime = Query(..., description="Timezone-aware datetime"),
+    date_to: datetime = Query(..., description="Timezone-aware datetime"),
+    visible_enterprise_ids: set[int] | None = dep_visible_ids,
+    vehicle_service: VehicleService = dep_vehicle_service,
+    service: TripService = dep_trip_service,
+):
+    if date_to < date_from:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="date_to must be >= date_from",
+        )
+
+    vehicle = await vehicle_service.get_by_id(id)
+    if not vehicle:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vehicle not found",
+        )
+
+    _ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
+
+    try:
+        return await service.get_vehicle_trips_in_range(
+            vehicle_id=id,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(err),
+        ) from err
 
 
 @router.get(

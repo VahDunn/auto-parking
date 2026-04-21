@@ -7,22 +7,42 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
 
 from auto_parking.api.schemas.trip import TripFilter
-from auto_parking.db.models import Enterprise, Trip, Vehicle
+from auto_parking.db.models import Enterprise, Trip, Vehicle, VehicleGpsPoint
 
 
 class TripRepository:
     def __init__(self, db: AsyncSession):
         self.db: AsyncSession = db
 
-    async def get(self, filter_obj: TripFilter) -> Sequence[Trip]:
-        stmt = select(Trip).options(
+    @staticmethod
+    def _base_options():
+        return (
             selectinload(Trip.vehicle).options(
                 load_only(Vehicle.id, Vehicle.enterprise_id),
                 selectinload(Vehicle.enterprise).options(
                     load_only(Enterprise.id, Enterprise.timezone)
                 ),
             ),
+            selectinload(Trip.start_point).options(
+                load_only(
+                    VehicleGpsPoint.id,
+                    VehicleGpsPoint.vehicle_id,
+                    VehicleGpsPoint.recorded_at_utc,
+                    VehicleGpsPoint.position,
+                )
+            ),
+            selectinload(Trip.end_point).options(
+                load_only(
+                    VehicleGpsPoint.id,
+                    VehicleGpsPoint.vehicle_id,
+                    VehicleGpsPoint.recorded_at_utc,
+                    VehicleGpsPoint.position,
+                )
+            ),
         )
+
+    async def get(self, filter_obj: TripFilter) -> Sequence[Trip]:
+        stmt = select(Trip).options(*self._base_options())
 
         if filter_obj.vehicle_id is not None:
             stmt = stmt.where(Trip.vehicle_id == filter_obj.vehicle_id)
@@ -70,20 +90,11 @@ class TripRepository:
 
     async def get_by_id(self, trip_id: int) -> Trip | None:
         result = await self.db.execute(
-            select(Trip)
-            .where(Trip.id == trip_id)
-            .options(
-                selectinload(Trip.vehicle).options(
-                    load_only(Vehicle.id, Vehicle.enterprise_id),
-                    selectinload(Vehicle.enterprise).options(
-                        load_only(Enterprise.id, Enterprise.timezone)
-                    ),
-                ),
-            )
+            select(Trip).where(Trip.id == trip_id).options(*self._base_options())
         )
         return result.scalar_one_or_none()
 
-    async def create(self, data: dict) -> Trip:
+    async def create(self, data: dict) -> Trip:  # pyright: ignore[reportMissingTypeArgument]
         trip = Trip(**data)
 
         self.db.add(trip)
@@ -112,7 +123,7 @@ class TripRepository:
             raise
 
         await self.db.refresh(trip)
-        return trip
+        return await self.get_by_id(trip.id)
 
     async def delete(self, trip_id: int) -> bool:
         trip = await self.get_by_id(trip_id)
@@ -139,8 +150,9 @@ class TripRepository:
             .where(Trip.vehicle_id == vehicle_id)
             .where(Trip.started_at_utc >= date_from_utc)
             .where(Trip.ended_at_utc <= date_to_utc)
+            .options(*self._base_options())
             .order_by(Trip.started_at_utc.asc(), Trip.id.asc())
         )
 
         result = await self.db.execute(stmt)
-        return result.scalars().all()
+        return result.unique().scalars().all()

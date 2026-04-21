@@ -1,12 +1,16 @@
 from collections.abc import Sequence
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from auto_parking.api.schemas.trip import TripFilter, TripOut
+from geoalchemy2.shape import to_shape
+from shapely.geometry import Point
+
+from auto_parking.api.schemas.trip import TripFilter, TripOut, TripPointOut
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
 
 if TYPE_CHECKING:
     from auto_parking.api.schemas.trip import TripCreate, TripUpdate
-    from auto_parking.db.models import Trip
+    from auto_parking.db.models import Trip, VehicleGpsPoint
     from auto_parking.repo.trip import TripRepository
 
 
@@ -16,6 +20,22 @@ class TripService:
 
     async def get(self, filter_obj: TripFilter) -> list[TripOut]:
         trips: Sequence[Trip] = await self._repo.get(filter_obj)
+        return [self._build_out(t) for t in trips]
+
+    async def get_vehicle_trips_in_range(
+        self,
+        vehicle_id: int,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> list[TripOut]:
+        date_from_utc = to_utc(date_from)
+        date_to_utc = to_utc(date_to)
+
+        trips = await self._repo.get_trips_inside_range(
+            vehicle_id=vehicle_id,
+            date_from_utc=date_from_utc,
+            date_to_utc=date_to_utc,
+        )
         return [self._build_out(t) for t in trips]
 
     async def get_by_id(self, trip_id: int) -> TripOut | None:
@@ -72,4 +92,27 @@ class TripService:
             started_at_enterprise=to_enterprise_tz(trip.started_at_utc, tz),
             ended_at_enterprise=to_enterprise_tz(trip.ended_at_utc, tz),
             enterprise_timezone=tz or "UTC",
+            start_point=self._build_point_out(trip.start_point, tz),
+            end_point=self._build_point_out(trip.end_point, tz),
+        )
+
+    def _build_point_out(
+        self,
+        point: "VehicleGpsPoint",
+        enterprise_tz: str | None,
+    ) -> TripPointOut:
+        shapely_point = to_shape(point.position)
+        if not isinstance(shapely_point, Point):
+            raise ValueError("Expected Point geometry")
+
+        return TripPointOut(
+            id=point.id,
+            recorded_at_utc=point.recorded_at_utc,
+            recorded_at_enterprise=to_enterprise_tz(
+                point.recorded_at_utc,
+                enterprise_tz,
+            ),
+            latitude=shapely_point.y,
+            longitude=shapely_point.x,
+            address=None,
         )
