@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -55,7 +56,7 @@ class TripCreate(BaseModel):
 
 
 class TripUpdate(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     started_at: datetime | None = None
     ended_at: datetime | None = None
