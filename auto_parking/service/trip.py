@@ -11,16 +11,22 @@ from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
 if TYPE_CHECKING:
     from auto_parking.api.schemas.trip import TripCreate, TripUpdate
     from auto_parking.db.models import Trip, VehicleGpsPoint
+    from auto_parking.integrations.geocoding.base import ReverseGeocoder
     from auto_parking.repo.trip import TripRepository
 
 
 class TripService:
-    def __init__(self, repo: "TripRepository") -> None:
+    def __init__(
+        self,
+        repo: "TripRepository",
+        geocoder: "ReverseGeocoder | None" = None,
+    ) -> None:
         self._repo = repo
+        self._geocoder = geocoder
 
     async def get(self, filter_obj: TripFilter) -> list[TripOut]:
         trips: Sequence[Trip] = await self._repo.get(filter_obj)
-        return [self._build_out(t) for t in trips]
+        return [await self._build_out(t) for t in trips]
 
     async def get_vehicle_trips_in_range(
         self,
@@ -36,11 +42,11 @@ class TripService:
             date_from_utc=date_from_utc,
             date_to_utc=date_to_utc,
         )
-        return [self._build_out(t) for t in trips]
+        return [await self._build_out(t) for t in trips]
 
     async def get_by_id(self, trip_id: int) -> TripOut | None:
         trip: Trip | None = await self._repo.get_by_id(trip_id)
-        return self._build_out(trip) if trip else None
+        return await self._build_out(trip) if trip else None
 
     async def create(self, payload: "TripCreate") -> TripOut:
         data = payload.model_dump()
@@ -51,7 +57,7 @@ class TripService:
         data["ended_at_utc"] = to_utc(ended_at)
 
         trip: Trip = await self._repo.create(data)
-        return self._build_out(trip)
+        return await self._build_out(trip)
 
     async def update(self, trip_id: int, payload: "TripUpdate") -> TripOut | None:
         trip = await self._repo.get_by_id(trip_id)
@@ -75,12 +81,12 @@ class TripService:
             raise ValueError("ended_at must be greater than or equal to started_at")
 
         trip = await self._repo.update(trip_id, payload_dump)
-        return self._build_out(trip) if trip else None
+        return await self._build_out(trip) if trip else None
 
     async def delete(self, trip_id: int) -> bool:
         return await self._repo.delete(trip_id)
 
-    def _build_out(self, trip: "Trip") -> TripOut:
+    async def _build_out(self, trip: "Trip") -> TripOut:
         enterprise = trip.vehicle.enterprise if trip.vehicle else None
         tz = enterprise.timezone if enterprise else None
 
@@ -92,11 +98,11 @@ class TripService:
             started_at_enterprise=to_enterprise_tz(trip.started_at_utc, tz),
             ended_at_enterprise=to_enterprise_tz(trip.ended_at_utc, tz),
             enterprise_timezone=tz or "UTC",
-            start_point=self._build_point_out(trip.start_point, tz),
-            end_point=self._build_point_out(trip.end_point, tz),
+            start_point=await self._build_point_out(trip.start_point, tz),
+            end_point=await self._build_point_out(trip.end_point, tz),
         )
 
-    def _build_point_out(
+    async def _build_point_out(
         self,
         point: "VehicleGpsPoint",
         enterprise_tz: str | None,
@@ -105,6 +111,16 @@ class TripService:
         if not isinstance(shapely_point, Point):
             raise ValueError("Expected Point geometry")
 
+        latitude = shapely_point.y
+        longitude = shapely_point.x
+
+        address: str | None = None
+        if self._geocoder is not None:
+            address = await self._geocoder.reverse_geocode(
+                latitude=latitude,
+                longitude=longitude,
+            )
+
         return TripPointOut(
             id=point.id,
             recorded_at_utc=point.recorded_at_utc,
@@ -112,7 +128,7 @@ class TripService:
                 point.recorded_at_utc,
                 enterprise_tz,
             ),
-            latitude=shapely_point.y,
-            longitude=shapely_point.x,
-            address=None,
+            latitude=latitude,
+            longitude=longitude,
+            address=address,
         )

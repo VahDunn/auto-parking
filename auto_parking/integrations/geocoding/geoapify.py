@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 from typing import Any
 
 import httpx
 
+from auto_parking.integrations.geocoding.base import ReverseGeocoder
 
-class GeoapifyGeocoder:
+
+class GeoapifyReverseGeocoder(ReverseGeocoder):
     BASE_URL = "https://api.geoapify.com/v1/geocode/reverse"
 
     def __init__(self, api_key: str, timeout: float = 10.0) -> None:

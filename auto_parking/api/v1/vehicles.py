@@ -53,6 +53,14 @@ def _ensure_enterprise_visible(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
 
+def _ensure_aware_datetime(value: datetime, field_name: str) -> None:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_name} must be timezone-aware",
+        )
+
+
 dep_actor_guard = Depends(require_manager_or_higher)
 dep_visible_ids = Depends(get_visible_enterprise_ids)
 
@@ -186,6 +194,9 @@ async def get_vehicle_trips(
     vehicle_service: VehicleService = dep_vehicle_service,
     service: TripService = dep_trip_service,
 ):
+    _ensure_aware_datetime(date_from, "date_from")
+    _ensure_aware_datetime(date_to, "date_to")
+
     if date_to < date_from:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -227,6 +238,9 @@ async def get_vehicle_track(
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleTrackService = dep_vehicle_track_service,
 ):
+    _ensure_aware_datetime(date_from, "date_from")
+    _ensure_aware_datetime(date_to, "date_to")
+
     if date_to < date_from:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -273,6 +287,9 @@ async def get_vehicle_track_by_trips(
     vehicle_service: VehicleService = dep_vehicle_service,
     service: TripTrackService = dep_trip_track_service,
 ):
+    _ensure_aware_datetime(date_from, "date_from")
+    _ensure_aware_datetime(date_to, "date_to")
+
     if date_to < date_from:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

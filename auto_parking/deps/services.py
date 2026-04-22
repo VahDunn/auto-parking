@@ -1,5 +1,6 @@
 from fastapi import Depends
 
+from auto_parking.deps.integrations import get_reverse_geocoder
 from auto_parking.deps.repos import (
     dep_driver_repo,
     dep_enterprise_repo,
@@ -49,7 +50,7 @@ def get_vehicle_track_service(
 
 
 def get_trip_service(repo: TripRepository = dep_trip_repo) -> TripService:
-    return TripService(repo)
+    return TripService(repo, geocoder=get_reverse_geocoder())
 
 
 def get_trip_track_service(

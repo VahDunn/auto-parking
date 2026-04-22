@@ -9,6 +9,8 @@ from auto_parking.core.domain.user_role import UserRole
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.services import (
     dep_enterprise_service,
+    dep_trip_service,
+    dep_trip_track_service,
     dep_vehicle_service,
     dep_vehicle_track_service,
 )
@@ -44,7 +46,7 @@ def overrides():
     fastapi_app.dependency_overrides.clear()
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 def vehicle_service_mock():
     svc = AsyncMock()
     svc.get = AsyncMock()
@@ -55,14 +57,34 @@ def vehicle_service_mock():
     return svc
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 def vehicle_track_service_mock():
     svc = AsyncMock()
     svc.get_track = AsyncMock()
     return svc
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
+def trip_service_mock():
+    svc = AsyncMock()
+    svc.get = AsyncMock()
+    svc.get_by_id = AsyncMock()
+    svc.get_vehicle_trips_in_range = AsyncMock()
+    svc.create = AsyncMock()
+    svc.update = AsyncMock()
+    svc.delete = AsyncMock()
+    return svc
+
+
+@pytest.fixture
+def trip_track_service_mock():
+    svc = AsyncMock()
+    svc.get_track = AsyncMock()
+    svc.get_grouped_track = AsyncMock()
+    return svc
+
+
+@pytest.fixture
 def enterprise_service_mock():
     svc = AsyncMock()
     svc.get = AsyncMock()
@@ -97,6 +119,20 @@ def set_vehicle_track_service_override(overrides, mock):
         return mock
 
     overrides[dep_callable(dep_vehicle_track_service)] = _dep
+
+
+def set_trip_service_override(overrides, mock):
+    async def _dep():
+        return mock
+
+    overrides[dep_callable(dep_trip_service)] = _dep
+
+
+def set_trip_track_service_override(overrides, mock):
+    async def _dep():
+        return mock
+
+    overrides[dep_callable(dep_trip_track_service)] = _dep
 
 
 def set_enterprise_service_override(overrides, mock):
