@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Any
+from typing import Any, override
 
 import httpx
 
@@ -8,12 +6,20 @@ from auto_parking.integrations.geocoding.base import ReverseGeocoder
 
 
 class GeoapifyReverseGeocoder(ReverseGeocoder):
-    BASE_URL = "https://api.geoapify.com/v1/geocode/reverse"
+    BASE_URL: str = "https://api.geoapify.com/v1/geocode/reverse"
 
-    def __init__(self, api_key: str, timeout: float = 10.0) -> None:
-        self._api_key = api_key
-        self._timeout = timeout
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        lang: str = "ru",
+        timeout: float = 10.0,
+    ) -> None:
+        self._api_key: str = api_key
+        self._lang: str = lang
+        self._timeout: float = timeout
 
+    @override
     async def reverse_geocode(
         self,
         *,
@@ -23,6 +29,7 @@ class GeoapifyReverseGeocoder(ReverseGeocoder):
         params = {
             "lat": latitude,
             "lon": longitude,
+            "lang": self._lang,
             "apiKey": self._api_key,
         }
 
