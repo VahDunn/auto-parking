@@ -306,7 +306,7 @@ async def get_vehicle_track_by_trips(
     _ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
 
     try:
-        result = await service.get_track(
+        result = await service.get_grouped_track(
             vehicle_id=id,
             date_from=date_from,
             date_to=date_to,

@@ -75,7 +75,7 @@ function renderVehicleModelOptions(models, selectedId = null) {
     });
 }
 
-function renderVehiclesTable(vehicles, modelsMap, onEdit, onDelete, onTrack) {
+function renderVehiclesTable(vehicles, modelsMap, onEdit, onDelete, onSelectVehicle) {
     const tbody = document.getElementById("vehicleTableBody");
     tbody.innerHTML = "";
 
@@ -100,20 +100,83 @@ function renderVehiclesTable(vehicles, modelsMap, onEdit, onDelete, onTrack) {
             <td>${vehicle.mileage}</td>
             <td>${vehicle.price}</td>
             <td>${formatDateTime(vehicle.purchased_at_enterprise)}</td>
-           <td>
-                <div class="d-flex gap-2">
+            <td>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-sm btn-outline-primary select-btn">Выбрать</button>
                     <button class="btn btn-sm btn-primary edit-btn">Редактировать</button>
                     <button class="btn btn-sm btn-danger delete-btn">Удалить</button>
-                    <button class="btn btn-sm btn-outline-secondary track-btn">Трек</button>
                 </div>
-           </td>
+            </td>
         `;
 
+        tr.querySelector(".select-btn").addEventListener("click", () => onSelectVehicle(vehicle));
         tr.querySelector(".edit-btn").addEventListener("click", () => onEdit(vehicle));
         tr.querySelector(".delete-btn").addEventListener("click", () => onDelete(vehicle));
-        tr.querySelector(".track-btn").addEventListener("click", () => onTrack(vehicle));
-
         tbody.appendChild(tr);
+    });
+}
+
+function renderSelectedVehicleInfo(vehicle, modelName = "—") {
+    const container = document.getElementById("selectedVehicleInfo");
+
+    if (!vehicle) {
+        container.innerHTML = `<span class="text-muted">Сначала выберите машину в таблице</span>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <div><strong>ID:</strong> ${vehicle.id}</div>
+        <div><strong>Госномер:</strong> ${vehicle.vehicle_number ?? "—"}</div>
+        <div><strong>Модель:</strong> ${modelName}</div>
+        <div><strong>Год выпуска:</strong> ${vehicle.manufacture_year ?? "—"}</div>
+        <div><strong>Пробег:</strong> ${vehicle.mileage ?? "—"}</div>
+        <div><strong>Цена:</strong> ${vehicle.price ?? "—"}</div>
+        <div><strong>Цвет:</strong> ${vehicle.color ?? "—"}</div>
+        <div><strong>Дата покупки:</strong> ${formatDateTime(vehicle.purchased_at_enterprise)}</div>
+        <div><strong>Enterprise ID:</strong> ${vehicle.enterprise_id ?? "—"}</div>
+    `;
+}
+
+function renderTripList(trips, onShowTripMap) {
+    const container = document.getElementById("tripList");
+    container.innerHTML = "";
+
+    if (!trips || trips.length === 0) {
+        container.innerHTML = `
+            <div class="list-group-item text-muted">
+                Поездок за выбранный диапазон нет
+            </div>
+        `;
+        return;
+    }
+
+    trips.forEach((trip) => {
+        const item = document.createElement("div");
+        item.className = "list-group-item";
+
+        const startAddr = trip.start_point?.address || "—";
+        const endAddr = trip.end_point?.address || "—";
+
+        item.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div>
+                    <div class="fw-semibold">Поездка #${trip.id}</div>
+                    <div class="small text-muted">
+                        ${formatDateTime(trip.started_at_enterprise)} — ${formatDateTime(trip.ended_at_enterprise)}
+                    </div>
+                    <div class="small mt-2"><strong>Начало:</strong> ${startAddr}</div>
+                    <div class="small"><strong>Конец:</strong> ${endAddr}</div>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary show-trip-map-btn">
+                        Показать на карте
+                    </button>
+                </div>
+            </div>
+        `;
+
+        item.querySelector(".show-trip-map-btn").addEventListener("click", () => onShowTripMap(trip));
+        container.appendChild(item);
     });
 }
 
@@ -187,4 +250,9 @@ function renderVehiclePagination(vehicles, currentPage, pageSize, onPageChange) 
     document.getElementById("vehicleNextBtn")?.addEventListener("click", async () => {
         await onPageChange("next");
     });
+}
+
+function localInputToIso(value) {
+    if (!value) return "";
+    return new Date(value).toISOString();
 }

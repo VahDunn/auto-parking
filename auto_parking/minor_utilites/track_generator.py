@@ -12,9 +12,9 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auto_parking.db.engine import AsyncSessionLocal
-from auto_parking.db.models import Enterprise, Vehicle, VehicleGpsPoint
+from auto_parking.db.models import Enterprise, Trip, Vehicle, VehicleGpsPoint
 
-app = typer.Typer(help="Утилита генерации GPS-треков для существующих машин")
+app = typer.Typer(help="Утилита генерации GPS-треков и поездок для существующих машин")
 
 OSRM_BASE_URL = "https://router.project-osrm.org"
 
@@ -45,6 +45,9 @@ class VehicleRouteState:
     route_number: int
     seed: int | None
     skipped: bool = False
+    current_trip_started_at_utc: datetime | None = None
+    current_trip_start_point_id: int | None = None
+    completed_routes: int = 0
 
 
 def _normalize_city_name(name: str | None) -> str | None:
@@ -58,6 +61,12 @@ def _city_center_from_name(name: str | None) -> tuple[float, float] | None:
     if not normalized:
         return None
     return CITY_CENTERS.get(normalized)
+
+
+def _pick_route_length_km(base_track_length_km: float) -> float:
+    min_length = max(0.3, base_track_length_km * 0.5)
+    max_length = max(min_length, base_track_length_km * 1.5)
+    return random.uniform(min_length, max_length)
 
 
 async def _get_vehicle_ids_by_enterprise(
@@ -78,10 +87,14 @@ async def _get_vehicle_ids_by_enterprise(
 async def clear_enterprise_track_points(enterprise_id: int) -> None:
     async with AsyncSessionLocal() as db:
         vehicle_ids = await _get_vehicle_ids_by_enterprise(db, enterprise_id)
+
+        await db.execute(delete(Trip).where(Trip.vehicle_id.in_(vehicle_ids)))
         await db.execute(delete(VehicleGpsPoint).where(VehicleGpsPoint.vehicle_id.in_(vehicle_ids)))
         await db.commit()
+
         typer.echo(
-            f"Удалены точки машин предприятия {enterprise_id}. Количество машин: {len(vehicle_ids)}"
+            f"Удалены поездки и точки машин предприятия {enterprise_id}. "
+            f"Количество машин: {len(vehicle_ids)}"
         )
 
 
@@ -365,15 +378,45 @@ def _make_track_point(
     )
 
 
+def _make_trip(
+    *,
+    vehicle_id: int,
+    started_at_utc: datetime,
+    ended_at_utc: datetime,
+    start_point_id: int,
+    end_point_id: int,
+) -> Trip:
+    return Trip(
+        vehicle_id=vehicle_id,
+        started_at_utc=started_at_utc,
+        ended_at_utc=ended_at_utc,
+        start_point_id=start_point_id,
+        end_point_id=end_point_id,
+    )
+
+
 async def _insert_track_points_batch(
     db: AsyncSession,
     points: list[VehicleGpsPoint],
-) -> None:
+) -> list[VehicleGpsPoint]:
     if not points:
-        return
+        return points
 
     db.add_all(points)
     await db.commit()
+    return points
+
+
+async def _insert_trips_batch(
+    db: AsyncSession,
+    trips: list[Trip],
+) -> list[Trip]:
+    if not trips:
+        return trips
+
+    db.add_all(trips)
+    await db.commit()
+    return trips
 
 
 async def _insert_single_track_point(
@@ -382,7 +425,7 @@ async def _insert_single_track_point(
     recorded_at_utc: datetime,
     lon: float,
     lat: float,
-) -> None:
+) -> VehicleGpsPoint:
     point = _make_track_point(
         vehicle_id=vehicle_id,
         recorded_at_utc=recorded_at_utc,
@@ -391,6 +434,28 @@ async def _insert_single_track_point(
     )
     db.add(point)
     await db.commit()
+    return point
+
+
+async def _insert_single_trip(
+    db: AsyncSession,
+    *,
+    vehicle_id: int,
+    started_at_utc: datetime,
+    ended_at_utc: datetime,
+    start_point_id: int,
+    end_point_id: int,
+) -> Trip:
+    trip = _make_trip(
+        vehicle_id=vehicle_id,
+        started_at_utc=started_at_utc,
+        ended_at_utc=ended_at_utc,
+        start_point_id=start_point_id,
+        end_point_id=end_point_id,
+    )
+    db.add(trip)
+    await db.commit()
+    return trip
 
 
 async def _prepare_vehicle_route_state(
@@ -432,12 +497,13 @@ async def _prepare_vehicle_route_state(
         )
 
     route_center_lat, route_center_lon = center
+    actual_track_length_km = _pick_route_length_km(track_length_km)
 
     raw_route, used_osrm_any = await _build_full_route(
         center_lat=route_center_lat,
         center_lon=route_center_lon,
         radius_km=radius_km,
-        track_length_km=track_length_km,
+        track_length_km=actual_track_length_km,
         use_osrm=use_osrm,
     )
 
@@ -449,6 +515,7 @@ async def _prepare_vehicle_route_state(
 
     typer.echo(
         f"Маршрут #1 для машины {vehicle_id} подготовлен. "
+        f"Целевая длина: {actual_track_length_km:.2f} км. "
         f"Точек: {len(resampled_route)}. "
         f"Источник: {'OSRM' if used_osrm_any else 'fallback'}."
     )
@@ -490,8 +557,16 @@ async def _rebuild_vehicle_route_state(
 
     if not new_state.skipped:
         new_state.route_number = state.route_number + 1
+        new_state.completed_routes = state.completed_routes
 
     return new_state
+
+
+def _is_route_limit_reached(
+    completed_routes: int,
+    routes_count: int | None,
+) -> bool:
+    return routes_count is not None and completed_routes >= routes_count
 
 
 async def generate_live_track(
@@ -508,6 +583,7 @@ async def generate_live_track(
     use_osrm: bool,
     clear_before: bool,
     loop: bool,
+    routes_count: int | None,
 ) -> None:
     if radius_km <= 0:
         raise ValueError("radius_km должен быть больше 0")
@@ -519,6 +595,8 @@ async def generate_live_track(
         raise ValueError("step_m должен быть больше 0")
     if step_jitter_m < 0:
         raise ValueError("step_jitter_m не может быть отрицательным")
+    if routes_count is not None and routes_count <= 0:
+        raise ValueError("routes_count должен быть больше 0")
 
     if seed is not None:
         random.seed(seed)
@@ -542,21 +620,27 @@ async def generate_live_track(
         route_center_lat, route_center_lon = center
 
         if clear_before:
+            await db.execute(delete(Trip).where(Trip.vehicle_id == vehicle_id))
             await db.execute(
                 delete(VehicleGpsPoint).where(VehicleGpsPoint.vehicle_id == vehicle_id)
             )
             await db.commit()
 
         route_number = 0
+        completed_routes = 0
 
         while True:
+            if _is_route_limit_reached(completed_routes, routes_count):
+                break
+
             route_number += 1
+            actual_track_length_km = _pick_route_length_km(track_length_km)
 
             raw_route, used_osrm_any = await _build_full_route(
                 center_lat=route_center_lat,
                 center_lon=route_center_lon,
                 radius_km=radius_km,
-                track_length_km=track_length_km,
+                track_length_km=actual_track_length_km,
                 use_osrm=use_osrm,
             )
 
@@ -568,20 +652,24 @@ async def generate_live_track(
 
             typer.echo(
                 f"Маршрут #{route_number} для машины {vehicle_id} подготовлен. "
+                f"Целевая длина: {actual_track_length_km:.2f} км. "
                 f"Точек: {len(resampled_route)}. "
                 f"Источник: {'OSRM' if used_osrm_any else 'fallback'}."
             )
 
+            inserted_points: list[VehicleGpsPoint] = []
+
             for idx, (lon, lat) in enumerate(resampled_route, start=1):
                 now_utc = datetime.now(UTC)
 
-                await _insert_single_track_point(
+                point = await _insert_single_track_point(
                     db=db,
                     vehicle_id=vehicle_id,
                     recorded_at_utc=now_utc,
                     lon=lon,
                     lat=lat,
                 )
+                inserted_points.append(point)
 
                 typer.echo(
                     f"[route {route_number}][{idx}/{len(resampled_route)}] "
@@ -593,10 +681,33 @@ async def generate_live_track(
                 if idx < len(resampled_route):
                     await asyncio.sleep(interval_sec)
 
-            if not loop:
+            if len(inserted_points) >= 2:
+                trip = await _insert_single_trip(
+                    db=db,
+                    vehicle_id=vehicle_id,
+                    started_at_utc=inserted_points[0].recorded_at_utc,
+                    ended_at_utc=inserted_points[-1].recorded_at_utc,
+                    start_point_id=inserted_points[0].id,
+                    end_point_id=inserted_points[-1].id,
+                )
+                completed_routes += 1
+
+                typer.echo(
+                    f"[trip] vehicle_id={vehicle_id} trip_id={trip.id} "
+                    f"start_point_id={trip.start_point_id} end_point_id={trip.end_point_id} "
+                    f"completed_routes={completed_routes}"
+                )
+
+            if routes_count is not None and completed_routes >= routes_count:
                 break
 
-    typer.echo("Генерация live-трека завершена")
+            if not loop and routes_count is None:
+                break
+
+            if not loop and routes_count is not None:
+                continue
+
+    typer.echo("Генерация live-трека и поездок завершена")
 
 
 async def generate_enterprise_live_tracks(
@@ -612,6 +723,7 @@ async def generate_enterprise_live_tracks(
     seed: int | None,
     use_osrm: bool,
     clear_before: bool,
+    routes_count: int | None,
 ) -> None:
     if radius_km <= 0:
         raise ValueError("radius_km должен быть больше 0")
@@ -623,11 +735,14 @@ async def generate_enterprise_live_tracks(
         raise ValueError("step_m должен быть больше 0")
     if step_jitter_m < 0:
         raise ValueError("step_jitter_m не может быть отрицательным")
+    if routes_count is not None and routes_count <= 0:
+        raise ValueError("routes_count должен быть больше 0")
 
     async with AsyncSessionLocal() as db:
         vehicle_ids = await _get_vehicle_ids_by_enterprise(db, enterprise_id)
 
         if clear_before:
+            await db.execute(delete(Trip).where(Trip.vehicle_id.in_(vehicle_ids)))
             await db.execute(
                 delete(VehicleGpsPoint).where(VehicleGpsPoint.vehicle_id.in_(vehicle_ids))
             )
@@ -666,10 +781,19 @@ async def generate_enterprise_live_tracks(
 
     try:
         while True:
+            if routes_count is not None and all(
+                _is_route_limit_reached(state.completed_routes, routes_count)
+                for state in active_states
+            ):
+                break
+
             now_utc = datetime.now(UTC)
-            batch: list[VehicleGpsPoint] = []
+            pending_insertions: list[tuple[VehicleRouteState, VehicleGpsPoint]] = []
 
             for i, state in enumerate(active_states):
+                if _is_route_limit_reached(state.completed_routes, routes_count):
+                    continue
+
                 if state.point_index >= len(state.route_points):
                     new_state = await _rebuild_vehicle_route_state(
                         state,
@@ -699,24 +823,69 @@ async def generate_enterprise_live_tracks(
                 lon, lat = state.route_points[state.point_index]
                 state.point_index += 1
 
-                batch.append(
-                    _make_track_point(
-                        vehicle_id=state.vehicle_id,
-                        recorded_at_utc=now_utc,
-                        lon=lon,
-                        lat=lat,
+                pending_insertions.append(
+                    (
+                        state,
+                        _make_track_point(
+                            vehicle_id=state.vehicle_id,
+                            recorded_at_utc=now_utc,
+                            lon=lon,
+                            lat=lat,
+                        ),
                     )
                 )
 
             async with AsyncSessionLocal() as db:
-                await _insert_track_points_batch(db, batch)
+                points = [point for _, point in pending_insertions]
+                await _insert_track_points_batch(db, points)
 
-            typer.echo(f"[tick] {now_utc.isoformat()} записано точек: {len(batch)}")
+                completed_trips: list[Trip] = []
+
+                for state, point in pending_insertions:
+                    if state.current_trip_start_point_id is None:
+                        state.current_trip_start_point_id = point.id
+                        state.current_trip_started_at_utc = point.recorded_at_utc
+
+                    if state.point_index >= len(state.route_points):
+                        if (
+                            state.current_trip_start_point_id is not None
+                            and state.current_trip_started_at_utc is not None
+                        ):
+                            completed_trips.append(
+                                _make_trip(
+                                    vehicle_id=state.vehicle_id,
+                                    started_at_utc=state.current_trip_started_at_utc,
+                                    ended_at_utc=point.recorded_at_utc,
+                                    start_point_id=state.current_trip_start_point_id,
+                                    end_point_id=point.id,
+                                )
+                            )
+                            state.completed_routes += 1
+
+                        state.current_trip_start_point_id = None
+                        state.current_trip_started_at_utc = None
+
+                await _insert_trips_batch(db, completed_trips)
+
+            if pending_insertions:
+                typer.echo(
+                    f"[tick] {now_utc.isoformat()} "
+                    f"записано точек: {len(pending_insertions)} "
+                    f"создано поездок: {sum(1 for state, _ in pending_insertions if state.point_index >= len(state.route_points))}"
+                )
+
+            if routes_count is not None and all(
+                _is_route_limit_reached(state.completed_routes, routes_count)
+                for state in active_states
+            ):
+                break
 
             await asyncio.sleep(interval_sec)
 
     except KeyboardInterrupt:
         typer.echo("Остановка генерации enterprise...")
+
+    typer.echo("Генерация enterprise-треков и поездок завершена")
 
 
 async def clear_track_points(
@@ -729,14 +898,16 @@ async def clear_track_points(
 
     async with AsyncSessionLocal() as db:
         if clear_all:
+            await db.execute(delete(Trip))
             await db.execute(delete(VehicleGpsPoint))
             await db.commit()
-            typer.echo("Удалены все точки")
+            typer.echo("Удалены все поездки и точки")
             return
 
+        await db.execute(delete(Trip).where(Trip.vehicle_id == vehicle_id))
         await db.execute(delete(VehicleGpsPoint).where(VehicleGpsPoint.vehicle_id == vehicle_id))
         await db.commit()
-        typer.echo(f"Удалены точки машины {vehicle_id}")
+        typer.echo(f"Удалены поездки и точки машины {vehicle_id}")
 
 
 @app.command("track-generate-live")
@@ -751,7 +922,7 @@ def track_generate_live(
     ] = 5.0,
     track_length_km: Annotated[
         float,
-        typer.Option("--track-length-km", help="Желаемая длина маршрута в километрах"),
+        typer.Option("--track-length-km", help="Базовая желаемая длина маршрута в километрах"),
     ] = 8.0,
     interval_sec: Annotated[
         int,
@@ -783,12 +954,18 @@ def track_generate_live(
     ] = False,
     clear_before: Annotated[
         bool,
-        typer.Option("--clear-before", help="Очистить старые точки этой машины перед генерацией"),
+        typer.Option(
+            "--clear-before", help="Очистить старые поездки и точки этой машины перед генерацией"
+        ),
     ] = False,
     loop: Annotated[
         bool,
         typer.Option("--loop", help="После окончания маршрута сразу начинать новый"),
     ] = False,
+    routes_count: Annotated[
+        int | None,
+        typer.Option("--routes-count", help="Сгенерировать ровно столько поездок и остановиться"),
+    ] = None,
 ) -> None:
     asyncio.run(
         generate_live_track(
@@ -804,6 +981,7 @@ def track_generate_live(
             use_osrm=not no_osrm,
             clear_before=clear_before,
             loop=loop,
+            routes_count=routes_count,
         )
     )
 
@@ -820,7 +998,7 @@ def track_generate_enterprise_live(
     ] = 5.0,
     track_length_km: Annotated[
         float,
-        typer.Option("--track-length-km", help="Желаемая длина маршрута в километрах"),
+        typer.Option("--track-length-km", help="Базовая желаемая длина маршрута в километрах"),
     ] = 8.0,
     interval_sec: Annotated[
         int,
@@ -852,8 +1030,17 @@ def track_generate_enterprise_live(
     ] = False,
     clear_before: Annotated[
         bool,
-        typer.Option("--clear-before", help="Очистить старые точки всех машин предприятия"),
+        typer.Option(
+            "--clear-before", help="Очистить старые поездки и точки всех машин предприятия"
+        ),
     ] = False,
+    routes_count: Annotated[
+        int | None,
+        typer.Option(
+            "--routes-count",
+            help="Сгенерировать ровно столько поездок на каждую машину и остановиться",
+        ),
+    ] = None,
 ) -> None:
     asyncio.run(
         generate_enterprise_live_tracks(
@@ -868,6 +1055,7 @@ def track_generate_enterprise_live(
             seed=seed,
             use_osrm=not no_osrm,
             clear_before=clear_before,
+            routes_count=routes_count,
         )
     )
 
@@ -876,11 +1064,11 @@ def track_generate_enterprise_live(
 def track_clear(
     vehicle_id: Annotated[
         int | None,
-        typer.Option("--vehicle-id", help="ID машины, у которой удалить точки"),
+        typer.Option("--vehicle-id", help="ID машины, у которой удалить точки и поездки"),
     ] = None,
     clear_all: Annotated[
         bool,
-        typer.Option("--all", help="Удалить все точки всех машин"),
+        typer.Option("--all", help="Удалить все точки и все поездки"),
     ] = False,
 ) -> None:
     asyncio.run(

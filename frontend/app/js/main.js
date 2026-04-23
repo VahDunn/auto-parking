@@ -10,6 +10,8 @@ const showCreateFormBtn = document.getElementById("showCreateFormBtn");
 const cancelVehicleFormBtn = document.getElementById("cancelVehicleFormBtn");
 const vehicleForm = document.getElementById("vehicleForm");
 const vehicleEnterpriseTitle = document.getElementById("vehicleEnterpriseTitle");
+const loadTripsBtn = document.getElementById("loadTripsBtn");
+const showAllTripsMapBtn = document.getElementById("showAllTripsMapBtn");
 
 let enterprisesState = [];
 let selectedEnterprise = null;
@@ -17,8 +19,136 @@ let selectedEnterpriseVehicles = [];
 let vehicleModels = [];
 let vehicleModelsMap = new Map();
 
+let selectedVehicle = null;
+let selectedVehicleTrips = [];
+let selectedVehicleGroupedTracks = [];
+
 let vehiclePage = 1;
 const vehiclePageSize = 10;
+
+let leafletMap = null;
+let leafletLayers = [];
+
+function getTrackColor(index) {
+    const colors = [
+        "#0d6efd",
+        "#dc3545",
+        "#198754",
+        "#fd7e14",
+        "#6f42c1",
+        "#20c997",
+        "#6610f2",
+        "#d63384"
+    ];
+    return colors[index % colors.length];
+}
+
+function initMapIfNeeded() {
+    if (!leafletMap) {
+        leafletMap = L.map("map").setView([55.75, 37.61], 11);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(leafletMap);
+    }
+
+    setTimeout(() => {
+        leafletMap.invalidateSize();
+    }, 100);
+}
+
+function clearMapLayers() {
+    leafletLayers.forEach(layer => leafletMap.removeLayer(layer));
+    leafletLayers = [];
+}
+
+function fitMapToBounds(bounds) {
+    if (!leafletMap || bounds.length === 0) return;
+    leafletMap.fitBounds(bounds, {padding: [20, 20]});
+}
+
+function drawGroupedGeojsonTracks(groupedTracks) {
+    initMapIfNeeded();
+    clearMapLayers();
+
+    const bounds = [];
+    let drawnCount = 0;
+
+    groupedTracks.forEach((trip, index) => {
+        const features = trip.track?.features || [];
+
+        const latlngs = features
+            .map((feature) => {
+                const coords = feature?.geometry?.coordinates;
+                if (!coords || coords.length < 2) return null;
+
+                const [lon, lat] = coords;
+                if (typeof lat !== "number" || typeof lon !== "number") return null;
+
+                return [lat, lon];
+            })
+            .filter(Boolean);
+
+        if (latlngs.length < 2) {
+            return;
+        }
+
+        drawnCount += 1;
+
+        latlngs.forEach((point) => bounds.push(point));
+
+        const polyline = L.polyline(latlngs, {
+            color: getTrackColor(index),
+            weight: 5,
+            opacity: 0.9
+        }).addTo(leafletMap);
+
+        polyline.bindPopup(
+            `Поездка #${trip.trip_id}<br>${formatDateTime(trip.started_at_enterprise)} — ${formatDateTime(trip.ended_at_enterprise)}`
+        );
+
+        leafletLayers.push(polyline);
+
+        const startMarker = L.marker(latlngs[0]).addTo(leafletMap);
+        startMarker.bindPopup(`Старт поездки #${trip.trip_id}`);
+        leafletLayers.push(startMarker);
+
+        const endMarker = L.marker(latlngs[latlngs.length - 1]).addTo(leafletMap);
+        endMarker.bindPopup(`Финиш поездки #${trip.trip_id}`);
+        leafletLayers.push(endMarker);
+    });
+
+    setTimeout(() => {
+        leafletMap.invalidateSize();
+
+        if (bounds.length > 0) {
+            leafletMap.fitBounds(bounds, {
+                padding: [30, 30],
+                maxZoom: 15
+            });
+        } else if (drawnCount === 0) {
+            leafletMap.setView([29.95, -90.07], 12);
+        }
+    }, 100);
+}
+
+function renderTrackJson(titleText, payload) {
+    const container = document.getElementById("trackContainer");
+    const output = document.getElementById("trackOutput");
+    const title = document.getElementById("trackTitle");
+
+    title.textContent = titleText;
+    container.classList.remove("d-none");
+    output.textContent = JSON.stringify(payload, null, 2);
+}
+
+function setDefaultTripDateRange() {
+    const now = new Date();
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    document.getElementById("tripDateFrom").value = toDateTimeLocalValue(dayAgo.toISOString());
+    document.getElementById("tripDateTo").value = toDateTimeLocalValue(now.toISOString());
+}
 
 async function loadVehicleModels() {
     vehicleModels = await getVehicleModelsRequest();
@@ -32,26 +162,16 @@ async function handleShowTrack(vehicle) {
 
         const now = new Date();
         const dateTo = now.toISOString();
-
         const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         const dateFrom = dayAgo.toISOString();
-
         const format = document.getElementById("trackFormat").value;
 
-        const track = await getVehicleTrackRequest(
-            vehicle.id,
-            dateFrom,
-            dateTo,
-            format
+        const track = await getVehicleTrackRequest(vehicle.id, dateFrom, dateTo, format);
+
+        renderTrackJson(
+            `Плоский трек машины ${vehicle.vehicle_number} за последние 24 часа (${format})`,
+            track
         );
-
-        const container = document.getElementById("trackContainer");
-        const output = document.getElementById("trackOutput");
-        const title = document.getElementById("trackTitle");
-
-        title.textContent = `Трек машины ${vehicle.vehicle_number} за последние 24 часа (${format})`;
-        container.classList.remove("d-none");
-        output.textContent = JSON.stringify(track, null, 2);
     } catch (error) {
         showMessage(vehicleMessage, "danger", error.message);
     }
@@ -60,6 +180,7 @@ async function handleShowTrack(vehicle) {
 async function loadEnterprises() {
     clearMessage(enterpriseMessage);
     renderEnterpriseInfo(null);
+
     document.getElementById("enterpriseList").innerHTML = `
         <li class="list-group-item">Загрузка...</li>
     `;
@@ -100,7 +221,7 @@ async function loadVehiclesForEnterprise(enterprise) {
             vehicleModelsMap,
             startEditVehicle,
             handleDeleteVehicle,
-            handleShowTrack
+            handleSelectVehicle
         );
 
         renderVehiclePagination(vehicles, vehiclePage, vehiclePageSize, async (direction) => {
@@ -121,6 +242,9 @@ async function loadVehiclesForEnterprise(enterprise) {
 
 async function handleEnterpriseSelect(enterprise) {
     selectedEnterprise = enterprise;
+    selectedVehicle = null;
+    selectedVehicleTrips = [];
+    selectedVehicleGroupedTracks = [];
     vehiclePage = 1;
 
     renderEnterpriseInfo(enterprise);
@@ -133,8 +257,121 @@ async function handleEnterpriseSelect(enterprise) {
     vehicleCard.classList.remove("d-none");
     hideVehicleForm();
     resetVehicleForm();
+    renderSelectedVehicleInfo(null);
+    renderTripList([], () => {
+    });
+    setDefaultTripDateRange();
+
+    initMapIfNeeded();
+    clearMapLayers();
 
     await loadVehiclesForEnterprise(enterprise);
+}
+
+async function handleSelectVehicle(vehicle) {
+    selectedVehicle = vehicle;
+    const modelName = vehicleModelsMap.get(vehicle.model_id)?.name || `Модель ${vehicle.model_id}`;
+
+    renderSelectedVehicleInfo(vehicle, modelName);
+    setDefaultTripDateRange();
+    await loadTripsForSelectedVehicle();
+}
+
+async function loadTripsForSelectedVehicle() {
+    if (!selectedVehicle) {
+        showMessage(vehicleMessage, "warning", "Сначала выберите машину");
+        return;
+    }
+
+    try {
+        clearMessage(vehicleMessage);
+
+        const dateFromValue = document.getElementById("tripDateFrom").value;
+        const dateToValue = document.getElementById("tripDateTo").value;
+
+        const dateFrom = localInputToIso(dateFromValue);
+        const dateTo = localInputToIso(dateToValue);
+
+        if (!dateFrom || !dateTo) {
+            showMessage(vehicleMessage, "warning", "Укажите диапазон дат");
+            return;
+        }
+
+        const trips = await getVehicleTripsRequest(selectedVehicle.id, dateFrom, dateTo);
+        selectedVehicleTrips = trips;
+
+        renderTripList(trips, async (trip) => {
+            await showSingleTripOnMap(trip);
+        });
+    } catch (error) {
+        showMessage(vehicleMessage, "danger", error.message);
+    }
+}
+
+async function showSingleTripOnMap(trip) {
+    if (!selectedVehicle) return;
+
+    try {
+        clearMessage(vehicleMessage);
+
+        const format = "geojson";
+        const grouped = await getVehicleTrackByTripsRequest(
+            selectedVehicle.id,
+            trip.started_at_utc,
+            trip.ended_at_utc,
+            format
+        );
+
+        renderTrackJson(
+            `Трек поездки #${trip.id} (${format})`,
+            grouped
+        );
+
+        drawGroupedGeojsonTracks(grouped);
+    } catch (error) {
+        showMessage(vehicleMessage, "danger", error.message);
+    }
+}
+
+async function showAllTripsOnMap() {
+    if (!selectedVehicle) {
+        showMessage(vehicleMessage, "warning", "Сначала выберите машину");
+        return;
+    }
+
+    try {
+        clearMessage(vehicleMessage);
+
+        const dateFromValue = document.getElementById("tripDateFrom").value;
+        const dateToValue = document.getElementById("tripDateTo").value;
+
+        const dateFrom = localInputToIso(dateFromValue);
+        const dateTo = localInputToIso(dateToValue);
+
+        if (!dateFrom || !dateTo) {
+            showMessage(vehicleMessage, "warning", "Укажите диапазон дат");
+            return;
+        }
+
+        const format = "geojson";
+        const grouped = await getVehicleTrackByTripsRequest(
+            selectedVehicle.id,
+            dateFrom,
+            dateTo,
+            format
+        );
+
+        selectedVehicleGroupedTracks = grouped;
+
+        renderTrackJson(
+            `Все треки машины ${selectedVehicle.vehicle_number} за диапазон (${format})`,
+            grouped
+        );
+
+        drawGroupedGeojsonTracks(grouped);
+    } catch (error) {
+        showMessage(vehicleMessage, "danger", error.message);
+    }
 }
 
 function startCreateVehicle() {
@@ -195,6 +432,7 @@ async function refreshSelectedEnterpriseData() {
 
     if (!updatedEnterprise) {
         selectedEnterprise = null;
+        selectedVehicle = null;
         vehicleCard.classList.add("d-none");
         renderEnterpriseInfo(null);
         renderEnterprises(enterprisesState, null, handleEnterpriseSelect);
@@ -211,6 +449,21 @@ async function refreshSelectedEnterpriseData() {
     );
 
     await loadVehiclesForEnterprise(updatedEnterprise);
+
+    if (selectedVehicle) {
+        const refreshedVehicle = selectedEnterpriseVehicles.find(v => v.id === selectedVehicle.id);
+        if (refreshedVehicle) {
+            selectedVehicle = refreshedVehicle;
+            const modelName = vehicleModelsMap.get(refreshedVehicle.model_id)?.name || `Модель ${refreshedVehicle.model_id}`;
+            renderSelectedVehicleInfo(refreshedVehicle, modelName);
+        } else {
+            selectedVehicle = null;
+            renderSelectedVehicleInfo(null);
+            renderTripList([], () => {
+            });
+            clearMapLayers();
+        }
+    }
 }
 
 loginForm.addEventListener("submit", async (e) => {
@@ -274,6 +527,14 @@ cancelVehicleFormBtn.addEventListener("click", () => {
     resetVehicleForm();
 });
 
+loadTripsBtn.addEventListener("click", async () => {
+    await loadTripsForSelectedVehicle();
+});
+
+showAllTripsMapBtn.addEventListener("click", async () => {
+    await showAllTripsOnMap();
+});
+
 vehicleForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     clearMessage(vehicleMessage);
@@ -305,15 +566,7 @@ vehicleForm.addEventListener("submit", async (e) => {
 
     try {
         if (vehicleId) {
-            const updatePayload = {
-                ...basePayload
-            };
-
-            if (colorValue) {
-                updatePayload.color = colorValue;
-            }
-
-            await updateVehicleRequest(Number(vehicleId), updatePayload);
+            await updateVehicleRequest(Number(vehicleId), {...basePayload});
             showMessage(vehicleMessage, "success", "Машина обновлена");
         } else {
             await createVehicleRequest(basePayload);

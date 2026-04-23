@@ -45,9 +45,7 @@ async function getVehicleRequest(id) {
 async function getVehiclesByEnterpriseRequest(enterpriseId, limit = 10, offset = 0) {
     return await apiRequest(
         `/vehicles?enterprise_ids=${enterpriseId}&sort_by=-id&limit=${limit}&offset=${offset}`,
-        {
-            method: "GET"
-        }
+        {method: "GET"}
     );
 }
 
@@ -85,6 +83,29 @@ async function getVehicleTrackRequest(id, dateFrom, dateTo, format = "geojson") 
     });
 
     return await apiRequest(`/vehicles/${id}/track?${params.toString()}`, {
+        method: "GET"
+    });
+}
+
+async function getVehicleTripsRequest(id, dateFrom, dateTo) {
+    const params = new URLSearchParams({
+        date_from: dateFrom,
+        date_to: dateTo
+    });
+
+    return await apiRequest(`/vehicles/${id}/trips?${params.toString()}`, {
+        method: "GET"
+    });
+}
+
+async function getVehicleTrackByTripsRequest(id, dateFrom, dateTo, format = "geojson") {
+    const params = new URLSearchParams({
+        date_from: dateFrom,
+        date_to: dateTo,
+        format
+    });
+
+    return await apiRequest(`/vehicles/${id}/track-by-trips?${params.toString()}`, {
         method: "GET"
     });
 }
