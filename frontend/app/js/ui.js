@@ -12,9 +12,11 @@ function clearMessage(container) {
 
 function renderEnterpriseInfo(enterprise) {
     const container = document.getElementById("selectedEnterpriseInfo");
+    const buttons = document.getElementById("enterpriseExportButtons");
 
     if (!enterprise) {
         container.innerHTML = `<span class="text-muted">Сначала выберите предприятие слева</span>`;
+        buttons?.classList.add("d-none");
         return;
     }
 
@@ -26,6 +28,8 @@ function renderEnterpriseInfo(enterprise) {
         <div><strong>Менеджеры:</strong> ${enterprise.managers?.join(", ") || "—"}</div>
         <div><strong>Машины:</strong> ${enterprise.vehicles?.length || 0}</div>
     `;
+
+    buttons?.classList.remove("d-none");
 }
 
 function renderEnterprises(items, selectedEnterpriseId, onSelect) {
@@ -82,7 +86,7 @@ function renderVehiclesTable(vehicles, modelsMap, onEdit, onDelete, onSelectVehi
     if (!vehicles || vehicles.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-muted">У этого предприятия нет машин</td>
+                <td colspan="4" class="text-muted">У этого предприятия нет машин</td>
             </tr>
         `;
         return;
@@ -96,10 +100,6 @@ function renderVehiclesTable(vehicles, modelsMap, onEdit, onDelete, onSelectVehi
             <td>${vehicle.id}</td>
             <td>${vehicle.vehicle_number}</td>
             <td>${modelName}</td>
-            <td>${vehicle.manufacture_year}</td>
-            <td>${vehicle.mileage}</td>
-            <td>${vehicle.price}</td>
-            <td>${formatDateTime(vehicle.purchased_at_enterprise)}</td>
             <td>
                 <div class="d-flex gap-2 flex-wrap">
                     <button class="btn btn-sm btn-outline-primary select-btn">Выбрать</button>

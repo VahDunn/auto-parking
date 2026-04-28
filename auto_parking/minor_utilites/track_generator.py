@@ -868,10 +868,15 @@ async def generate_enterprise_live_tracks(
                 await _insert_trips_batch(db, completed_trips)
 
             if pending_insertions:
+                created_trips = sum(
+                    1
+                    for state, _ in pending_insertions
+                    if state.point_index >= len(state.route_points)
+                )
                 typer.echo(
                     f"[tick] {now_utc.isoformat()} "
                     f"записано точек: {len(pending_insertions)} "
-                    f"создано поездок: {sum(1 for state, _ in pending_insertions if state.point_index >= len(state.route_points))}"
+                    f"создано поездок: {created_trips}"
                 )
 
             if routes_count is not None and all(

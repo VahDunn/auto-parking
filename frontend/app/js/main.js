@@ -12,6 +12,8 @@ const vehicleForm = document.getElementById("vehicleForm");
 const vehicleEnterpriseTitle = document.getElementById("vehicleEnterpriseTitle");
 const loadTripsBtn = document.getElementById("loadTripsBtn");
 const showAllTripsMapBtn = document.getElementById("showAllTripsMapBtn");
+const exportEnterpriseJsonBtn = document.getElementById("exportEnterpriseJsonBtn");
+const exportEnterpriseCsvBtn = document.getElementById("exportEnterpriseCsvBtn");
 
 let enterprisesState = [];
 let selectedEnterprise = null;
@@ -58,13 +60,10 @@ function initMapIfNeeded() {
 }
 
 function clearMapLayers() {
+    if (!leafletMap) return;
+
     leafletLayers.forEach(layer => leafletMap.removeLayer(layer));
     leafletLayers = [];
-}
-
-function fitMapToBounds(bounds) {
-    if (!leafletMap || bounds.length === 0) return;
-    leafletMap.fitBounds(bounds, {padding: [20, 20]});
 }
 
 function drawGroupedGeojsonTracks(groupedTracks) {
@@ -94,7 +93,6 @@ function drawGroupedGeojsonTracks(groupedTracks) {
         }
 
         drawnCount += 1;
-
         latlngs.forEach((point) => bounds.push(point));
 
         const polyline = L.polyline(latlngs, {
@@ -108,14 +106,6 @@ function drawGroupedGeojsonTracks(groupedTracks) {
         );
 
         leafletLayers.push(polyline);
-
-        const startMarker = L.marker(latlngs[0]).addTo(leafletMap);
-        startMarker.bindPopup(`Старт поездки #${trip.trip_id}`);
-        leafletLayers.push(startMarker);
-
-        const endMarker = L.marker(latlngs[latlngs.length - 1]).addTo(leafletMap);
-        endMarker.bindPopup(`Финиш поездки #${trip.trip_id}`);
-        leafletLayers.push(endMarker);
     });
 
     setTimeout(() => {
@@ -144,37 +134,65 @@ function renderTrackJson(titleText, payload) {
 
 function setDefaultTripDateRange() {
     const now = new Date();
-    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     document.getElementById("tripDateFrom").value = toDateTimeLocalValue(dayAgo.toISOString());
     document.getElementById("tripDateTo").value = toDateTimeLocalValue(now.toISOString());
+
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const exportFrom = document.getElementById("exportDateFrom");
+    const exportTo = document.getElementById("exportDateTo");
+
+    if (exportFrom) {
+        exportFrom.value = toDateTimeLocalValue(monthAgo.toISOString());
+    }
+
+    if (exportTo) {
+        exportTo.value = toDateTimeLocalValue(now.toISOString());
+    }
+}
+
+async function handleExportEnterprise(format) {
+    if (!selectedEnterprise) {
+        showMessage(enterpriseMessage, "warning", "Сначала выберите предприятие");
+        return;
+    }
+
+    try {
+        clearMessage(enterpriseMessage);
+
+        const dateFromValue = document.getElementById("exportDateFrom").value;
+        const dateToValue = document.getElementById("exportDateTo").value;
+
+        const dateFrom = localInputToIso(dateFromValue);
+        const dateTo = localInputToIso(dateToValue);
+
+        if (!dateFrom || !dateTo) {
+            showMessage(enterpriseMessage, "warning", "Укажите диапазон дат для экспорта");
+            return;
+        }
+
+        if (new Date(dateTo) < new Date(dateFrom)) {
+            showMessage(enterpriseMessage, "warning", "Дата 'до' должна быть больше даты 'от'");
+            return;
+        }
+
+        await exportEnterpriseRequest(
+            selectedEnterprise.id,
+            dateFrom,
+            dateTo,
+            format
+        );
+    } catch (error) {
+        showMessage(enterpriseMessage, "danger", error.message);
+    }
 }
 
 async function loadVehicleModels() {
     vehicleModels = await getVehicleModelsRequest();
     vehicleModelsMap = new Map(vehicleModels.map(model => [model.id, model]));
     renderVehicleModelOptions(vehicleModels);
-}
-
-async function handleShowTrack(vehicle) {
-    try {
-        clearMessage(vehicleMessage);
-
-        const now = new Date();
-        const dateTo = now.toISOString();
-        const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        const dateFrom = dayAgo.toISOString();
-        const format = document.getElementById("trackFormat").value;
-
-        const track = await getVehicleTrackRequest(vehicle.id, dateFrom, dateTo, format);
-
-        renderTrackJson(
-            `Плоский трек машины ${vehicle.vehicle_number} за последние 24 часа (${format})`,
-            track
-        );
-    } catch (error) {
-        showMessage(vehicleMessage, "danger", error.message);
-    }
 }
 
 async function loadEnterprises() {
@@ -201,8 +219,9 @@ async function loadEnterprises() {
 async function loadVehiclesForEnterprise(enterprise) {
     clearMessage(vehicleMessage);
     vehicleEnterpriseTitle.textContent = `${enterprise.name} (ID: ${enterprise.id})`;
+
     document.getElementById("vehicleTableBody").innerHTML = `
-        <tr><td colspan="8">Загрузка...</td></tr>
+        <tr><td colspan="4">Загрузка...</td></tr>
     `;
 
     try {
@@ -236,6 +255,9 @@ async function loadVehiclesForEnterprise(enterprise) {
             }
         });
     } catch (error) {
+        document.getElementById("vehicleTableBody").innerHTML = `
+            <tr><td colspan="4" class="text-muted">Не удалось загрузить машины</td></tr>
+        `;
         showMessage(vehicleMessage, "danger", error.message);
     }
 }
@@ -314,16 +336,15 @@ async function showSingleTripOnMap(trip) {
     try {
         clearMessage(vehicleMessage);
 
-        const format = "geojson";
         const grouped = await getVehicleTrackByTripsRequest(
             selectedVehicle.id,
             trip.started_at_utc,
             trip.ended_at_utc,
-            format
+            "geojson"
         );
 
         renderTrackJson(
-            `Трек поездки #${trip.id} (${format})`,
+            `Трек поездки #${trip.id} (geojson)`,
             grouped
         );
 
@@ -353,18 +374,17 @@ async function showAllTripsOnMap() {
             return;
         }
 
-        const format = "geojson";
         const grouped = await getVehicleTrackByTripsRequest(
             selectedVehicle.id,
             dateFrom,
             dateTo,
-            format
+            "geojson"
         );
 
         selectedVehicleGroupedTracks = grouped;
 
         renderTrackJson(
-            `Все треки машины ${selectedVehicle.vehicle_number} за диапазон (${format})`,
+            `Все треки машины ${selectedVehicle.vehicle_number} за диапазон (geojson)`,
             grouped
         );
 
@@ -452,6 +472,7 @@ async function refreshSelectedEnterpriseData() {
 
     if (selectedVehicle) {
         const refreshedVehicle = selectedEnterpriseVehicles.find(v => v.id === selectedVehicle.id);
+
         if (refreshedVehicle) {
             selectedVehicle = refreshedVehicle;
             const modelName = vehicleModelsMap.get(refreshedVehicle.model_id)?.name || `Модель ${refreshedVehicle.model_id}`;
@@ -511,6 +532,7 @@ reloadBtn.addEventListener("click", async () => {
                 await loadVehiclesForEnterprise(updatedEnterprise);
             } else {
                 selectedEnterprise = null;
+                selectedVehicle = null;
                 vehicleCard.classList.add("d-none");
                 renderEnterpriseInfo(null);
             }
@@ -533,6 +555,14 @@ loadTripsBtn.addEventListener("click", async () => {
 
 showAllTripsMapBtn.addEventListener("click", async () => {
     await showAllTripsOnMap();
+});
+
+exportEnterpriseJsonBtn?.addEventListener("click", async () => {
+    await handleExportEnterprise("json");
+});
+
+exportEnterpriseCsvBtn?.addEventListener("click", async () => {
+    await handleExportEnterprise("csv");
 });
 
 vehicleForm.addEventListener("submit", async (e) => {

@@ -12,16 +12,22 @@ class VehicleRepository:
     def __init__(self, db: AsyncSession):
         self.db: AsyncSession = db
 
-    async def get(self, filter_obj: VehicleFilter) -> Sequence[Vehicle]:
-        stmt = select(Vehicle).options(
+    @staticmethod
+    def _base_options():
+        return (
             selectinload(Vehicle.drivers).options(load_only(Driver.id)),
             selectinload(Vehicle.enterprise).options(load_only(Enterprise.id, Enterprise.timezone)),
         )
 
+    async def get(self, filter_obj: VehicleFilter) -> Sequence[Vehicle]:
+        stmt = select(Vehicle).options(*self._base_options())
+
         if filter_obj.id:
             stmt = stmt.where(Vehicle.id.in_(filter_obj.id))
+
         if filter_obj.enterprise_ids:
             stmt = stmt.where(Vehicle.enterprise_id.in_(filter_obj.enterprise_ids))
+
         if filter_obj.driver_id is not None:
             stmt = stmt.where(Vehicle.drivers.any(Driver.id == filter_obj.driver_id))
 
@@ -59,16 +65,18 @@ class VehicleRepository:
 
     async def get_by_id(self, vehicle_id: int) -> Vehicle | None:
         result = await self.db.execute(
-            select(Vehicle)
-            .where(Vehicle.id == vehicle_id)
-            .options(
-                selectinload(Vehicle.drivers).options(load_only(Driver.id)),
-                selectinload(Vehicle.enterprise).options(
-                    load_only(Enterprise.id, Enterprise.timezone)
-                ),
-            )
+            select(Vehicle).where(Vehicle.id == vehicle_id).options(*self._base_options())
         )
         return result.scalar_one_or_none()
+
+    async def get_by_enterprise_id(self, enterprise_id: int) -> Sequence[Vehicle]:
+        result = await self.db.execute(
+            select(Vehicle)
+            .where(Vehicle.enterprise_id == enterprise_id)
+            .options(*self._base_options())
+            .order_by(Vehicle.id.asc())
+        )
+        return result.unique().scalars().all()
 
     async def create(self, data: dict) -> Vehicle:
         vehicle = Vehicle(**data)
@@ -80,10 +88,11 @@ class VehicleRepository:
         except Exception:
             await self.db.rollback()
             raise
-        await self.db.refresh(vehicle)
-        return await self.get_by_id(vehicle.id)  # type: ignore[return-value]
 
-    async def update(self, vehicle_id: int, data: dict) -> Vehicle | None:
+        await self.db.refresh(vehicle)
+        return await self.get_by_id(vehicle.id)  # pyright: ignore[reportReturnType]
+
+    async def update(self, vehicle_id: int, data: dict) -> Vehicle | None:  # pyright: ignore[reportMissingTypeArgument]
         vehicle = await self.get_by_id(vehicle_id)
         if not vehicle:
             return None

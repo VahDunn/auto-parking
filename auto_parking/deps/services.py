@@ -17,6 +17,7 @@ from auto_parking.repo.vehicle import VehicleRepository
 from auto_parking.repo.vehicle_track import VehicleTrackRepository
 from auto_parking.service.driver import DriverService
 from auto_parking.service.enterprise import EnterpriseService
+from auto_parking.service.export import ExportService
 from auto_parking.service.trip import TripService
 from auto_parking.service.trip_track import TripTrackService
 from auto_parking.service.user import UserService
@@ -61,6 +62,20 @@ def get_trip_track_service(
     return TripTrackService(vehicle_repo=vehicle_repo, track_repo=track_repo, trip_repo=trip_repo)
 
 
+def get_export_service(
+    enterprise_repo: EnterpriseRepository = dep_enterprise_repo,
+    vehicle_repo: VehicleRepository = dep_vehicle_repo,
+    trip_repo: TripRepository = dep_trip_repo,
+    track_repo: VehicleTrackRepository = dep_track_repo,
+) -> ExportService:
+    return ExportService(
+        enterprise_repo=enterprise_repo,
+        vehicle_repo=vehicle_repo,
+        trip_repo=trip_repo,
+        track_repo=track_repo,
+    )
+
+
 dep_trip_service = Depends(get_trip_service)
 dep_vehicle_track_service = Depends(get_vehicle_track_service)
 dep_enterprise_service = Depends(get_enterprise_service)
@@ -68,3 +83,4 @@ dep_driver_service = Depends(get_driver_service)
 dep_vehicle_service = Depends(get_vehicle_service)
 dep_user_service = Depends(get_user_service)
 dep_trip_track_service = Depends(get_trip_track_service)
+dep_export_service = Depends(get_export_service)
