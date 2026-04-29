@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
+from geoalchemy2.elements import WKTElement
 from sqlalchemy import Row, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,3 +65,33 @@ class VehicleTrackRepository:
 
         result = await self.db.execute(stmt)
         return result.all()
+
+    async def create_point(
+        self,
+        *,
+        vehicle_id: int,
+        recorded_at_utc: datetime,
+        latitude: float,
+        longitude: float,
+    ) -> VehicleGpsPoint:
+        point = VehicleGpsPoint(
+            vehicle_id=vehicle_id,
+            recorded_at_utc=recorded_at_utc,
+            position=self._point_wkt(longitude, latitude),
+        )
+
+        self.db.add(point)
+        await self.db.flush()
+
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        await self.db.refresh(point)
+        return point
+
+    @staticmethod
+    def _point_wkt(lon: float, lat: float) -> WKTElement:
+        return WKTElement(f"POINT({lon} {lat})", srid=4326)

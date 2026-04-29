@@ -12,9 +12,18 @@ const vehicleForm = document.getElementById("vehicleForm");
 const vehicleEnterpriseTitle = document.getElementById("vehicleEnterpriseTitle");
 const loadTripsBtn = document.getElementById("loadTripsBtn");
 const showAllTripsMapBtn = document.getElementById("showAllTripsMapBtn");
-const exportEnterpriseJsonBtn = document.getElementById("exportEnterpriseJsonBtn");
-const exportEnterpriseCsvBtn = document.getElementById("exportEnterpriseCsvBtn");
+const exportFullJsonBtn = document.getElementById("exportFullJsonBtn");
+const exportFullCsvBtn = document.getElementById("exportFullCsvBtn");
+const exportVehiclesJsonBtn = document.getElementById("exportVehiclesJsonBtn");
+const exportVehiclesCsvBtn = document.getElementById("exportVehiclesCsvBtn");
+const exportVehicleTripsJsonBtn = document.getElementById("exportVehicleTripsJsonBtn");
+const exportVehicleTripsCsvBtn = document.getElementById("exportVehicleTripsCsvBtn");
+const importDropZone = document.getElementById("importDropZone");
+const importFileInput = document.getElementById("importFileInput");
+const importBtn = document.getElementById("importBtn");
+const importFileName = document.getElementById("importFileName");
 
+let selectedImportFile = null;
 let enterprisesState = [];
 let selectedEnterprise = null;
 let selectedEnterpriseVehicles = [];
@@ -50,7 +59,7 @@ function initMapIfNeeded() {
         leafletMap = L.map("map").setView([55.75, 37.61], 11);
 
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: "&copy; OpenStreetMap contributors"
         }).addTo(leafletMap);
     }
 
@@ -59,11 +68,73 @@ function initMapIfNeeded() {
     }, 100);
 }
 
+function detectImportFormat(file) {
+    const name = file.name.toLowerCase();
+
+    if (name.endsWith(".json")) {
+        return "json";
+    }
+
+    if (name.endsWith(".csv")) {
+        return "csv";
+    }
+
+    return null;
+}
+
 function clearMapLayers() {
-    if (!leafletMap) return;
+    if (!leafletMap) {
+        return;
+    }
 
     leafletLayers.forEach(layer => leafletMap.removeLayer(layer));
     leafletLayers = [];
+}
+
+function setImportFile(file) {
+    selectedImportFile = file;
+
+    if (importFileName) {
+        importFileName.textContent = file
+            ? `Выбран файл: ${file.name}`
+            : "Файл не выбран";
+    }
+}
+
+async function handleImportEnterprise() {
+    if (!selectedImportFile) {
+        showMessage(enterpriseMessage, "warning", "Сначала выберите файл для импорта");
+        return;
+    }
+
+    const format = detectImportFormat(selectedImportFile);
+
+    if (!format) {
+        showMessage(enterpriseMessage, "warning", "Поддерживаются только .json и .csv файлы");
+        return;
+    }
+
+    try {
+        clearMessage(enterpriseMessage);
+
+        const result = await importEnterpriseRequest(selectedImportFile, format);
+
+        showMessage(
+            enterpriseMessage,
+            "success",
+            `Импорт завершён. Enterprise ID: ${result.enterprise_id}, машин: ${result.imported_vehicles}, поездок: ${result.imported_trips}, точек: ${result.imported_points}`
+        );
+
+        setImportFile(null);
+
+        if (importFileInput) {
+            importFileInput.value = "";
+        }
+
+        await loadEnterprises();
+    } catch (error) {
+        showMessage(enterpriseMessage, "danger", error.message);
+    }
 }
 
 function drawGroupedGeojsonTracks(groupedTracks) {
@@ -153,7 +224,46 @@ function setDefaultTripDateRange() {
     }
 }
 
-async function handleExportEnterprise(format) {
+function getExportDateRange() {
+    const dateFromValue = document.getElementById("exportDateFrom").value;
+    const dateToValue = document.getElementById("exportDateTo").value;
+
+    const dateFrom = localInputToIso(dateFromValue);
+    const dateTo = localInputToIso(dateToValue);
+
+    if (!dateFrom || !dateTo) {
+        throw new Error("Укажите диапазон дат для экспорта");
+    }
+
+    if (new Date(dateTo) < new Date(dateFrom)) {
+        throw new Error("Дата 'до' должна быть больше даты 'от'");
+    }
+
+    return {dateFrom, dateTo};
+}
+
+async function handleExportEnterpriseFull(format) {
+    if (!selectedEnterprise) {
+        showMessage(enterpriseMessage, "warning", "Сначала выберите предприятие");
+        return;
+    }
+
+    try {
+        clearMessage(enterpriseMessage);
+        const {dateFrom, dateTo} = getExportDateRange();
+
+        await exportEnterpriseFullRequest(
+            selectedEnterprise.id,
+            dateFrom,
+            dateTo,
+            format
+        );
+    } catch (error) {
+        showMessage(enterpriseMessage, "danger", error.message);
+    }
+}
+
+async function handleExportEnterpriseVehicles(format) {
     if (!selectedEnterprise) {
         showMessage(enterpriseMessage, "warning", "Сначала выберите предприятие");
         return;
@@ -162,30 +272,45 @@ async function handleExportEnterprise(format) {
     try {
         clearMessage(enterpriseMessage);
 
-        const dateFromValue = document.getElementById("exportDateFrom").value;
-        const dateToValue = document.getElementById("exportDateTo").value;
+        await exportEnterpriseVehiclesRequest(
+            selectedEnterprise.id,
+            format
+        );
+    } catch (error) {
+        showMessage(enterpriseMessage, "danger", error.message);
+    }
+}
 
-        const dateFrom = localInputToIso(dateFromValue);
-        const dateTo = localInputToIso(dateToValue);
+async function handleExportVehicleTrips(format) {
+    if (!selectedVehicle) {
+        showMessage(vehicleMessage, "warning", "Сначала выберите машину");
+        return;
+    }
+
+    try {
+        clearMessage(vehicleMessage);
+
+        const dateFrom = localInputToIso(document.getElementById("tripDateFrom").value);
+        const dateTo = localInputToIso(document.getElementById("tripDateTo").value);
 
         if (!dateFrom || !dateTo) {
-            showMessage(enterpriseMessage, "warning", "Укажите диапазон дат для экспорта");
+            showMessage(vehicleMessage, "warning", "Укажите диапазон дат");
             return;
         }
 
         if (new Date(dateTo) < new Date(dateFrom)) {
-            showMessage(enterpriseMessage, "warning", "Дата 'до' должна быть больше даты 'от'");
+            showMessage(vehicleMessage, "warning", "Дата 'до' должна быть больше даты 'от'");
             return;
         }
 
-        await exportEnterpriseRequest(
-            selectedEnterprise.id,
+        await exportVehicleTripsRequest(
+            selectedVehicle.id,
             dateFrom,
             dateTo,
             format
         );
     } catch (error) {
-        showMessage(enterpriseMessage, "danger", error.message);
+        showMessage(vehicleMessage, "danger", error.message);
     }
 }
 
@@ -218,7 +343,11 @@ async function loadEnterprises() {
 
 async function loadVehiclesForEnterprise(enterprise) {
     clearMessage(vehicleMessage);
+
+    const enterpriseId = enterprise.id;
     vehicleEnterpriseTitle.textContent = `${enterprise.name} (ID: ${enterprise.id})`;
+
+    selectedEnterpriseVehicles = [];
 
     document.getElementById("vehicleTableBody").innerHTML = `
         <tr><td colspan="4">Загрузка...</td></tr>
@@ -228,10 +357,14 @@ async function loadVehiclesForEnterprise(enterprise) {
         const offset = (vehiclePage - 1) * vehiclePageSize;
 
         const vehicles = await getVehiclesByEnterpriseRequest(
-            enterprise.id,
+            enterpriseId,
             vehiclePageSize,
             offset
         );
+
+        if (!selectedEnterprise || selectedEnterprise.id !== enterpriseId) {
+            return;
+        }
 
         selectedEnterpriseVehicles = vehicles;
 
@@ -244,6 +377,10 @@ async function loadVehiclesForEnterprise(enterprise) {
         );
 
         renderVehiclePagination(vehicles, vehiclePage, vehiclePageSize, async (direction) => {
+            if (!selectedEnterprise || selectedEnterprise.id !== enterpriseId) {
+                return;
+            }
+
             if (direction === "prev" && vehiclePage > 1) {
                 vehiclePage -= 1;
                 await loadVehiclesForEnterprise(selectedEnterprise);
@@ -255,6 +392,10 @@ async function loadVehiclesForEnterprise(enterprise) {
             }
         });
     } catch (error) {
+        if (!selectedEnterprise || selectedEnterprise.id !== enterpriseId) {
+            return;
+        }
+
         document.getElementById("vehicleTableBody").innerHTML = `
             <tr><td colspan="4" class="text-muted">Не удалось загрузить машины</td></tr>
         `;
@@ -267,6 +408,7 @@ async function handleEnterpriseSelect(enterprise) {
     selectedVehicle = null;
     selectedVehicleTrips = [];
     selectedVehicleGroupedTracks = [];
+    selectedEnterpriseVehicles = [];
     vehiclePage = 1;
 
     renderEnterpriseInfo(enterprise);
@@ -283,6 +425,10 @@ async function handleEnterpriseSelect(enterprise) {
     renderTripList([], () => {
     });
     setDefaultTripDateRange();
+
+    document.getElementById("vehicleTableBody").innerHTML = `
+        <tr><td colspan="4">Загрузка...</td></tr>
+    `;
 
     initMapIfNeeded();
     clearMapLayers();
@@ -443,16 +589,19 @@ async function refreshSelectedEnterpriseData() {
         return;
     }
 
+    const enterpriseId = selectedEnterprise.id;
+
     const updatedEnterprises = await getEnterprisesRequest();
     enterprisesState = updatedEnterprises;
 
     const updatedEnterprise = updatedEnterprises.find(
-        e => e.id === selectedEnterprise.id
+        e => e.id === enterpriseId
     );
 
     if (!updatedEnterprise) {
         selectedEnterprise = null;
         selectedVehicle = null;
+        selectedEnterpriseVehicles = [];
         vehicleCard.classList.add("d-none");
         renderEnterpriseInfo(null);
         renderEnterprises(enterprisesState, null, handleEnterpriseSelect);
@@ -522,8 +671,9 @@ reloadBtn.addEventListener("click", async () => {
         );
 
         if (selectedEnterprise) {
+            const selectedEnterpriseId = selectedEnterprise.id;
             const updatedEnterprise = enterprisesState.find(
-                e => e.id === selectedEnterprise.id
+                e => e.id === selectedEnterpriseId
             );
 
             if (updatedEnterprise) {
@@ -533,6 +683,7 @@ reloadBtn.addEventListener("click", async () => {
             } else {
                 selectedEnterprise = null;
                 selectedVehicle = null;
+                selectedEnterpriseVehicles = [];
                 vehicleCard.classList.add("d-none");
                 renderEnterpriseInfo(null);
             }
@@ -557,12 +708,28 @@ showAllTripsMapBtn.addEventListener("click", async () => {
     await showAllTripsOnMap();
 });
 
-exportEnterpriseJsonBtn?.addEventListener("click", async () => {
-    await handleExportEnterprise("json");
+exportFullJsonBtn?.addEventListener("click", async () => {
+    await handleExportEnterpriseFull("json");
 });
 
-exportEnterpriseCsvBtn?.addEventListener("click", async () => {
-    await handleExportEnterprise("csv");
+exportFullCsvBtn?.addEventListener("click", async () => {
+    await handleExportEnterpriseFull("csv");
+});
+
+exportVehiclesJsonBtn?.addEventListener("click", async () => {
+    await handleExportEnterpriseVehicles("json");
+});
+
+exportVehiclesCsvBtn?.addEventListener("click", async () => {
+    await handleExportEnterpriseVehicles("csv");
+});
+
+exportVehicleTripsJsonBtn?.addEventListener("click", async () => {
+    await handleExportVehicleTrips("json");
+});
+
+exportVehicleTripsCsvBtn?.addEventListener("click", async () => {
+    await handleExportVehicleTrips("csv");
 });
 
 vehicleForm.addEventListener("submit", async (e) => {
@@ -609,4 +776,38 @@ vehicleForm.addEventListener("submit", async (e) => {
     } catch (error) {
         showMessage(vehicleMessage, "danger", error.message);
     }
+});
+
+importDropZone?.addEventListener("click", () => {
+    importFileInput?.click();
+});
+
+importFileInput?.addEventListener("change", () => {
+    const file = importFileInput.files?.[0];
+    if (file) {
+        setImportFile(file);
+    }
+});
+
+importDropZone?.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    importDropZone.classList.add("border-primary");
+});
+
+importDropZone?.addEventListener("dragleave", () => {
+    importDropZone.classList.remove("border-primary");
+});
+
+importDropZone?.addEventListener("drop", (event) => {
+    event.preventDefault();
+    importDropZone.classList.remove("border-primary");
+
+    const file = event.dataTransfer.files?.[0];
+    if (file) {
+        setImportFile(file);
+    }
+});
+
+importBtn?.addEventListener("click", async () => {
+    await handleImportEnterprise();
 });

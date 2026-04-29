@@ -52,6 +52,36 @@
                     </div>
 
                     <div id="enterpriseMessage"></div>
+                    <div class="card border-0 bg-body-tertiary mb-4" id="enterpriseImportCard">
+                        <div class="card-body">
+                            <h5 class="mb-3">Импорт предприятия</h5>
+
+                            <div
+                                    id="importDropZone"
+                                    class="border rounded p-3 text-center bg-light"
+                                    style="cursor: pointer;"
+                            >
+                                <div class="fw-semibold">Перетащите сюда JSON/CSV файл</div>
+                                <div class="text-muted small">или нажмите для выбора файла</div>
+                                <input
+                                        type="file"
+                                        id="importFileInput"
+                                        class="d-none"
+                                        accept=".json,.csv,application/json,text/csv"
+                                />
+                            </div>
+
+                            <div class="mt-2 d-flex gap-2 flex-wrap">
+                                <button class="btn btn-primary btn-sm" id="importBtn" type="button">
+                                    Импорт
+                                </button>
+                            </div>
+
+                            <div id="importFileName" class="text-muted small mt-2">
+                                Файл не выбран
+                            </div>
+                        </div>
+                    </div>
                     <div class="row">
                         <div class="col-md-5">
                             <ul class="list-group" id="enterpriseList"></ul>
@@ -80,17 +110,24 @@
                                         </div>
 
                                         <div class="d-flex gap-2 flex-wrap">
-                                            <button class="btn btn-outline-primary btn-sm" id="exportEnterpriseJsonBtn"
+                                            <button class="btn btn-outline-primary btn-sm" id="exportFullJsonBtn"
                                                     type="button">
-                                                Экспорт JSON
+                                                Общий JSON
                                             </button>
-                                            <button class="btn btn-outline-secondary btn-sm" id="exportEnterpriseCsvBtn"
+                                            <button class="btn btn-outline-secondary btn-sm" id="exportFullCsvBtn"
                                                     type="button">
-                                                Экспорт CSV
+                                                Общий CSV
+                                            </button>
+                                            <button class="btn btn-outline-primary btn-sm" id="exportVehiclesJsonBtn"
+                                                    type="button">
+                                                Машины JSON
+                                            </button>
+                                            <button class="btn btn-outline-secondary btn-sm" id="exportVehiclesCsvBtn"
+                                                    type="button">
+                                                Машины CSV
                                             </button>
                                         </div>
                                     </div>
-
                                 </div>
                             </div>
                         </div>
@@ -242,6 +279,14 @@
                                             <button class="btn btn-outline-secondary btn-sm" id="showAllTripsMapBtn"
                                                     type="button">
                                                 Показать все треки
+                                            </button>
+                                            <button class="btn btn-outline-primary btn-sm"
+                                                    id="exportVehicleTripsJsonBtn" type="button">
+                                                Экспорт поездок JSON
+                                            </button>
+                                            <button class="btn btn-outline-secondary btn-sm"
+                                                    id="exportVehicleTripsCsvBtn" type="button">
+                                                Экспорт поездок CSV
                                             </button>
                                         </div>
                                     </div>

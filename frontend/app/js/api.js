@@ -144,3 +144,84 @@ async function exportEnterpriseRequest(enterpriseId, dateFrom, dateTo, format = 
     a.remove();
     window.URL.revokeObjectURL(url);
 }
+
+async function downloadFile(url, filename) {
+    const response = await fetch(url, {
+        method: "GET",
+        credentials: "include"
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Ошибка экспорта");
+    }
+
+    const blob = await response.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+
+    a.remove();
+    window.URL.revokeObjectURL(objectUrl);
+}
+
+async function exportEnterpriseFullRequest(enterpriseId, dateFrom, dateTo, format = "json") {
+    const params = new URLSearchParams({
+        date_from: dateFrom,
+        date_to: dateTo,
+        format
+    });
+
+    await downloadFile(
+        `${API_BASE}/enterprises/${enterpriseId}/export?${params.toString()}`,
+        `enterprise_${enterpriseId}_full_export.${format}`
+    );
+}
+
+async function exportEnterpriseVehiclesRequest(enterpriseId, format = "json") {
+    const params = new URLSearchParams({format});
+
+    await downloadFile(
+        `${API_BASE}/enterprises/${enterpriseId}/export-vehicles?${params.toString()}`,
+        `enterprise_${enterpriseId}_vehicles_export.${format}`
+    );
+}
+
+async function exportVehicleTripsRequest(vehicleId, dateFrom, dateTo, format = "json") {
+    const params = new URLSearchParams({
+        date_from: dateFrom,
+        date_to: dateTo,
+        format
+    });
+
+    await downloadFile(
+        `${API_BASE}/vehicles/${vehicleId}/export-trips?${params.toString()}`,
+        `vehicle_${vehicleId}_trips_export.${format}`
+    );
+}
+
+async function importEnterpriseRequest(file, format = "json") {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(
+        `${API_BASE}/enterprises/import?format=${encodeURIComponent(format)}`,
+        {
+            method: "POST",
+            credentials: "include",
+            body: formData
+        }
+    );
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.detail || "Ошибка импорта");
+    }
+
+    return data;
+}

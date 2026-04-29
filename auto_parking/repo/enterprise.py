@@ -78,6 +78,21 @@ class EnterpriseRepository:
         )
         return result.scalar_one_or_none()
 
+    async def create(self, data: dict) -> Enterprise:  # pyright: ignore[reportMissingTypeArgument]
+        enterprise = Enterprise(**data)
+
+        self.db.add(enterprise)
+        await self.db.flush()
+
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        await self.db.refresh(enterprise)
+        return enterprise
+
     async def delete(self, enterprise_id: int) -> bool:
         stmt = delete(Enterprise).where(Enterprise.id == enterprise_id).returning(Enterprise.id)
         res = await self.db.execute(stmt)

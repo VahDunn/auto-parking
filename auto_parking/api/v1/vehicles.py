@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 
 from auto_parking.api.schemas.trip import TripOut
 from auto_parking.api.schemas.trip_track import TripTrackGroupOut
@@ -11,10 +12,11 @@ from auto_parking.api.schemas.vehicle_track import (
     TrackFormat,
     VehicleTrackPointOut,
 )
+from auto_parking.core.domain.import_export_format import ExportFormat
 from auto_parking.core.errors import NotFoundError
 from auto_parking.deps.access import require_manager_or_higher
-from auto_parking.deps.commons import dep_query
 from auto_parking.deps.services import (
+    dep_export_service,
     dep_trip_service,
     dep_trip_track_service,
     dep_vehicle_service,
@@ -26,7 +28,17 @@ from auto_parking.service.trip_track import TripTrackService
 from auto_parking.service.vehicle import VehicleService
 from auto_parking.service.vehicle_track import VehicleTrackService
 
+if TYPE_CHECKING:
+    from auto_parking.service.export import ExportService
+
 router = APIRouter()
+
+
+def _parse_int_list(value: str | None) -> list[int] | None:
+    if value is None or value.strip() == "":
+        return None
+
+    return [int(item.strip()) for item in value.split(",") if item.strip()]
 
 
 def _apply_enterprise_visibility(
@@ -61,6 +73,26 @@ def _ensure_aware_datetime(value: datetime, field_name: str) -> None:
         )
 
 
+def _export_response(
+    *,
+    content: str,
+    format: ExportFormat,
+    filename_base: str,
+) -> Response:
+    if format == ExportFormat.csv:
+        return Response(
+            content=content,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.csv"'},
+        )
+
+    return Response(
+        content=content,
+        media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename_base}.json"'},
+    )
+
+
 dep_actor_guard = Depends(require_manager_or_higher)
 dep_visible_ids = Depends(get_visible_enterprise_ids)
 
@@ -71,23 +103,30 @@ dep_visible_ids = Depends(get_visible_enterprise_ids)
     dependencies=[dep_actor_guard],
 )
 async def get_vehicles(
-    id: list[int] | None = dep_query,
-    enterprise_ids: list[int] | None = dep_query,
-    driver_id: int | None = dep_query,
+    id: str | None = Query(None),
+    enterprise_ids: str | None = Query(None),
+    driver_id: int | None = Query(None),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     sort_by: str | None = Query(None),
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
 ):
-    enterprise_ids = _apply_enterprise_visibility(enterprise_ids, visible_enterprise_ids)
-    if visible_enterprise_ids is not None and enterprise_ids == []:
+    parsed_ids = _parse_int_list(id)
+    parsed_enterprise_ids = _parse_int_list(enterprise_ids)
+
+    parsed_enterprise_ids = _apply_enterprise_visibility(
+        parsed_enterprise_ids,
+        visible_enterprise_ids,
+    )
+
+    if visible_enterprise_ids is not None and parsed_enterprise_ids == []:
         return []
 
     return await service.get(
         VehicleFilter(
-            id=id,
-            enterprise_ids=enterprise_ids,
+            id=parsed_ids,
+            enterprise_ids=parsed_enterprise_ids,
             driver_id=driver_id,
             limit=limit,
             offset=offset,
@@ -148,14 +187,10 @@ async def update_vehicle(
 
     _ensure_vehicle_visible(current, visible_enterprise_ids)
 
-    data = payload.model_dump(exclude_unset=True)
-    if "enterprise_id" in data and visible_enterprise_ids is not None:
-        if data["enterprise_id"] not in visible_enterprise_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-
     updated = await service.update(id, payload)
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
+
     return updated
 
 
@@ -178,7 +213,45 @@ async def delete_vehicle(
     ok = await service.delete(id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
-    return
+
+
+@router.get(
+    "/{id}/export-trips",
+    dependencies=[dep_actor_guard],
+)
+async def export_vehicle_trips(
+    id: int,
+    date_from: datetime = Query(...),
+    date_to: datetime = Query(...),
+    format: ExportFormat = Query(ExportFormat.json),
+    visible_enterprise_ids: set[int] | None = dep_visible_ids,
+    vehicle_service: VehicleService = dep_vehicle_service,
+    service: "ExportService" = dep_export_service,
+):
+    _ensure_aware_datetime(date_from, "date_from")
+    _ensure_aware_datetime(date_to, "date_to")
+
+    if date_to < date_from:
+        raise HTTPException(status_code=400, detail="date_to must be >= date_from")
+
+    vehicle = await vehicle_service.get_by_id(id)
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    _ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
+
+    content = await service.export_vehicle_trips(
+        vehicle_id=id,
+        date_from=date_from,
+        date_to=date_to,
+        format=format,
+    )
+
+    return _export_response(
+        content=content,
+        format=format,
+        filename_base=f"vehicle_{id}_trips_export",
+    )
 
 
 @router.get(
@@ -188,8 +261,8 @@ async def delete_vehicle(
 )
 async def get_vehicle_trips(
     id: int,
-    date_from: datetime = Query(..., description="Timezone-aware datetime"),
-    date_to: datetime = Query(..., description="Timezone-aware datetime"),
+    date_from: datetime = Query(...),
+    date_to: datetime = Query(...),
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     vehicle_service: VehicleService = dep_vehicle_service,
     service: TripService = dep_trip_service,
@@ -197,32 +270,17 @@ async def get_vehicle_trips(
     _ensure_aware_datetime(date_from, "date_from")
     _ensure_aware_datetime(date_to, "date_to")
 
-    if date_to < date_from:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="date_to must be >= date_from",
-        )
-
     vehicle = await vehicle_service.get_by_id(id)
     if not vehicle:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vehicle not found",
-        )
+        raise HTTPException(status_code=404, detail="Vehicle not found")
 
     _ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
 
-    try:
-        return await service.get_vehicle_trips_in_range(
-            vehicle_id=id,
-            date_from=date_from,
-            date_to=date_to,
-        )
-    except ValueError as err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(err),
-        ) from err
+    return await service.get_vehicle_trips_in_range(
+        vehicle_id=id,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
 
 @router.get(
@@ -232,8 +290,8 @@ async def get_vehicle_trips(
 )
 async def get_vehicle_track(
     id: int,
-    date_from: datetime = Query(..., description="Timezone-aware datetime"),
-    date_to: datetime = Query(..., description="Timezone-aware datetime"),
+    date_from: datetime = Query(...),
+    date_to: datetime = Query(...),
     format: TrackFormat = Query(TrackFormat.json),
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleTrackService = dep_vehicle_track_service,
@@ -241,30 +299,15 @@ async def get_vehicle_track(
     _ensure_aware_datetime(date_from, "date_from")
     _ensure_aware_datetime(date_to, "date_to")
 
-    if date_to < date_from:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="date_to must be >= date_from",
-        )
-
-    try:
-        result, vehicle = await service.get_track(
-            vehicle_id=id,
-            date_from=date_from,
-            date_to=date_to,
-            format=format,
-        )
-    except ValueError as err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(err),
-        ) from err
+    result, vehicle = await service.get_track(
+        vehicle_id=id,
+        date_from=date_from,
+        date_to=date_to,
+        format=format,
+    )
 
     if vehicle is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vehicle not found",
-        )
+        raise HTTPException(status_code=404, detail="Vehicle not found")
 
     _ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
     return result
@@ -272,16 +315,13 @@ async def get_vehicle_track(
 
 @router.get(
     "/{id}/track-by-trips",
-    response_model=list[TripTrackGroupOut]
-    | list[VehicleTrackPointOut]
-    | GeoJSONFeatureCollection
-    | list[dict[str, Any]],
+    response_model=list[TripTrackGroupOut],
     dependencies=[dep_actor_guard],
 )
 async def get_vehicle_track_by_trips(
     id: int,
-    date_from: datetime = Query(..., description="Timezone-aware datetime"),
-    date_to: datetime = Query(..., description="Timezone-aware datetime"),
+    date_from: datetime = Query(...),
+    date_to: datetime = Query(...),
     format: TrackFormat = Query(TrackFormat.json),
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     vehicle_service: VehicleService = dep_vehicle_service,
@@ -290,38 +330,15 @@ async def get_vehicle_track_by_trips(
     _ensure_aware_datetime(date_from, "date_from")
     _ensure_aware_datetime(date_to, "date_to")
 
-    if date_to < date_from:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="date_to must be >= date_from",
-        )
-
     vehicle = await vehicle_service.get_by_id(id)
     if not vehicle:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vehicle not found",
-        )
+        raise HTTPException(status_code=404, detail="Vehicle not found")
 
     _ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
 
-    try:
-        result = await service.get_grouped_track(
-            vehicle_id=id,
-            date_from=date_from,
-            date_to=date_to,
-            format=format,
-        )
-
-    except NotFoundError as err:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=err.message,
-        ) from err
-    except ValueError as err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(err),
-        ) from err
-
-    return result
+    return await service.get_grouped_track(
+        vehicle_id=id,
+        date_from=date_from,
+        date_to=date_to,
+        format=format,
+    )
