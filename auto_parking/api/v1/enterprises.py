@@ -194,3 +194,53 @@ async def import_enterprise(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(err),
         ) from err
+
+
+@router.get(
+    "/{id}/export-guid-dump",
+    dependencies=[dep_actor_guard],
+)
+async def export_enterprise_guid_dump(
+    id: int,
+    date_from: datetime = Query(...),
+    date_to: datetime = Query(...),
+    format: ExportFormat = Query(ExportFormat.json),
+    visible_enterprise_ids: set[int] | None = dep_visible_ids,
+    service: "ExportService" = dep_export_service,
+):
+    if date_from.tzinfo is None or date_from.utcoffset() is None:
+        raise HTTPException(400, "date_from must be timezone-aware")
+
+    if date_to.tzinfo is None or date_to.utcoffset() is None:
+        raise HTTPException(400, "date_to must be timezone-aware")
+
+    if date_to < date_from:
+        raise HTTPException(400, "date_to must be >= date_from")
+
+    if visible_enterprise_ids is not None and id not in visible_enterprise_ids:
+        raise HTTPException(403, "Forbidden")
+
+    try:
+        content = await service.export_enterprise_guid_dump(
+            enterprise_id=id,
+            date_from=date_from,
+            date_to=date_to,
+            format=format,
+        )
+    except NotFoundError as err:
+        raise HTTPException(404, err.message) from err
+
+    if format == ExportFormat.csv:
+        return Response(
+            content=content,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="enterprise_{id}_guid_dump.csv"'
+            },
+        )
+
+    return Response(
+        content=content,
+        media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="enterprise_{id}_guid_dump.json"'},
+    )

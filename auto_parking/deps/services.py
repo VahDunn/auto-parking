@@ -68,13 +68,16 @@ def get_export_service(
     vehicle_repo: VehicleRepository = dep_vehicle_repo,
     trip_repo: TripRepository = dep_trip_repo,
     track_repo: VehicleTrackRepository = dep_track_repo,
+    driver_repo: DriverRepository = dep_driver_repo,
 ) -> ExportService:
     return ExportService(
         enterprise_repo=enterprise_repo,
         vehicle_repo=vehicle_repo,
         trip_repo=trip_repo,
         track_repo=track_repo,
+        driver_repo=driver_repo,
     )
+
 
 def get_import_service(
     enterprise_repo: EnterpriseRepository = dep_enterprise_repo,
