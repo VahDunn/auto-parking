@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auto_parking.deps.commons import depends_db
 from auto_parking.repo.driver import DriverRepository
 from auto_parking.repo.enterprise import EnterpriseRepository
+from auto_parking.repo.report import ReportRepository
 from auto_parking.repo.trip import TripRepository
 from auto_parking.repo.user import UserRepository
 from auto_parking.repo.vehicle import VehicleRepository
@@ -46,9 +47,16 @@ def get_trip_repo(
     return TripRepository(db)
 
 
+def get_report_repo(
+    db: AsyncSession = depends_db,
+) -> ReportRepository:
+    return ReportRepository(db)
+
+
 dep_enterprise_repo = Depends(get_enterprise_repo)
 dep_vehicle_repo = Depends(get_vehicle_repo)
 dep_driver_repo = Depends(get_driver_repo)
 dep_manager_repo = Depends(get_manager_repo)
 dep_track_repo = Depends(get_vehicle_track_repo)
 dep_trip_repo = Depends(get_trip_repo)
+dep_report_repo = Depends(get_report_repo)
