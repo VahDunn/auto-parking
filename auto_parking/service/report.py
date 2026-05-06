@@ -184,7 +184,7 @@ class ReportService:
     async def _build_vehicle_geography(self, payload: ReportCreate) -> list[dict[str, Any]]:
         trips = await self._get_trips(payload)
 
-        zones: dict[str, int] = defaultdict(int)
+        zones: dict[tuple[str, str], int] = defaultdict(int)
 
         for trip in trips:
             if trip.start_point is None:
@@ -192,19 +192,22 @@ class ReportService:
 
             lat, lon = self._point_lat_lon(trip.start_point)
             precision = int(payload.params_json.get("precision", 2))
+
+            time_key = self._period_key(trip.started_at_utc, payload.period)
             zone = f"{round(lat, precision)}_{round(lon, precision)}"
-            zones[zone] += 1
+
+            zones[(time_key, zone)] += 1
 
         return [
             {
-                "time": zone,
+                "time": time_key,
                 "value": count,
                 "extra": {
                     "unit": "trip_count",
                     "zone": zone,
                 },
             }
-            for zone, count in sorted(zones.items())
+            for (time_key, zone), count in sorted(zones.items())
         ]
 
     def _trip_distance_km(self, trip) -> float:

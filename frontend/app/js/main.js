@@ -22,7 +22,15 @@ const importDropZone = document.getElementById("importDropZone");
 const importFileInput = document.getElementById("importFileInput");
 const importBtn = document.getElementById("importBtn");
 const importFileName = document.getElementById("importFileName");
+const reportMessage = document.getElementById("reportMessage");
+const reportForm = document.getElementById("reportForm");
+const reloadReportsBtn = document.getElementById("reloadReportsBtn");
+const exportReportJsonBtn = document.getElementById("exportReportJsonBtn");
+const exportReportCsvBtn = document.getElementById("exportReportCsvBtn");
+const reportsCard = document.getElementById("reportsCard");
 
+let selectedReport = null;
+let reportsState = [];
 let selectedImportFile = null;
 let enterprisesState = [];
 let selectedEnterprise = null;
@@ -323,7 +331,7 @@ async function loadVehicleModels() {
 async function loadEnterprises() {
     clearMessage(enterpriseMessage);
     renderEnterpriseInfo(null);
-
+    reportsCard?.classList.add("d-none");
     document.getElementById("enterpriseList").innerHTML = `
         <li class="list-group-item">Загрузка...</li>
     `;
@@ -419,12 +427,16 @@ async function handleEnterpriseSelect(enterprise) {
     );
 
     vehicleCard.classList.remove("d-none");
+    reportsCard?.classList.remove("d-none");
     hideVehicleForm();
     resetVehicleForm();
     renderSelectedVehicleInfo(null);
     renderTripList([], () => {
     });
     setDefaultTripDateRange();
+    setDefaultReportDateRange();
+    document.getElementById("reportVehicleId").value = "";
+    await loadReports();
 
     document.getElementById("vehicleTableBody").innerHTML = `
         <tr><td colspan="4">Загрузка...</td></tr>
@@ -441,6 +453,8 @@ async function handleSelectVehicle(vehicle) {
     const modelName = vehicleModelsMap.get(vehicle.model_id)?.name || `Модель ${vehicle.model_id}`;
 
     renderSelectedVehicleInfo(vehicle, modelName);
+    document.getElementById("reportVehicleId").value = vehicle.id;
+    document.getElementById("reportName").value = `Отчёт по машине ${vehicle.vehicle_number}`;
     setDefaultTripDateRange();
     await loadTripsForSelectedVehicle();
 }
@@ -636,6 +650,120 @@ async function refreshSelectedEnterpriseData() {
     }
 }
 
+function setDefaultReportDateRange() {
+    const now = new Date();
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const reportDateFrom = document.getElementById("reportDateFrom");
+    const reportDateTo = document.getElementById("reportDateTo");
+
+    if (reportDateFrom) {
+        reportDateFrom.value = toDateTimeLocalValue(monthAgo.toISOString());
+    }
+
+    if (reportDateTo) {
+        reportDateTo.value = toDateTimeLocalValue(now.toISOString());
+    }
+}
+
+async function loadReports() {
+    try {
+        reportsState = await getReportsRequest();
+        renderReportsList(
+            reportsState,
+            selectedEnterprise?.id ?? null,
+            handleOpenReport,
+            handleRebuildReport,
+            handleDeleteReport
+        );
+    } catch (error) {
+        showMessage(reportMessage, "danger", error.message);
+    }
+}
+
+async function handleCreateReport(event) {
+    event.preventDefault();
+
+    if (!selectedEnterprise) {
+        showMessage(reportMessage, "warning", "Сначала выберите предприятие");
+        return;
+    }
+
+    const dateFrom = localInputToIso(document.getElementById("reportDateFrom").value);
+    const dateTo = localInputToIso(document.getElementById("reportDateTo").value);
+    const vehicleId = Number(document.getElementById("reportVehicleId").value);
+
+    if (!dateFrom || !dateTo) {
+        showMessage(reportMessage, "warning", "Укажите диапазон дат");
+        return;
+    }
+
+    if (new Date(dateTo) < new Date(dateFrom)) {
+        showMessage(reportMessage, "warning", "Дата 'до' должна быть больше даты 'от'");
+        return;
+    }
+
+    try {
+        clearMessage(reportMessage);
+
+        const report = await createReportRequest({
+            name: document.getElementById("reportName").value.trim(),
+            report_type: document.getElementById("reportType").value,
+            period: document.getElementById("reportPeriod").value,
+            date_from: dateFrom,
+            date_to: dateTo,
+            enterprise_id: selectedEnterprise.id,
+            vehicle_id: vehicleId
+        });
+
+        showMessage(reportMessage, "success", `Отчёт создан: #${report.id}`);
+        renderReportResult(report);
+        await loadReports();
+    } catch (error) {
+        showMessage(reportMessage, "danger", error.message);
+    }
+}
+
+async function handleOpenReport(report) {
+    try {
+        clearMessage(reportMessage);
+
+        selectedReport = report;
+
+        const fullReport = await getReportRequest(report.id);
+        renderReportResult(fullReport);
+    } catch (error) {
+        showMessage(reportMessage, "danger", error.message);
+    }
+}
+
+async function handleRebuildReport(report) {
+    try {
+        clearMessage(reportMessage);
+        const rebuilt = await rebuildReportRequest(report.id);
+        showMessage(reportMessage, "success", `Отчёт #${rebuilt.id} пересчитан`);
+        renderReportResult(rebuilt);
+        await loadReports();
+    } catch (error) {
+        showMessage(reportMessage, "danger", error.message);
+    }
+}
+
+async function handleDeleteReport(report) {
+    const confirmed = window.confirm(`Удалить отчёт #${report.id} "${report.name}"?`);
+    if (!confirmed) return;
+
+    try {
+        clearMessage(reportMessage);
+        await deleteReportRequest(report.id);
+        showMessage(reportMessage, "success", "Отчёт удалён");
+        document.getElementById("reportResultCard")?.classList.add("d-none");
+        await loadReports();
+    } catch (error) {
+        showMessage(reportMessage, "danger", error.message);
+    }
+}
+
 loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     clearMessage(messageBox);
@@ -653,6 +781,8 @@ loginForm.addEventListener("submit", async (e) => {
 
         await loadVehicleModels();
         await loadEnterprises();
+        setDefaultReportDateRange();
+        await loadReports();
     } catch (error) {
         showMessage(messageBox, "danger", error.message);
     }
@@ -810,4 +940,30 @@ importDropZone?.addEventListener("drop", (event) => {
 
 importBtn?.addEventListener("click", async () => {
     await handleImportEnterprise();
+});
+
+reportForm?.addEventListener("submit", handleCreateReport);
+
+reloadReportsBtn?.addEventListener("click", async () => {
+    clearMessage(reportMessage);
+    await loadReports();
+});
+
+
+exportReportJsonBtn?.addEventListener("click", async () => {
+    if (!selectedReport) {
+        showMessage(reportMessage, "warning", "Сначала выберите отчёт");
+        return;
+    }
+
+    await exportReportRequest(selectedReport.id, "json");
+});
+
+exportReportCsvBtn?.addEventListener("click", async () => {
+    if (!selectedReport) {
+        showMessage(reportMessage, "warning", "Сначала выберите отчёт");
+        return;
+    }
+
+    await exportReportRequest(selectedReport.id, "csv");
 });

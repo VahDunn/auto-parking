@@ -1,6 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import csv
+import io
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from auto_parking.api.schemas.report import ReportCreate, ReportInfo, ReportOut
+from auto_parking.core.domain import ExportFormat
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.services import dep_report_service
 from auto_parking.deps.visibility import get_visible_enterprise_ids
@@ -109,6 +114,90 @@ async def rebuild_report(
     return report
 
 
+@router.get(
+    "/{id}/export",
+    dependencies=[dep_actor_guard],
+)
+async def export_report(
+    id: int,
+    format: ExportFormat = ExportFormat.json,
+    visible_enterprise_ids: set[int] | None = dep_visible_ids,
+    service: ReportService = dep_report_service,
+):
+    report = await service.get_by_id(id)
+
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    if visible_enterprise_ids is not None and report.enterprise_id not in visible_enterprise_ids:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    filename = f"report_{report.id}"
+
+    if format == ExportFormat.csv:
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        writer.writerow(
+            [
+                "report_id",
+                "name",
+                "report_type",
+                "period",
+                "date_from",
+                "date_to",
+                "enterprise_id",
+                "vehicle_id",
+                "time",
+                "value",
+                "extra_json",
+            ]
+        )
+
+        for item in report.result_json:
+            writer.writerow(
+                [
+                    report.id,
+                    report.name,
+                    report.report_type,
+                    report.period,
+                    report.date_from.isoformat(),
+                    report.date_to.isoformat(),
+                    report.enterprise_id,
+                    report.vehicle_id or "",
+                    item.get("time", ""),
+                    item.get("value", ""),
+                    json.dumps(item.get("extra", {}), ensure_ascii=False),
+                ]
+            )
+
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'},
+        )
+
+    payload = {
+        "id": report.id,
+        "name": report.name,
+        "report_type": report.report_type,
+        "period": report.period,
+        "date_from": report.date_from.isoformat(),
+        "date_to": report.date_to.isoformat(),
+        "enterprise_id": report.enterprise_id,
+        "vehicle_id": report.vehicle_id,
+        "params_json": report.params_json,
+        "result_json": report.result_json,
+        "created_at": report.created_at.isoformat(),
+    }
+
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, indent=2),
+        media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}.json"'},
+    )
+
+
 @router.delete(
     "/{id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -126,4 +215,4 @@ async def delete_report(
     if visible_enterprise_ids is not None and report.enterprise_id not in visible_enterprise_ids:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    await service.delete(id)
+    return await service.delete(id)

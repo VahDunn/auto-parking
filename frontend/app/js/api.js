@@ -225,3 +225,41 @@ async function importEnterpriseRequest(file, format = "json") {
 
     return data;
 }
+
+async function getReportTypesRequest() {
+    return await apiRequest("/reports/types", {method: "GET"});
+}
+
+async function getReportsRequest() {
+    return await apiRequest("/reports", {method: "GET"});
+}
+
+async function getReportRequest(id) {
+    return await apiRequest(`/reports/${id}`, {method: "GET"});
+}
+
+async function createReportRequest(payload) {
+    return await apiRequest("/reports", {
+        method: "POST",
+        body: JSON.stringify(payload)
+    });
+}
+
+async function rebuildReportRequest(id) {
+    return await apiRequest(`/reports/${id}/rebuild`, {
+        method: "POST"
+    });
+}
+
+async function deleteReportRequest(id) {
+    return await apiRequest(`/reports/${id}`, {
+        method: "DELETE"
+    });
+}
+
+async function exportReportRequest(reportId, format = "json") {
+    await downloadFile(
+        `${API_BASE}/reports/${reportId}/export?format=${format}`,
+        `report_${reportId}.${format}`
+    );
+}
