@@ -22,6 +22,7 @@ from auto_parking.service.enterprise import EnterpriseService
 from auto_parking.service.export import ExportService
 from auto_parking.service.import_ import ImportService
 from auto_parking.service.report import ReportService
+from auto_parking.service.report_pdf import ReportPdfBuilder
 from auto_parking.service.trip import TripService
 from auto_parking.service.trip_track import TripTrackService
 from auto_parking.service.user import UserService
@@ -108,6 +109,10 @@ def get_report_service(
     )
 
 
+def get_reports_pdf_service():
+    return ReportPdfBuilder()
+
+
 dep_import_service = Depends(get_import_service)
 dep_trip_service = Depends(get_trip_service)
 dep_vehicle_track_service = Depends(get_vehicle_track_service)
@@ -118,3 +123,4 @@ dep_user_service = Depends(get_user_service)
 dep_trip_track_service = Depends(get_trip_track_service)
 dep_export_service = Depends(get_export_service)
 dep_report_service = Depends(get_report_service)
+dep_reports_pdf_service = Depends(get_reports_pdf_service)

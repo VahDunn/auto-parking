@@ -7,9 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from auto_parking.api.schemas.report import ReportCreate, ReportInfo, ReportOut
 from auto_parking.core.domain import ExportFormat
 from auto_parking.deps.access import require_manager_or_higher
-from auto_parking.deps.services import dep_report_service
+from auto_parking.deps.services import dep_report_service, dep_reports_pdf_service
 from auto_parking.deps.visibility import get_visible_enterprise_ids
 from auto_parking.service.report import ReportService
+from auto_parking.service.report_pdf import ReportPdfBuilder
 
 router = APIRouter()
 
@@ -123,6 +124,7 @@ async def export_report(
     format: ExportFormat = ExportFormat.json,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: ReportService = dep_report_service,
+    pdf_service: ReportPdfBuilder = dep_reports_pdf_service,
 ):
     report = await service.get_by_id(id)
 
@@ -133,6 +135,14 @@ async def export_report(
         raise HTTPException(status_code=403, detail="Forbidden")
 
     filename = f"report_{report.id}"
+
+    if format == ExportFormat.pdf:
+        pdf_bytes = pdf_service.build(report)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": (f'attachment; filename="{filename}.pdf"')},
+        )
 
     if format == ExportFormat.csv:
         output = io.StringIO()

@@ -28,6 +28,7 @@ const reloadReportsBtn = document.getElementById("reloadReportsBtn");
 const exportReportJsonBtn = document.getElementById("exportReportJsonBtn");
 const exportReportCsvBtn = document.getElementById("exportReportCsvBtn");
 const reportsCard = document.getElementById("reportsCard");
+const exportReportPdfBtn = document.getElementById("exportReportPdfBtn");
 
 let selectedReport = null;
 let reportsState = [];
@@ -966,4 +967,13 @@ exportReportCsvBtn?.addEventListener("click", async () => {
     }
 
     await exportReportRequest(selectedReport.id, "csv");
+});
+
+exportReportPdfBtn?.addEventListener("click", async () => {
+    if (!selectedReport) {
+        showMessage(reportMessage, "warning", "Сначала выберите отчёт");
+        return;
+    }
+
+    await exportReportRequest(selectedReport, "pdf");
 });

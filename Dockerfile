@@ -12,6 +12,7 @@ COPY pyproject.toml .
 COPY alembic.ini .
 COPY alembic ./alembic
 COPY auto_parking ./auto_parking
+COPY assets ./assets
 
 RUN pip install --upgrade pip \
     && pip install .

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
@@ -13,7 +13,6 @@ from auto_parking.api.schemas.vehicle_track import (
     VehicleTrackPointOut,
 )
 from auto_parking.core.domain.import_export_format import ExportFormat
-from auto_parking.core.errors import NotFoundError
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.services import (
     dep_export_service,

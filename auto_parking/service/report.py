@@ -1,9 +1,15 @@
+import io
+import json
 from collections import defaultdict
 from datetime import datetime, timedelta
 from math import atan2, cos, radians, sin, sqrt
 from typing import Any
 
 from geoalchemy2.shape import to_shape
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from shapely import Point
 
 from auto_parking.api.schemas.report import ReportCreate, ReportInfo
@@ -33,7 +39,9 @@ class ReportService:
             ReportInfo(
                 type=ReportType.vehicle_mileage,
                 title="Пробег автомобиля за период",
-                description="Считает пробег автомобиля по поездкам и группирует по дням, месяцам или годам.",
+                description=(
+                    "Считает пробег автомобиля по поездкам и группирует по дням, месяцам или годам."
+                ),
                 parameters=["enterprise_id", "vehicle_id", "period", "date_from", "date_to"],
             ),
             ReportInfo(
@@ -265,6 +273,86 @@ class ReportService:
         if not isinstance(geom, Point):
             raise ValueError("Expected Point geometry")
         return float(geom.y), float(geom.x)
+
+    def report_to_pdf(self, report) -> bytes:
+        buffer = io.BytesIO()
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            rightMargin=24,
+            leftMargin=24,
+            topMargin=24,
+            bottomMargin=24,
+        )
+
+        styles = getSampleStyleSheet()
+        elements = []
+
+        elements.append(Paragraph(f"Report: {report.name}", styles["Title"]))
+        elements.append(Spacer(1, 12))
+
+        meta_data = [
+            ["ID", str(report.id)],
+            ["Type", str(report.report_type)],
+            ["Period", str(report.period)],
+            ["Enterprise ID", str(report.enterprise_id)],
+            ["Vehicle ID", str(report.vehicle_id or "")],
+            ["Date from", report.date_from.isoformat()],
+            ["Date to", report.date_to.isoformat()],
+            ["Created at", report.created_at.isoformat()],
+        ]
+
+        meta_table = Table(meta_data, colWidths=[120, 520])
+        meta_table.setStyle(
+            TableStyle(
+                [
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ]
+            )
+        )
+
+        elements.append(meta_table)
+        elements.append(Spacer(1, 18))
+
+        rows = [["Time", "Value", "Extra"]]
+
+        for item in report.result_json:
+            rows.append(
+                [
+                    str(item.get("time", "")),
+                    str(item.get("value", "")),
+                    json.dumps(item.get("extra", {}), ensure_ascii=False),
+                ]
+            )
+
+        if len(rows) == 1:
+            rows.append(["", "No data", ""])
+
+        result_table = Table(rows, colWidths=[160, 100, 460], repeatRows=1)
+        result_table.setStyle(
+            TableStyle(
+                [
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ]
+            )
+        )
+
+        elements.append(Paragraph("Result", styles["Heading2"]))
+        elements.append(result_table)
+
+        doc.build(elements)
+
+        pdf = buffer.getvalue()
+        buffer.close()
+
+        return pdf
 
     @staticmethod
     def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
