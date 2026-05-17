@@ -29,6 +29,8 @@ const exportReportJsonBtn = document.getElementById("exportReportJsonBtn");
 const exportReportCsvBtn = document.getElementById("exportReportCsvBtn");
 const reportsCard = document.getElementById("reportsCard");
 const exportReportPdfBtn = document.getElementById("exportReportPdfBtn");
+const gpxFileInput = document.getElementById("gpxFileInput");
+const importGpxBtn = document.getElementById("importGpxBtn");
 
 let selectedReport = null;
 let reportsState = [];
@@ -230,6 +232,40 @@ function setDefaultTripDateRange() {
 
     if (exportTo) {
         exportTo.value = toDateTimeLocalValue(now.toISOString());
+    }
+}
+
+
+async function handleImportGpx() {
+    if (!selectedVehicle) {
+        showMessage(vehicleMessage, "warning", "Сначала выберите машину");
+        return;
+    }
+
+    const file = gpxFileInput?.files?.[0];
+
+    if (!file) {
+        showMessage(vehicleMessage, "warning", "Сначала выберите GPX-файл");
+        return;
+    }
+
+    try {
+        clearMessage(vehicleMessage);
+
+        const trip = await importVehicleTripGpxRequest(selectedVehicle.id, file);
+
+        showMessage(
+            vehicleMessage,
+            "success",
+            `GPX импортирован. Создана поездка #${trip.id}`
+        );
+
+        gpxFileInput.value = "";
+
+        await loadTripsForSelectedVehicle();
+        await showAllTripsOnMap();
+    } catch (error) {
+        showMessage(vehicleMessage, "danger", error.message);
     }
 }
 
@@ -976,4 +1012,8 @@ exportReportPdfBtn?.addEventListener("click", async () => {
     }
 
     await exportReportRequest(selectedReport, "pdf");
+});
+
+importGpxBtn?.addEventListener("click", async () => {
+    await handleImportGpx();
 });

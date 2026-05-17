@@ -285,3 +285,25 @@ function buildReportFilename(report, format) {
 
     return `${parts.map(safe).join("_")}.${format}`;
 }
+
+async function importVehicleTripGpxRequest(vehicleId, file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(
+        `${API_BASE}/vehicles/${vehicleId}/trips/import-gpx`,
+        {
+            method: "POST",
+            credentials: "include",
+            body: formData
+        }
+    );
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.detail || "Ошибка импорта GPX");
+    }
+
+    return data;
+}

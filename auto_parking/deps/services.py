@@ -20,6 +20,7 @@ from auto_parking.repo.vehicle_track import VehicleTrackRepository
 from auto_parking.service.driver import DriverService
 from auto_parking.service.enterprise import EnterpriseService
 from auto_parking.service.export import ExportService
+from auto_parking.service.gpx_import import GpxImportService
 from auto_parking.service.import_ import ImportService
 from auto_parking.service.report import ReportService
 from auto_parking.service.report_pdf import ReportPdfBuilder
@@ -28,7 +29,6 @@ from auto_parking.service.trip_track import TripTrackService
 from auto_parking.service.user import UserService
 from auto_parking.service.vehicle import VehicleService
 from auto_parking.service.vehicle_track import VehicleTrackService
-from auto_parking.service.gpx import GpxService
 
 
 def get_enterprise_service(
@@ -108,6 +108,7 @@ def get_report_service(
         trip_repo=trip_repo,
         vehicle_repo=vehicle_repo,
     )
+
 
 def get_gpx_import_service(
     vehicle_repo: VehicleRepository = dep_vehicle_repo,

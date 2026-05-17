@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 
 from auto_parking.api.schemas.trip import TripOut
@@ -16,11 +16,11 @@ from auto_parking.core.domain.import_export_format import ExportFormat
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.services import (
     dep_export_service,
+    dep_gpx_import_service,
     dep_trip_service,
     dep_trip_track_service,
     dep_vehicle_service,
     dep_vehicle_track_service,
-    dep_gpx_import_service,
 )
 from auto_parking.deps.visibility import get_visible_enterprise_ids
 from auto_parking.service.trip import TripService
@@ -30,6 +30,7 @@ from auto_parking.service.vehicle_track import VehicleTrackService
 
 if TYPE_CHECKING:
     from auto_parking.service.export import ExportService
+    from auto_parking.service.gpx_import import GpxImportService
 
 router = APIRouter()
 
@@ -343,6 +344,7 @@ async def get_vehicle_track_by_trips(
         format=format,
     )
 
+
 @router.post(
     "/{id}/trips/import-gpx",
     response_model=TripOut,
@@ -355,7 +357,7 @@ async def import_vehicle_trip_gpx(
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     vehicle_service: VehicleService = dep_vehicle_service,
     trip_service: TripService = dep_trip_service,
-    service: GpxImportService = dep_gpx_import_service,
+    service: "GpxImportService" = dep_gpx_import_service,
 ):
     vehicle = await vehicle_service.get_by_id(id)
     if not vehicle:

@@ -56,7 +56,7 @@ class GpxImportService:
         )
 
         if overlapping:
-            raise ValueError("GPX trip overlaps existing trips")
+            raise ValueError("GPX не может перекрывать существующие поездки")
 
         existing_points = await self._track_repo.get_points_by_intervals(
             vehicle_id=vehicle_id,
