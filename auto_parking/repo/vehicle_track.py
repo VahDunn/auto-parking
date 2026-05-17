@@ -53,6 +53,7 @@ class VehicleTrackRepository:
 
         stmt = (
             select(
+                VehicleGpsPoint.id,
                 VehicleGpsPoint.recorded_at_utc,
                 func.ST_Y(VehicleGpsPoint.position).label("latitude"),
                 func.ST_X(VehicleGpsPoint.position).label("longitude"),
@@ -91,6 +92,38 @@ class VehicleTrackRepository:
 
         await self.db.refresh(point)
         return point
+
+    async def create_points_bulk(
+            self,
+            points_data: Sequence[dict[str, Any]],
+    ) -> Sequence[VehicleGpsPoint]:
+        if not points_data:
+            return []
+        points = [
+            VehicleGpsPoint(
+                vehicle_id=item["vehicle_id"],
+                recorded_at_utc=item["recorded_at_utc"],
+                position=self._point_wkt(
+                    item["longitude"],
+                    item["latitude"],
+                ),
+            )
+            for item in points_data
+        ]
+
+        self.db.add_all(points)
+        await self.db.flush()
+
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        for point in points:
+            await self.db.refresh(point)
+
+        return points
 
     @staticmethod
     def _point_wkt(lon: float, lat: float) -> WKTElement:

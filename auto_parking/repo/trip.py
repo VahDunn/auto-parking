@@ -88,17 +88,36 @@ class TripRepository:
         result = await self.db.execute(stmt)
         return result.unique().scalars().all()
 
+    async def get_overlapping_trips(
+        self,
+        vehicle_id: int,
+        started_at_utc: datetime,
+        ended_at_utc: datetime,
+    ) -> Sequence[Trip]:
+        stmt = (
+            select(Trip)
+            .where(Trip.vehicle_id == vehicle_id)
+            .where(Trip.started_at_utc <= ended_at_utc)
+            .where(Trip.ended_at_utc >= started_at_utc)
+            .options(*self._base_options())
+            .order_by(Trip.started_at_utc.asc(), Trip.id.asc())
+        )
+
+        result = await self.db.execute(stmt)
+        return result.unique().scalars().all()
+
     async def get_by_id(self, trip_id: int) -> Trip | None:
         result = await self.db.execute(
             select(Trip).where(Trip.id == trip_id).options(*self._base_options())
         )
         return result.scalar_one_or_none()
 
-    async def create(self, data: dict) -> Trip:  # pyright: ignore[reportMissingTypeArgument]
+    async def create(self, data: dict[str, Any]) -> Trip:
         trip = Trip(**data)
 
         self.db.add(trip)
         await self.db.flush()
+
         try:
             await self.db.commit()
         except Exception:
@@ -131,6 +150,7 @@ class TripRepository:
             return False
 
         await self.db.delete(trip)
+
         try:
             await self.db.commit()
         except Exception:
