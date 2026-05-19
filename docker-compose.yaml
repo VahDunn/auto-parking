@@ -47,5 +47,47 @@ services:
     depends_on:
       - auto-parking
 
+  seed-vehicles:
+    build: .
+    profiles:
+      - tools
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    command: >
+      python -m auto_parking.minor_utilities.generate_vehicles
+      generate
+      --count 120
+      --enterprise-id 2
+      --driver-ratio 2
+      --seed 42
+
+  seed-tracks:
+    build: .
+    profiles:
+      - tools
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    command: >
+      python -m auto_parking.minor_utilities.seed_demo_tracks
+      generate
+      --enterprise-id 2
+      --vehicles-count 120
+      --total-trips 2000
+      --points-per-trip 100
+      --date-from 2024-01-01
+      --date-to 2026-01-01
+      --clear-before
+      --seed 42
+
 volumes:
   db_data:
