@@ -18,7 +18,6 @@ DEFAULT_VEHICLES_COUNT = 120
 DEFAULT_TOTAL_TRIPS = 2000
 DEFAULT_POINTS_PER_TRIP = 100
 
-# New Orleans, как в твоём enterprise dump
 DEFAULT_CENTER_LAT = 29.9511
 DEFAULT_CENTER_LON = -90.0715
 
@@ -83,7 +82,6 @@ def build_route_points(
         lat = lat1 + (lat2 - lat1) * local_t
         lon = lon1 + (lon2 - lon1) * local_t
 
-        # Небольшой шум, чтобы линия не была идеально прямой.
         lat += random.uniform(-0.00025, 0.00025)
         lon += random.uniform(-0.00025, 0.00025)
 
@@ -148,7 +146,6 @@ def random_trip_start(
     date_to: date,
 ) -> datetime:
     total_days = (date_to - date_from).days
-
     trip_day = date_from + timedelta(days=random.randint(0, total_days - 1))
 
     return datetime.combine(
@@ -312,13 +309,13 @@ def generate(
         typer.Option("--points-per-trip", help="Количество GPS-точек в одной поездке"),
     ] = DEFAULT_POINTS_PER_TRIP,
     date_from: Annotated[
-        date,
-        typer.Option("--date-from", help="Начало исторического периода"),
-    ] = date(2024, 1, 1),
+        str,
+        typer.Option("--date-from", help="Начало исторического периода: YYYY-MM-DD"),
+    ] = "2024-01-01",
     date_to: Annotated[
-        date,
-        typer.Option("--date-to", help="Конец исторического периода"),
-    ] = date(2026, 1, 1),
+        str,
+        typer.Option("--date-to", help="Конец исторического периода: YYYY-MM-DD"),
+    ] = "2026-01-01",
     center_lat: Annotated[
         float,
         typer.Option("--center-lat", help="Широта центра генерации"),
@@ -340,14 +337,22 @@ def generate(
         typer.Option("--seed", help="Seed для воспроизводимой генерации"),
     ] = None,
 ) -> None:
+    try:
+        parsed_date_from = date.fromisoformat(date_from)
+        parsed_date_to = date.fromisoformat(date_to)
+    except ValueError as exc:
+        raise typer.BadParameter(
+            "date_from/date_to должны быть в формате YYYY-MM-DD"
+        ) from exc
+
     asyncio.run(
         seed_demo_tracks(
             enterprise_id=enterprise_id,
             vehicles_count=vehicles_count,
             total_trips=total_trips,
             points_per_trip=points_per_trip,
-            date_from=date_from,
-            date_to=date_to,
+            date_from=parsed_date_from,
+            date_to=parsed_date_to,
             center_lat=center_lat,
             center_lon=center_lon,
             radius_km=radius_km,

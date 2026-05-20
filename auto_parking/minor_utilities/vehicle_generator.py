@@ -142,7 +142,10 @@ async def generate_vehicles(
             )
 
             data = payload.model_dump()
+
             data["vehicle_number"] = await generate_unique_plate(db)
+
+            data["purchased_at_utc"] = data.pop("purchased_at")
 
             vehicle = Vehicle(**data)
 
@@ -203,7 +206,7 @@ def generate(
     asyncio.run(
         generate_vehicles(
             total_count=count,
-            enterprise_ids=enterprise_ids[1:],
+            enterprise_ids=enterprise_ids,
             driver_ratio=driver_ratio,
             seed=seed,
         )
