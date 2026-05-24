@@ -12,10 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auto_parking.db.engine import AsyncSessionLocal
 from auto_parking.db.models import Trip, Vehicle, VehicleGpsPoint
 
-app = typer.Typer(help="Генератор demo-данных: исторические поездки и GPS-точки")
+app = typer.Typer(help="Генератор demo-данных: поездки и GPS-точки")
 
-DEFAULT_VEHICLES_COUNT = 120
-DEFAULT_TOTAL_TRIPS = 2000
+DEFAULT_TRIPS_PER_VEHICLE = 30
 DEFAULT_POINTS_PER_TRIP = 100
 
 DEFAULT_CENTER_LAT = 29.9511
@@ -94,24 +93,16 @@ async def get_vehicle_ids(
     db: AsyncSession,
     *,
     enterprise_id: int,
-    vehicles_count: int,
 ) -> list[int]:
     result = await db.execute(
         select(Vehicle.id)
         .where(Vehicle.enterprise_id == enterprise_id)
         .order_by(Vehicle.id)
-        .limit(vehicles_count)
     )
     vehicle_ids = list(result.scalars().all())
 
     if not vehicle_ids:
         raise ValueError(f"У enterprise_id={enterprise_id} нет машин")
-
-    if len(vehicle_ids) < vehicles_count:
-        raise ValueError(
-            f"У enterprise_id={enterprise_id} найдено только {len(vehicle_ids)} машин, "
-            f"а нужно {vehicles_count}. Сначала догенерируй машины."
-        )
 
     return vehicle_ids
 
@@ -122,22 +113,6 @@ async def clear_old_data(db: AsyncSession, vehicle_ids: list[int]) -> None:
         delete(VehicleGpsPoint).where(VehicleGpsPoint.vehicle_id.in_(vehicle_ids))
     )
     await db.commit()
-
-
-def distribute_trips(
-    *,
-    vehicle_ids: list[int],
-    total_trips: int,
-) -> dict[int, int]:
-    base_count = total_trips // len(vehicle_ids)
-    remainder = total_trips % len(vehicle_ids)
-
-    result: dict[int, int] = {}
-
-    for index, vehicle_id in enumerate(vehicle_ids):
-        result[vehicle_id] = base_count + (1 if index < remainder else 0)
-
-    return result
 
 
 def random_trip_start(
@@ -162,8 +137,7 @@ def random_trip_start(
 async def seed_demo_tracks(
     *,
     enterprise_id: int,
-    vehicles_count: int,
-    total_trips: int,
+    trips_per_vehicle: int,
     points_per_trip: int,
     date_from: date,
     date_to: date,
@@ -176,11 +150,8 @@ async def seed_demo_tracks(
     if seed is not None:
         random.seed(seed)
 
-    if vehicles_count <= 0:
-        raise ValueError("vehicles_count должен быть больше 0")
-
-    if total_trips <= 0:
-        raise ValueError("total_trips должен быть больше 0")
+    if trips_per_vehicle <= 0:
+        raise ValueError("trips_per_vehicle должен быть больше 0")
 
     if points_per_trip < 2:
         raise ValueError("points_per_trip должен быть минимум 2")
@@ -192,28 +163,19 @@ async def seed_demo_tracks(
         raise ValueError("radius_km должен быть больше 0")
 
     async with AsyncSessionLocal() as db:
-        vehicle_ids = await get_vehicle_ids(
-            db,
-            enterprise_id=enterprise_id,
-            vehicles_count=vehicles_count,
-        )
+        vehicle_ids = await get_vehicle_ids(db, enterprise_id=enterprise_id)
 
         if clear_before:
             await clear_old_data(db, vehicle_ids)
 
-        trips_by_vehicle = distribute_trips(
-            vehicle_ids=vehicle_ids,
-            total_trips=total_trips,
-        )
-
         created_trips_total = 0
         created_points_total = 0
 
-        for vehicle_id, trips_count in trips_by_vehicle.items():
+        for vehicle_id in vehicle_ids:
             points_to_insert: list[VehicleGpsPoint] = []
             trip_specs: list[tuple[datetime, datetime, int, int]] = []
 
-            for _ in range(trips_count):
+            for _ in range(trips_per_vehicle):
                 started_at = random_trip_start(
                     date_from=date_from,
                     date_to=date_to,
@@ -256,24 +218,29 @@ async def seed_demo_tracks(
                     )
                 )
 
-            db.add_all(points_to_insert)
-            await db.flush()
+            try:
+                db.add_all(points_to_insert)
+                await db.flush()
 
-            trips_to_insert: list[Trip] = []
+                trips_to_insert: list[Trip] = []
 
-            for started_at, ended_at, first_idx, last_idx in trip_specs:
-                trips_to_insert.append(
-                    Trip(
-                        vehicle_id=vehicle_id,
-                        started_at_utc=started_at,
-                        ended_at_utc=ended_at,
-                        start_point_id=points_to_insert[first_idx].id,
-                        end_point_id=points_to_insert[last_idx].id,
+                for started_at, ended_at, first_idx, last_idx in trip_specs:
+                    trips_to_insert.append(
+                        Trip(
+                            vehicle_id=vehicle_id,
+                            started_at_utc=started_at,
+                            ended_at_utc=ended_at,
+                            start_point_id=points_to_insert[first_idx].id,
+                            end_point_id=points_to_insert[last_idx].id,
+                        )
                     )
-                )
 
-            db.add_all(trips_to_insert)
-            await db.commit()
+                db.add_all(trips_to_insert)
+                await db.commit()
+
+            except Exception:
+                await db.rollback()
+                raise
 
             created_trips_total += len(trips_to_insert)
             created_points_total += len(points_to_insert)
@@ -285,25 +252,26 @@ async def seed_demo_tracks(
             )
 
     typer.echo("Генерация завершена")
-    typer.echo(f"Машин: {vehicles_count}")
-    typer.echo(f"Поездок: {created_trips_total}")
-    typer.echo(f"GPS-точек: {created_points_total}")
+    typer.echo(f"Предприятие: {enterprise_id}")
+    typer.echo(f"Машин: {len(vehicle_ids)}")
+    typer.echo(f"Поездок на машину: {trips_per_vehicle}")
+    typer.echo(f"Поездок всего: {created_trips_total}")
+    typer.echo(f"GPS-точек всего: {created_points_total}")
 
 
-@app.command("generate")
+@app.command()
 def generate(
     enterprise_id: Annotated[
         int,
         typer.Option("--enterprise-id", help="ID предприятия"),
     ],
-    vehicles_count: Annotated[
+    trips_per_vehicle: Annotated[
         int,
-        typer.Option("--vehicles-count", help="Сколько машин использовать"),
-    ] = DEFAULT_VEHICLES_COUNT,
-    total_trips: Annotated[
-        int,
-        typer.Option("--total-trips", help="Общее количество поездок"),
-    ] = DEFAULT_TOTAL_TRIPS,
+        typer.Option(
+            "--trips-per-vehicle",
+            help="Количество поездок на каждую машину предприятия",
+        ),
+    ] = DEFAULT_TRIPS_PER_VEHICLE,
     points_per_trip: Annotated[
         int,
         typer.Option("--points-per-trip", help="Количество GPS-точек в одной поездке"),
@@ -348,8 +316,7 @@ def generate(
     asyncio.run(
         seed_demo_tracks(
             enterprise_id=enterprise_id,
-            vehicles_count=vehicles_count,
-            total_trips=total_trips,
+            trips_per_vehicle=trips_per_vehicle,
             points_per_trip=points_per_trip,
             date_from=parsed_date_from,
             date_to=parsed_date_to,

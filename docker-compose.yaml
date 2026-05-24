@@ -94,8 +94,7 @@ services:
     command: >
       python -m auto_parking.minor_utilities.seed_demo_tracks
       --enterprise-id 2
-      --vehicles-count 120
-      --total-trips 2000
+      --trips-per-vehicle 30
       --points-per-trip 100
       --date-from 2024-01-01
       --date-to 2026-01-01
