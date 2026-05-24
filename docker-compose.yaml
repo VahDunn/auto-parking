@@ -32,15 +32,13 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       APP_ENV: ${APP_ENV}
       DEBUG: ${DEBUG}
-      TEST_ADMIN_LOGIN: ${TEST_ADMIN_LOGIN}
-      TEST_ADMIN_PASS: ${TEST_ADMIN_PASS}
     command: >
       uvicorn auto_parking.main:app
       --host 0.0.0.0
       --port 8000
       --workers 4
     expose:
-      - "8000"  
+      - "8000"
 
   frontend:
     build: ./frontend

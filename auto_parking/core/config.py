@@ -13,8 +13,6 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, alias="DEBUG")
 
     database_url: str = Field(..., alias="DATABASE_URL")
-    test_admin_login: str = Field(alias="TEST_ADMIN_NAME")
-    test_admin_pass: str = Field(alias="TEST_ADMIN_PASS")
     jwt_secret_key: str = Field(alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_access_ttl_minutes: int = Field(default=30, alias="JWT_ACCESS_TTL_MINUTES")
