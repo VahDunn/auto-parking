@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from auto_parking.api.schemas.driver import DriverOut
-from auto_parking.core.models import DriverModel
+from auto_parking.core.domain.models import DriverModel
 from auto_parking.deps.commons import dep_actor
 from auto_parking.deps.services import dep_driver_service, dep_user_service
 from auto_parking.filter import DriverFilter

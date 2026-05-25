@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, status
 
-from auto_parking.core.enums.user_role import UserRole
+from auto_parking.core.domain.enums.user_role import UserRole
 from auto_parking.db.models import User
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.services import dep_user_service

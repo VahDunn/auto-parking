@@ -4,8 +4,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.responses import Response
 
 from auto_parking.api.schemas.enterprise import EnterpriseOut
-from auto_parking.core.enums.import_export_format import ExportFormat
-from auto_parking.core.models import EnterpriseModel
+from auto_parking.core.domain.enums.import_export_format import ExportFormat
+from auto_parking.core.domain.models import EnterpriseModel
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.visibility import get_visible_enterprise_ids
 

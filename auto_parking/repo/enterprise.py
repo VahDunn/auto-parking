@@ -5,7 +5,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
 
-from auto_parking.core.enums.user_role import UserRole
+from auto_parking.core.domain.enums.user_role import UserRole
 from auto_parking.db.models import Driver, Enterprise, User, Vehicle
 
 if TYPE_CHECKING:

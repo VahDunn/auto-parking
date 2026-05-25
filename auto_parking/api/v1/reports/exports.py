@@ -9,7 +9,7 @@ from auto_parking.api.v1.reports.common import (
     dep_visible_ids,
     ensure_report_visible,
 )
-from auto_parking.core.enums import ExportFormat
+from auto_parking.core.domain.enums import ExportFormat
 from auto_parking.deps.services import dep_report_service, dep_reports_pdf_service
 from auto_parking.service.report import ReportService
 from auto_parking.service.report_pdf import ReportPdfBuilder

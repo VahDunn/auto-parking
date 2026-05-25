@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import field_validator
 
 from auto_parking.api.schemas.base import ApiSchema
-from auto_parking.core.enums import TrackFormat
+from auto_parking.core.domain.enums import TrackFormat
 
 
 def _ensure_aware(dt: datetime) -> datetime:

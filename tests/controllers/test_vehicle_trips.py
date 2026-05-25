@@ -3,8 +3,8 @@ from datetime import datetime
 
 import pytest
 
-from auto_parking.core.enums.user_role import UserRole
-from auto_parking.core.models import TripModel, TripPointModel
+from auto_parking.core.domain.enums.user_role import UserRole
+from auto_parking.core.domain.models import TripModel, TripPointModel
 from tests.conftest import (
     set_actor_override,
     set_trip_service_override,

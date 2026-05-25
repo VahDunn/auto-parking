@@ -9,7 +9,7 @@ from auto_parking.api.v1.vehicles.common import (
     parse_int_list,
     vehicle_out,
 )
-from auto_parking.core.models import VehicleCreateModel, VehicleUpdateModel
+from auto_parking.core.domain.models import VehicleCreateModel, VehicleUpdateModel
 from auto_parking.deps.services import dep_vehicle_service
 from auto_parking.filter import VehicleFilter
 from auto_parking.service.vehicle import VehicleService

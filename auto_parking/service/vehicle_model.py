@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from auto_parking.core.models import VehicleModelInfo
+from auto_parking.core.domain.models import VehicleModelInfo
 from auto_parking.db.models import VehicleModel
 from auto_parking.repo.vehicle_model import VehicleModelRepository
 

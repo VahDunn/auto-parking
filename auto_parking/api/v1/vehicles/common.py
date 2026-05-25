@@ -12,8 +12,8 @@ from auto_parking.api.schemas.vehicle_track import (
     GeoJSONGeometry,
     VehicleTrackPointOut,
 )
-from auto_parking.core.enums.import_export_format import ExportFormat
-from auto_parking.core.models import (
+from auto_parking.core.domain.enums.import_export_format import ExportFormat
+from auto_parking.core.domain.models import (
     GeoJSONFeatureCollectionModel,
     GeoJSONFeatureModel,
     GeoJSONGeometryModel,

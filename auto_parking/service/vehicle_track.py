@@ -2,8 +2,8 @@ import json
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from auto_parking.core.enums import TrackFormat
-from auto_parking.core.models import (
+from auto_parking.core.domain.enums import TrackFormat
+from auto_parking.core.domain.models import (
     GeoJSONFeatureCollectionModel,
     GeoJSONFeatureModel,
     GeoJSONGeometryModel,

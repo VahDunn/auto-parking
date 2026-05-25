@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING
 
-from auto_parking.core.enums.user_role import UserRole
+from auto_parking.core.domain.enums.user_role import UserRole
 from auto_parking.core.errors import ConflictError, ForbiddenError, NotFoundError
-from auto_parking.core.models import EnterpriseModel
+from auto_parking.core.domain.models import EnterpriseModel
 from auto_parking.filter import EnterpriseFilter
 
 if TYPE_CHECKING:

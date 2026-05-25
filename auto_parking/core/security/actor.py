@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from fastapi import Depends
 
-from auto_parking.core.enums.user_role import UserRole
+from auto_parking.core.domain.enums.user_role import UserRole
 from auto_parking.core.security.bearer import get_token
 from auto_parking.core.security.jwt import decode_access_token
 

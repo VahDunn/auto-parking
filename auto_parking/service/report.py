@@ -12,9 +12,9 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from shapely import Point
 
-from auto_parking.core.enums.report_period import ReportPeriod
-from auto_parking.core.enums.report_type import ReportType
-from auto_parking.core.models import ReportCreateModel, ReportInfoModel, ReportModel
+from auto_parking.core.domain.enums.report_period import ReportPeriod
+from auto_parking.core.domain.enums.report_type import ReportType
+from auto_parking.core.domain.models import ReportCreateModel, ReportInfoModel, ReportModel
 from auto_parking.core.utils.datetime import to_utc
 from auto_parking.db.models import Report
 from auto_parking.filter import TripFilter

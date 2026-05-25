@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 
 from auto_parking.api.v1.enterprises.common import dep_actor_guard
-from auto_parking.core.enums.import_export_format import ImportFormat
+from auto_parking.core.domain.enums.import_export_format import ImportFormat
 from auto_parking.deps.services import dep_import_service
 
 if TYPE_CHECKING:

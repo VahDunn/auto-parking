@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from auto_parking.core.models import DriverModel
+from auto_parking.core.domain.models import DriverModel
 from auto_parking.db.models import Driver
 from auto_parking.filter import DriverFilter
 from auto_parking.repo.driver import DriverRepository

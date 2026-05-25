@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from jose import JWTError, jwt
 
 from auto_parking.core.config import settings
-from auto_parking.core.enums.user_role import UserRole
+from auto_parking.core.domain.enums.user_role import UserRole
 
 SECRET_KEY = settings.jwt_secret_key
 ALGORITHM = settings.jwt_algorithm

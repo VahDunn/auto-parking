@@ -11,7 +11,7 @@ from auto_parking.api.v1.vehicles.common import (
     ensure_valid_date_range,
     export_response,
 )
-from auto_parking.core.enums.import_export_format import ExportFormat
+from auto_parking.core.domain.enums.import_export_format import ExportFormat
 from auto_parking.deps.services import dep_export_service, dep_vehicle_service
 from auto_parking.service.vehicle import VehicleService
 

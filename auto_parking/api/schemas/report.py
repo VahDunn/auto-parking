@@ -4,8 +4,8 @@ from typing import Any
 from pydantic import Field, field_validator
 
 from auto_parking.api.schemas.base import ApiSchema
-from auto_parking.core.enums.report_period import ReportPeriod
-from auto_parking.core.enums.report_type import ReportType
+from auto_parking.core.domain.enums.report_period import ReportPeriod
+from auto_parking.core.domain.enums.report_type import ReportType
 
 
 class ReportInfo(ApiSchema):

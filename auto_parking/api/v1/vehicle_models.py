@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from auto_parking.api.schemas.vehicle_model import VehicleModelOut
-from auto_parking.core.models import VehicleModelInfo
+from auto_parking.core.domain.models import VehicleModelInfo
 from auto_parking.deps.services import dep_vehicle_model_service
 from auto_parking.service.vehicle_model import VehicleModelService
 

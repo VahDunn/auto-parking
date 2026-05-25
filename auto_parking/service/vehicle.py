@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from auto_parking.core.models import VehicleCreateModel, VehicleModel, VehicleUpdateModel
+from auto_parking.core.domain.models import VehicleCreateModel, VehicleModel, VehicleUpdateModel
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
 from auto_parking.filter import VehicleFilter
 

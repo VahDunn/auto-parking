@@ -1,16 +1,24 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
 import pytest_asyncio
 from asgi_lifespan import LifespanManager
 
-from auto_parking.core.enums.user_role import UserRole
+from auto_parking.core.domain.enums.user_role import UserRole
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.services import (
+    dep_driver_service,
     dep_enterprise_service,
+    dep_export_service,
+    dep_gpx_import_service,
+    dep_import_service,
+    dep_report_service,
+    dep_reports_pdf_service,
     dep_trip_service,
     dep_trip_track_service,
+    dep_user_service,
+    dep_vehicle_model_service,
     dep_vehicle_service,
     dep_vehicle_track_service,
 )
@@ -93,6 +101,74 @@ def enterprise_service_mock():
     return svc
 
 
+@pytest.fixture
+def driver_service_mock():
+    svc = AsyncMock()
+    svc.get = AsyncMock()
+    svc.get_by_id = AsyncMock()
+    return svc
+
+
+@pytest.fixture
+def user_service_mock():
+    svc = AsyncMock()
+    svc.get = AsyncMock()
+    svc.get_by_id = AsyncMock()
+    return svc
+
+
+@pytest.fixture
+def vehicle_model_service_mock():
+    svc = AsyncMock()
+    svc.get_all = AsyncMock()
+    svc.get_by_id = AsyncMock()
+    return svc
+
+
+@pytest.fixture
+def export_service_mock():
+    svc = AsyncMock()
+    svc.export_enterprise_full = AsyncMock()
+    svc.export_enterprise_guid_dump = AsyncMock()
+    svc.export_enterprise_vehicles = AsyncMock()
+    svc.export_vehicle_trips = AsyncMock()
+    return svc
+
+
+@pytest.fixture
+def import_service_mock():
+    svc = AsyncMock()
+    svc.import_enterprise_json = AsyncMock()
+    svc.import_enterprise_csv = AsyncMock()
+    return svc
+
+
+@pytest.fixture
+def report_service_mock():
+    svc = AsyncMock()
+    svc.get_available_reports = AsyncMock()
+    svc.get_all = AsyncMock()
+    svc.get_by_id = AsyncMock()
+    svc.create = AsyncMock()
+    svc.rebuild = AsyncMock()
+    svc.delete = AsyncMock()
+    return svc
+
+
+@pytest.fixture
+def reports_pdf_service_mock():
+    svc = Mock()
+    svc.build.return_value = b"%PDF-1.4 test"
+    return svc
+
+
+@pytest.fixture
+def gpx_import_service_mock():
+    svc = AsyncMock()
+    svc.import_vehicle_trip = AsyncMock()
+    return svc
+
+
 def set_actor_override(overrides, role: UserRole, actor_id: int = 1):
     async def _dep():
         return FakeActor(role=role, id=actor_id)
@@ -140,3 +216,59 @@ def set_enterprise_service_override(overrides, mock):
         return mock
 
     overrides[dep_callable(dep_enterprise_service)] = _dep
+
+
+def set_driver_service_override(overrides, mock):
+    async def _dep():
+        return mock
+
+    overrides[dep_callable(dep_driver_service)] = _dep
+
+
+def set_user_service_override(overrides, mock):
+    async def _dep():
+        return mock
+
+    overrides[dep_callable(dep_user_service)] = _dep
+
+
+def set_vehicle_model_service_override(overrides, mock):
+    async def _dep():
+        return mock
+
+    overrides[dep_callable(dep_vehicle_model_service)] = _dep
+
+
+def set_export_service_override(overrides, mock):
+    async def _dep():
+        return mock
+
+    overrides[dep_callable(dep_export_service)] = _dep
+
+
+def set_import_service_override(overrides, mock):
+    async def _dep():
+        return mock
+
+    overrides[dep_callable(dep_import_service)] = _dep
+
+
+def set_report_service_override(overrides, mock):
+    async def _dep():
+        return mock
+
+    overrides[dep_callable(dep_report_service)] = _dep
+
+
+def set_reports_pdf_service_override(overrides, mock):
+    def _dep():
+        return mock
+
+    overrides[dep_callable(dep_reports_pdf_service)] = _dep
+
+
+def set_gpx_import_service_override(overrides, mock):
+    async def _dep():
+        return mock
+
+    overrides[dep_callable(dep_gpx_import_service)] = _dep

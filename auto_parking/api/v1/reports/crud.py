@@ -8,7 +8,7 @@ from auto_parking.api.v1.reports.common import (
     report_info_out,
     report_out,
 )
-from auto_parking.core.models import ReportCreateModel
+from auto_parking.core.domain.models import ReportCreateModel
 from auto_parking.deps.services import dep_report_service
 from auto_parking.service.report import ReportService
 
