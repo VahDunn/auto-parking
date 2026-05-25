@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auto_parking.db.models import User
 
 if TYPE_CHECKING:
-    from auto_parking.api.schemas.user import UserFilter
+    from auto_parking.filter import UserFilter
 
 
 class UserRepository:

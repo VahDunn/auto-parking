@@ -38,7 +38,7 @@ class ReportRepository:
         await self.db.refresh(report)
         return report
 
-    async def update_result(self, report_id: int, result_json: list[dict]) -> Report | None:
+    async def update(self, report_id: int, result_json: list[dict]) -> Report | None:
         report = await self.get_by_id(report_id)
         if report is None:
             return None

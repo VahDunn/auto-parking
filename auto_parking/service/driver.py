@@ -1,7 +1,8 @@
 from collections.abc import Sequence
 
-from auto_parking.api.schemas.driver import DriverFilter, DriverOut
+from auto_parking.api.schemas.driver import DriverOut
 from auto_parking.db.models import Driver
+from auto_parking.filter import DriverFilter
 from auto_parking.repo.driver import DriverRepository
 
 

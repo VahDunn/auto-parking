@@ -6,8 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
 
-from auto_parking.api.schemas.trip import TripFilter
 from auto_parking.db.models import Enterprise, Trip, Vehicle, VehicleGpsPoint
+from auto_parking.filter import TripFilter
 
 
 class TripRepository:
@@ -83,7 +83,11 @@ class TripRepository:
         else:
             stmt = stmt.order_by(Trip.started_at_utc, Trip.id)
 
-        stmt = stmt.offset(filter_obj.offset).limit(filter_obj.limit)
+        if filter_obj.offset is not None:
+            stmt = stmt.offset(filter_obj.offset)
+
+        if filter_obj.limit is not None:
+            stmt = stmt.limit(filter_obj.limit)
 
         result = await self.db.execute(stmt)
         return result.unique().scalars().all()
@@ -158,21 +162,3 @@ class TripRepository:
             raise
 
         return True
-
-    async def get_trips_inside_range(
-        self,
-        vehicle_id: int,
-        date_from_utc: datetime,
-        date_to_utc: datetime,
-    ) -> Sequence[Trip]:
-        stmt = (
-            select(Trip)
-            .where(Trip.vehicle_id == vehicle_id)
-            .where(Trip.started_at_utc >= date_from_utc)
-            .where(Trip.ended_at_utc <= date_to_utc)
-            .options(*self._base_options())
-            .order_by(Trip.started_at_utc.asc(), Trip.id.asc())
-        )
-
-        result = await self.db.execute(stmt)
-        return result.unique().scalars().all()

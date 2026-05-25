@@ -6,7 +6,7 @@ from fastapi.responses import Response
 
 from auto_parking.api.schemas.trip import TripOut
 from auto_parking.api.schemas.trip_track import TripTrackGroupOut
-from auto_parking.api.schemas.vehicle import VehicleCreate, VehicleFilter, VehicleOut, VehicleUpdate
+from auto_parking.api.schemas.vehicle import VehicleCreate, VehicleOut, VehicleUpdate
 from auto_parking.api.schemas.vehicle_track import (
     GeoJSONFeatureCollection,
     TrackFormat,
@@ -23,6 +23,7 @@ from auto_parking.deps.services import (
     dep_vehicle_track_service,
 )
 from auto_parking.deps.visibility import get_visible_enterprise_ids
+from auto_parking.filter import VehicleFilter
 from auto_parking.service.trip import TripService
 from auto_parking.service.trip_track import TripTrackService
 from auto_parking.service.vehicle import VehicleService
@@ -271,17 +272,23 @@ async def get_vehicle_trips(
     _ensure_aware_datetime(date_from, "date_from")
     _ensure_aware_datetime(date_to, "date_to")
 
+    if date_to < date_from:
+        raise HTTPException(status_code=400, detail="date_to must be >= date_from")
+
     vehicle = await vehicle_service.get_by_id(id)
     if not vehicle:
         raise HTTPException(status_code=404, detail="Vehicle not found")
 
     _ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
 
-    return await service.get_vehicle_trips_in_range(
-        vehicle_id=id,
-        date_from=date_from,
-        date_to=date_to,
-    )
+    try:
+        return await service.get_vehicle_trips_in_range(
+            vehicle_id=id,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
 
 
 @router.get(
@@ -299,6 +306,9 @@ async def get_vehicle_track(
 ):
     _ensure_aware_datetime(date_from, "date_from")
     _ensure_aware_datetime(date_to, "date_to")
+
+    if date_to < date_from:
+        raise HTTPException(status_code=400, detail="date_to must be >= date_from")
 
     result, vehicle = await service.get_track(
         vehicle_id=id,
@@ -330,6 +340,9 @@ async def get_vehicle_track_by_trips(
 ):
     _ensure_aware_datetime(date_from, "date_from")
     _ensure_aware_datetime(date_to, "date_to")
+
+    if date_to < date_from:
+        raise HTTPException(status_code=400, detail="date_to must be >= date_from")
 
     vehicle = await vehicle_service.get_by_id(id)
     if not vehicle:

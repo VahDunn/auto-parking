@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 def _ensure_aware(dt: datetime) -> datetime:
@@ -51,20 +51,6 @@ class TripOut(BaseModel):
     @classmethod
     def validate_aware_datetime(cls, v: datetime) -> datetime:
         return _ensure_aware(v)
-
-
-class TripFilter(BaseModel):
-    vehicle_id: int | None = None
-    vehicle_ids: list[int] | None = None
-
-    started_from: datetime | None = None
-    started_to: datetime | None = None
-    ended_from: datetime | None = None
-    ended_to: datetime | None = None
-
-    limit: int = Field(default=100, ge=1, le=1000)
-    offset: int = Field(default=0, ge=0)
-    sort_by: str | None = None
 
 
 class TripCreate(BaseModel):

@@ -12,6 +12,7 @@ from auto_parking.api.schemas.vehicle_track import (
 )
 from auto_parking.core.errors import NotFoundError
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
+from auto_parking.filter import TripFilter
 
 if TYPE_CHECKING:
     from auto_parking.repo.trip import TripRepository
@@ -47,10 +48,14 @@ class TripTrackService:
         date_from_utc = to_utc(date_from)
         date_to_utc = to_utc(date_to)
 
-        trips = await self._trip_repo.get_trips_inside_range(
-            vehicle_id=vehicle_id,
-            date_from_utc=date_from_utc,
-            date_to_utc=date_to_utc,
+        trips = await self._trip_repo.get(
+            TripFilter(
+                vehicle_id=vehicle_id,
+                started_from=date_from_utc,
+                ended_to=date_to_utc,
+                limit=None,
+                offset=None,
+            )
         )
 
         flat_rows: list[tuple[Any, int]] = []
@@ -106,10 +111,14 @@ class TripTrackService:
         date_from_utc = to_utc(date_from)
         date_to_utc = to_utc(date_to)
 
-        trips = await self._trip_repo.get_trips_inside_range(
-            vehicle_id=vehicle_id,
-            date_from_utc=date_from_utc,
-            date_to_utc=date_to_utc,
+        trips = await self._trip_repo.get(
+            TripFilter(
+                vehicle_id=vehicle_id,
+                started_from=date_from_utc,
+                ended_to=date_to_utc,
+                limit=None,
+                offset=None,
+            )
         )
 
         if format == TrackFormat.geojson:

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from auto_parking.db.models import User
 
 if TYPE_CHECKING:
-    from auto_parking.api.schemas.user import UserFilter
+    from auto_parking.filter import UserFilter
     from auto_parking.repo.user import UserRepository
 
 

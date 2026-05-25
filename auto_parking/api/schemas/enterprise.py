@@ -9,7 +9,3 @@ class EnterpriseOut(BaseModel):
     drivers: list[int] = Field(default_factory=list)
     managers: list[int] = Field(default_factory=list)
     timezone: str | None = None  # 👈 вот это
-
-
-class EnterpriseFilter(BaseModel):
-    ids: list[int] | None = None

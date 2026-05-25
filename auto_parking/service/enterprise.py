@@ -1,8 +1,9 @@
 from typing import TYPE_CHECKING
 
-from auto_parking.api.schemas.enterprise import EnterpriseFilter, EnterpriseOut
+from auto_parking.api.schemas.enterprise import EnterpriseOut
 from auto_parking.core.domain.user_role import UserRole
 from auto_parking.core.errors import ConflictError, ForbiddenError, NotFoundError
+from auto_parking.filter import EnterpriseFilter
 
 if TYPE_CHECKING:
     from auto_parking.db.models import Enterprise

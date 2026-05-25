@@ -13,11 +13,11 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from shapely import Point
 
 from auto_parking.api.schemas.report import ReportCreate, ReportInfo
-from auto_parking.api.schemas.trip import TripFilter
 from auto_parking.core.domain.report_period import ReportPeriod
 from auto_parking.core.domain.report_type import ReportType
 from auto_parking.core.utils.datetime import to_utc
 from auto_parking.db.models import Report
+from auto_parking.filter import TripFilter
 from auto_parking.repo.report import ReportRepository
 from auto_parking.repo.trip import TripRepository
 from auto_parking.repo.vehicle import VehicleRepository
@@ -98,7 +98,7 @@ class ReportService:
         )
 
         result_json = await self._build_result(payload)
-        return await self._report_repo.update_result(report_id, result_json)
+        return await self._report_repo.update(report_id, result_json)
 
     async def delete(self, report_id: int) -> bool:
         return await self._report_repo.delete(report_id)

@@ -1,8 +1,9 @@
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from auto_parking.api.schemas.vehicle import VehicleFilter, VehicleOut
+from auto_parking.api.schemas.vehicle import VehicleOut
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
+from auto_parking.filter import VehicleFilter
 
 if TYPE_CHECKING:
     from auto_parking.api.schemas.vehicle import VehicleCreate, VehicleUpdate

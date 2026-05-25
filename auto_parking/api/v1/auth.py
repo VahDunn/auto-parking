@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 
-from auto_parking.api.schemas.user import UserFilter
 from auto_parking.core.security.jwt import create_access_token
 from auto_parking.core.security.passwords import verify_password
 from auto_parking.deps.services import dep_user_service
+from auto_parking.filter import UserFilter
 
 router = APIRouter()
 

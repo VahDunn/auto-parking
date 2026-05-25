@@ -45,15 +45,6 @@ class VehicleOut(BaseModel):
         return v if v is not None else -1
 
 
-class VehicleFilter(BaseModel):
-    id: list[int] | None = None
-    enterprise_ids: list[int] | None = None
-    driver_id: int | None = None
-    limit: int = Field(default=50, ge=1, le=100)
-    offset: int = Field(default=0, ge=0)
-    sort_by: str | None = None
-
-
 class VehicleCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

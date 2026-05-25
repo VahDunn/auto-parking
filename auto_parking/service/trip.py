@@ -5,8 +5,9 @@ from typing import TYPE_CHECKING
 from geoalchemy2.shape import to_shape
 from shapely.geometry import Point
 
-from auto_parking.api.schemas.trip import TripFilter, TripOut, TripPointOut
+from auto_parking.api.schemas.trip import TripOut, TripPointOut
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
+from auto_parking.filter import TripFilter
 
 if TYPE_CHECKING:
     from auto_parking.api.schemas.trip import TripCreate, TripUpdate
@@ -37,10 +38,14 @@ class TripService:
         date_from_utc = to_utc(date_from)
         date_to_utc = to_utc(date_to)
 
-        trips = await self._repo.get_trips_inside_range(
-            vehicle_id=vehicle_id,
-            date_from_utc=date_from_utc,
-            date_to_utc=date_to_utc,
+        trips = await self._repo.get(
+            TripFilter(
+                vehicle_id=vehicle_id,
+                started_from=date_from_utc,
+                ended_to=date_to_utc,
+                limit=None,
+                offset=None,
+            )
         )
         return [await self._build_out(t) for t in trips]
 

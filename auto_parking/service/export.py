@@ -6,11 +6,11 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, TypedDict
 
-from auto_parking.api.schemas.driver import DriverFilter
 from auto_parking.core.domain.import_export_format import ExportFormat
 from auto_parking.core.errors import NotFoundError
 from auto_parking.core.utils.datetime import to_utc
 from auto_parking.db.models import Driver, Trip, Vehicle
+from auto_parking.filter import DriverFilter, TripFilter, VehicleFilter
 from auto_parking.repo.driver import DriverRepository
 from auto_parking.repo.enterprise import EnterpriseRepository
 from auto_parking.repo.trip import TripRepository
@@ -54,7 +54,9 @@ class ExportService:
 
         enterprise_external_id = self._new_external_id()
 
-        vehicles = await self._vehicle_repo.get_by_enterprise_id(enterprise_id)
+        vehicles = await self._vehicle_repo.get(
+            VehicleFilter(enterprise_ids=[enterprise_id], limit=None, offset=None)
+        )
         drivers = await self._driver_repo.get(
             DriverFilter(id=None, enterprise_ids=[enterprise_id], vehicle_id=None)
         )
@@ -98,10 +100,14 @@ class ExportService:
         }
 
         for vehicle in vehicles:
-            trips = await self._trip_repo.get_trips_inside_range(
-                vehicle_id=vehicle.id,
-                date_from_utc=date_from_utc,
-                date_to_utc=date_to_utc,
+            trips = await self._trip_repo.get(
+                TripFilter(
+                    vehicle_id=vehicle.id,
+                    started_from=date_from_utc,
+                    ended_to=date_to_utc,
+                    limit=None,
+                    offset=None,
+                )
             )
 
             trip_external_ids = {trip.id: self._new_external_id() for trip in trips}
@@ -147,7 +153,9 @@ class ExportService:
         if not enterprise:
             raise NotFoundError("Enterprise not found")
 
-        vehicles = await self._vehicle_repo.get_by_enterprise_id(enterprise_id)
+        vehicles = await self._vehicle_repo.get(
+            VehicleFilter(enterprise_ids=[enterprise_id], limit=None, offset=None)
+        )
 
         result: dict[str, Any] = {
             "enterprise": {
@@ -201,10 +209,14 @@ class ExportService:
         date_from_utc = to_utc(date_from)
         date_to_utc = to_utc(date_to)
 
-        trips = await self._trip_repo.get_trips_inside_range(
-            vehicle_id=vehicle.id,
-            date_from_utc=date_from_utc,
-            date_to_utc=date_to_utc,
+        trips = await self._trip_repo.get(
+            TripFilter(
+                vehicle_id=vehicle.id,
+                started_from=date_from_utc,
+                ended_to=date_to_utc,
+                limit=None,
+                offset=None,
+            )
         )
 
         intervals = [(trip.started_at_utc, trip.ended_at_utc) for trip in trips]
@@ -264,7 +276,9 @@ class ExportService:
         date_from_utc = to_utc(date_from)
         date_to_utc = to_utc(date_to)
 
-        vehicles = await self._vehicle_repo.get_by_enterprise_id(enterprise_id)
+        vehicles = await self._vehicle_repo.get(
+            VehicleFilter(enterprise_ids=[enterprise_id], limit=None, offset=None)
+        )
 
         result: dict[str, Any] = {
             "enterprise": {
@@ -282,10 +296,14 @@ class ExportService:
         }
 
         for vehicle in vehicles:
-            trips = await self._trip_repo.get_trips_inside_range(
-                vehicle_id=vehicle.id,
-                date_from_utc=date_from_utc,
-                date_to_utc=date_to_utc,
+            trips = await self._trip_repo.get(
+                TripFilter(
+                    vehicle_id=vehicle.id,
+                    started_from=date_from_utc,
+                    ended_to=date_to_utc,
+                    limit=None,
+                    offset=None,
+                )
             )
 
             intervals = [(trip.started_at_utc, trip.ended_at_utc) for trip in trips]

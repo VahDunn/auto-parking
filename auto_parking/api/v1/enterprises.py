@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 
-from auto_parking.api.schemas.enterprise import EnterpriseFilter, EnterpriseOut
+from auto_parking.api.schemas.enterprise import EnterpriseOut
 from auto_parking.core.domain.import_export_format import ExportFormat, ImportFormat
 from auto_parking.core.errors import NotFoundError
 from auto_parking.deps.access import require_manager_or_higher
@@ -15,6 +15,7 @@ from auto_parking.deps.services import (
     dep_import_service,
 )
 from auto_parking.deps.visibility import get_visible_enterprise_ids
+from auto_parking.filter import EnterpriseFilter
 
 if TYPE_CHECKING:
     from auto_parking.service.enterprise import EnterpriseService

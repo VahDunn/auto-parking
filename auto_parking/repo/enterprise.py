@@ -9,7 +9,7 @@ from auto_parking.core.domain.user_role import UserRole
 from auto_parking.db.models import Driver, Enterprise, User, Vehicle
 
 if TYPE_CHECKING:
-    from auto_parking.api.schemas.enterprise import EnterpriseFilter
+    from auto_parking.filter import EnterpriseFilter
 
 
 class EnterpriseRepository:

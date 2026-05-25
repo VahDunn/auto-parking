@@ -4,8 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
 
-from auto_parking.api.schemas.driver import DriverFilter
 from auto_parking.db.models import Driver, Vehicle
+from auto_parking.filter import DriverFilter
 
 
 class DriverRepository:

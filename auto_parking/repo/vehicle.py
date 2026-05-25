@@ -4,8 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
 
-from auto_parking.api.schemas.vehicle import VehicleFilter
 from auto_parking.db.models import Driver, Enterprise, Vehicle
+from auto_parking.filter import VehicleFilter
 
 
 class VehicleRepository:
@@ -58,7 +58,11 @@ class VehicleRepository:
         else:
             stmt = stmt.order_by(Vehicle.id)
 
-        stmt = stmt.offset(filter_obj.offset).limit(filter_obj.limit)
+        if filter_obj.offset is not None:
+            stmt = stmt.offset(filter_obj.offset)
+
+        if filter_obj.limit is not None:
+            stmt = stmt.limit(filter_obj.limit)
 
         result = await self.db.execute(stmt)
         return result.unique().scalars().all()
@@ -68,15 +72,6 @@ class VehicleRepository:
             select(Vehicle).where(Vehicle.id == vehicle_id).options(*self._base_options())
         )
         return result.scalar_one_or_none()
-
-    async def get_by_enterprise_id(self, enterprise_id: int) -> Sequence[Vehicle]:
-        result = await self.db.execute(
-            select(Vehicle)
-            .where(Vehicle.enterprise_id == enterprise_id)
-            .options(*self._base_options())
-            .order_by(Vehicle.id.asc())
-        )
-        return result.unique().scalars().all()
 
     async def create(self, data: dict) -> Vehicle:
         vehicle = Vehicle(**data)
