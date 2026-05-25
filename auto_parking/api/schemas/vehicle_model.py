@@ -1,7 +1,7 @@
-from pydantic import BaseModel
+from auto_parking.api.schemas.base import ApiSchema
 
 
-class VehicleModelOut(BaseModel):
+class VehicleModelOut(ApiSchema):
     id: int
     name: str
     type: str

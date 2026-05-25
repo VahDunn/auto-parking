@@ -8,6 +8,7 @@ from auto_parking.repo.report import ReportRepository
 from auto_parking.repo.trip import TripRepository
 from auto_parking.repo.user import UserRepository
 from auto_parking.repo.vehicle import VehicleRepository
+from auto_parking.repo.vehicle_model import VehicleModelRepository
 from auto_parking.repo.vehicle_track import VehicleTrackRepository
 
 
@@ -21,6 +22,12 @@ def get_vehicle_repo(
     db: AsyncSession = depends_db,
 ) -> VehicleRepository:
     return VehicleRepository(db)
+
+
+def get_vehicle_model_repo(
+    db: AsyncSession = depends_db,
+) -> VehicleModelRepository:
+    return VehicleModelRepository(db)
 
 
 def get_driver_repo(
@@ -55,6 +62,7 @@ def get_report_repo(
 
 dep_enterprise_repo = Depends(get_enterprise_repo)
 dep_vehicle_repo = Depends(get_vehicle_repo)
+dep_vehicle_model_repo = Depends(get_vehicle_model_repo)
 dep_driver_repo = Depends(get_driver_repo)
 dep_manager_repo = Depends(get_manager_repo)
 dep_track_repo = Depends(get_vehicle_track_repo)

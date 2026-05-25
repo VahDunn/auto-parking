@@ -1,7 +1,9 @@
 import re
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import Field, field_validator
+
+from auto_parking.api.schemas.base import ApiSchema
 
 PLATE_RE = re.compile(r"^(?i:[АВЕКМНОРСТУХ])\d{3}(?i:[АВЕКМНОРСТУХ]){2}\d{2,3}$")
 
@@ -10,9 +12,7 @@ def is_valid_plate(s: str) -> bool:
     return bool(PLATE_RE.fullmatch(s.strip()))
 
 
-class VehicleOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class VehicleOut(ApiSchema):
     id: int
     price: int
     mileage: int
@@ -45,9 +45,7 @@ class VehicleOut(BaseModel):
         return v if v is not None else -1
 
 
-class VehicleCreate(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class VehicleCreate(ApiSchema):
     price: int
     mileage: int
     vehicle_number: str
@@ -67,9 +65,7 @@ class VehicleCreate(BaseModel):
         return v
 
 
-class VehicleUpdate(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class VehicleUpdate(ApiSchema):
     price: int | None = None
     mileage: int | None = None
     vehicle_number: str | None = None

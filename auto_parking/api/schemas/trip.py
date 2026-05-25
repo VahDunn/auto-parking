@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import ConfigDict, field_validator
+
+from auto_parking.api.schemas.base import ApiSchema
 
 
 def _ensure_aware(dt: datetime) -> datetime:
@@ -10,9 +12,7 @@ def _ensure_aware(dt: datetime) -> datetime:
     return dt
 
 
-class TripPointOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class TripPointOut(ApiSchema):
     id: int
     recorded_at_utc: datetime
     recorded_at_enterprise: datetime
@@ -26,9 +26,7 @@ class TripPointOut(BaseModel):
         return _ensure_aware(v)
 
 
-class TripOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class TripOut(ApiSchema):
     id: int
     vehicle_id: int
 
@@ -53,9 +51,7 @@ class TripOut(BaseModel):
         return _ensure_aware(v)
 
 
-class TripCreate(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class TripCreate(ApiSchema):
     vehicle_id: int
     started_at: datetime
     ended_at: datetime
@@ -76,7 +72,7 @@ class TripCreate(BaseModel):
         return v
 
 
-class TripUpdate(BaseModel):
+class TripUpdate(ApiSchema):
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     started_at: datetime | None = None

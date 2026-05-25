@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from auto_parking.api.schemas.base import ApiSchema
 
 
-class DriverOut(BaseModel):
+class DriverOut(ApiSchema):
     id: int
     name: str
     salary_rub: int

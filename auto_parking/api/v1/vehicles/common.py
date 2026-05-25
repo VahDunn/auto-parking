@@ -1,0 +1,149 @@
+from datetime import datetime
+
+from fastapi import Depends, HTTPException, status
+from fastapi.responses import Response
+
+from auto_parking.api.schemas.trip import TripOut
+from auto_parking.api.schemas.trip_track import TripTrackGroupOut
+from auto_parking.api.schemas.vehicle import VehicleOut
+from auto_parking.api.schemas.vehicle_track import (
+    GeoJSONFeature,
+    GeoJSONFeatureCollection,
+    GeoJSONGeometry,
+    VehicleTrackPointOut,
+)
+from auto_parking.core.enums.import_export_format import ExportFormat
+from auto_parking.core.models import (
+    GeoJSONFeatureCollectionModel,
+    GeoJSONFeatureModel,
+    GeoJSONGeometryModel,
+    TripModel,
+    TripTrackGroupModel,
+    VehicleModel,
+    VehicleTrackPointModel,
+)
+from auto_parking.deps.access import require_manager_or_higher
+from auto_parking.deps.visibility import get_visible_enterprise_ids
+
+dep_actor_guard = Depends(require_manager_or_higher)
+dep_visible_ids = Depends(get_visible_enterprise_ids)
+
+
+def vehicle_out(vehicle: VehicleModel) -> VehicleOut:
+    return VehicleOut(**vehicle.to_dict())
+
+
+def trip_out(trip: TripModel) -> TripOut:
+    return TripOut(**trip.to_dict())
+
+
+def track_point_out(point: VehicleTrackPointModel) -> VehicleTrackPointOut:
+    return VehicleTrackPointOut(**point.to_dict())
+
+
+def geojson_geometry_out(geometry: GeoJSONGeometryModel) -> GeoJSONGeometry:
+    return GeoJSONGeometry(**geometry.to_dict())
+
+
+def geojson_feature_out(feature: GeoJSONFeatureModel) -> GeoJSONFeature:
+    return GeoJSONFeature(
+        type=feature.type,
+        geometry=geojson_geometry_out(feature.geometry),
+        properties=feature.properties,
+    )
+
+
+def geojson_collection_out(collection: GeoJSONFeatureCollectionModel) -> GeoJSONFeatureCollection:
+    return GeoJSONFeatureCollection(
+        type=collection.type,
+        features=[geojson_feature_out(feature) for feature in collection.features],
+    )
+
+
+def track_response_out(
+    result: list[VehicleTrackPointModel] | GeoJSONFeatureCollectionModel,
+) -> list[VehicleTrackPointOut] | GeoJSONFeatureCollection:
+    if isinstance(result, GeoJSONFeatureCollectionModel):
+        return geojson_collection_out(result)
+    return [track_point_out(point) for point in result]
+
+
+def trip_track_group_out(group: TripTrackGroupModel) -> TripTrackGroupOut:
+    return TripTrackGroupOut(
+        trip_id=group.trip_id,
+        vehicle_id=group.vehicle_id,
+        started_at_utc=group.started_at_utc,
+        ended_at_utc=group.ended_at_utc,
+        started_at_enterprise=group.started_at_enterprise,
+        ended_at_enterprise=group.ended_at_enterprise,
+        enterprise_timezone=group.enterprise_timezone,
+        points=(
+            [track_point_out(point) for point in group.points]
+            if group.points is not None
+            else None
+        ),
+        track=geojson_collection_out(group.track) if group.track is not None else None,
+    )
+
+
+def parse_int_list(value: str | None) -> list[int] | None:
+    if value is None or value.strip() == "":
+        return None
+
+    return [int(item.strip()) for item in value.split(",") if item.strip()]
+
+
+def apply_enterprise_visibility(
+    enterprise_ids: list[int] | None,
+    visible_enterprise_ids: set[int] | None,
+) -> list[int] | None:
+    if visible_enterprise_ids is None:
+        return enterprise_ids
+    if enterprise_ids is None:
+        return list(visible_enterprise_ids)
+    return list(set(enterprise_ids) & visible_enterprise_ids)
+
+
+def ensure_vehicle_visible(vehicle: VehicleModel, visible_enterprise_ids: set[int] | None) -> None:
+    ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
+
+
+def ensure_enterprise_visible(
+    enterprise_id: int,
+    visible_enterprise_ids: set[int] | None,
+) -> None:
+    if visible_enterprise_ids is not None and enterprise_id not in visible_enterprise_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
+def ensure_aware_datetime(value: datetime, field_name: str) -> None:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_name} must be timezone-aware",
+        )
+
+
+def ensure_valid_date_range(date_from: datetime, date_to: datetime) -> None:
+    if date_to < date_from:
+        raise HTTPException(status_code=400, detail="date_to must be >= date_from")
+
+
+def export_response(
+    *,
+    content: str,
+    format: ExportFormat,
+    filename_base: str,
+) -> Response:
+    if format == ExportFormat.csv:
+        return Response(
+            content=content,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.csv"'},
+        )
+
+    return Response(
+        content=content,
+        media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename_base}.json"'},
+    )

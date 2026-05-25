@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status
 
-from auto_parking.core.domain.user_role import UserRole
+from auto_parking.core.enums.user_role import UserRole
 from auto_parking.deps.commons import dep_actor
 
 

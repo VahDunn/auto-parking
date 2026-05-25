@@ -1,13 +1,10 @@
 from datetime import datetime
-from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import field_validator
 
-
-class TrackFormat(str, Enum):
-    json = "json"
-    geojson = "geojson"
+from auto_parking.api.schemas.base import ApiSchema
+from auto_parking.core.enums import TrackFormat
 
 
 def _ensure_aware(dt: datetime) -> datetime:
@@ -16,8 +13,7 @@ def _ensure_aware(dt: datetime) -> datetime:
     return dt
 
 
-class VehicleTrackPointOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class VehicleTrackPointOut(ApiSchema):
     id: int
     trip_id: int | None = None
     recorded_at_utc: datetime
@@ -31,7 +27,7 @@ class VehicleTrackPointOut(BaseModel):
         return _ensure_aware(v)
 
 
-class VehicleTrackQuery(BaseModel):
+class VehicleTrackQuery(ApiSchema):
     date_from: datetime
     date_to: datetime
     format: TrackFormat = TrackFormat.json
@@ -42,17 +38,17 @@ class VehicleTrackQuery(BaseModel):
         return _ensure_aware(v)
 
 
-class GeoJSONGeometry(BaseModel):
+class GeoJSONGeometry(ApiSchema):
     type: str
     coordinates: list[float]
 
 
-class GeoJSONFeature(BaseModel):
+class GeoJSONFeature(ApiSchema):
     type: str
     geometry: GeoJSONGeometry
     properties: dict[str, Any]
 
 
-class GeoJSONFeatureCollection(BaseModel):
+class GeoJSONFeatureCollection(ApiSchema):
     type: str
     features: list[GeoJSONFeature]

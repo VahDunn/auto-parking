@@ -5,7 +5,7 @@ import pytest
 import pytest_asyncio
 from asgi_lifespan import LifespanManager
 
-from auto_parking.core.domain.user_role import UserRole
+from auto_parking.core.enums.user_role import UserRole
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.services import (
     dep_enterprise_service,

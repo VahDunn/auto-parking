@@ -1,8 +1,10 @@
 from types import SimpleNamespace
+from datetime import datetime
 
 import pytest
 
-from auto_parking.core.domain.user_role import UserRole
+from auto_parking.core.enums.user_role import UserRole
+from auto_parking.core.models import TripModel, TripPointModel
 from tests.conftest import (
     set_actor_override,
     set_trip_service_override,
@@ -28,31 +30,31 @@ def make_trip_stub(
     start_point_id: int = 64446,
     end_point_id: int = 64455,
 ):
-    return {
-        "id": trip_id,
-        "vehicle_id": vehicle_id,
-        "started_at_utc": "2026-04-21T11:35:56.802506+00:00",
-        "ended_at_utc": "2026-04-21T11:36:42.072286+00:00",
-        "started_at_enterprise": "2026-04-21T06:35:56.802506-05:00",
-        "ended_at_enterprise": "2026-04-21T06:36:42.072286-05:00",
-        "enterprise_timezone": enterprise_timezone,
-        "start_point": {
-            "id": start_point_id,
-            "recorded_at_utc": "2026-04-21T11:35:56.802506+00:00",
-            "recorded_at_enterprise": "2026-04-21T06:35:56.802506-05:00",
-            "latitude": 29.932136117862218,
-            "longitude": -90.05673157637868,
-            "address": None,
-        },
-        "end_point": {
-            "id": end_point_id,
-            "recorded_at_utc": "2026-04-21T11:36:42.072286+00:00",
-            "recorded_at_enterprise": "2026-04-21T06:36:42.072286-05:00",
-            "latitude": 29.927131522589693,
-            "longitude": -90.05492833725192,
-            "address": None,
-        },
-    }
+    return TripModel(
+        id=trip_id,
+        vehicle_id=vehicle_id,
+        started_at_utc=datetime.fromisoformat("2026-04-21T11:35:56.802506+00:00"),
+        ended_at_utc=datetime.fromisoformat("2026-04-21T11:36:42.072286+00:00"),
+        started_at_enterprise=datetime.fromisoformat("2026-04-21T06:35:56.802506-05:00"),
+        ended_at_enterprise=datetime.fromisoformat("2026-04-21T06:36:42.072286-05:00"),
+        enterprise_timezone=enterprise_timezone,
+        start_point=TripPointModel(
+            id=start_point_id,
+            recorded_at_utc=datetime.fromisoformat("2026-04-21T11:35:56.802506+00:00"),
+            recorded_at_enterprise=datetime.fromisoformat("2026-04-21T06:35:56.802506-05:00"),
+            latitude=29.932136117862218,
+            longitude=-90.05673157637868,
+            address=None,
+        ),
+        end_point=TripPointModel(
+            id=end_point_id,
+            recorded_at_utc=datetime.fromisoformat("2026-04-21T11:36:42.072286+00:00"),
+            recorded_at_enterprise=datetime.fromisoformat("2026-04-21T06:36:42.072286-05:00"),
+            latitude=29.927131522589693,
+            longitude=-90.05492833725192,
+            address=None,
+        ),
+    )
 
 
 async def test_get_vehicle_trips_success(

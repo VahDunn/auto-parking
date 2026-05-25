@@ -5,12 +5,11 @@ from typing import TYPE_CHECKING
 from geoalchemy2.shape import to_shape
 from shapely.geometry import Point
 
-from auto_parking.api.schemas.trip import TripOut, TripPointOut
+from auto_parking.core.models import TripCreateModel, TripModel, TripPointModel, TripUpdateModel
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
 from auto_parking.filter import TripFilter
 
 if TYPE_CHECKING:
-    from auto_parking.api.schemas.trip import TripCreate, TripUpdate
     from auto_parking.db.models import Trip, VehicleGpsPoint
     from auto_parking.integrations.geocoding.base import ReverseGeocoder
     from auto_parking.repo.trip import TripRepository
@@ -25,7 +24,7 @@ class TripService:
         self._repo = repo
         self._geocoder = geocoder
 
-    async def get(self, filter_obj: TripFilter) -> list[TripOut]:
+    async def get(self, filter_obj: TripFilter) -> list[TripModel]:
         trips: Sequence[Trip] = await self._repo.get(filter_obj)
         return [await self._build_out(t) for t in trips]
 
@@ -34,7 +33,7 @@ class TripService:
         vehicle_id: int,
         date_from: datetime,
         date_to: datetime,
-    ) -> list[TripOut]:
+    ) -> list[TripModel]:
         date_from_utc = to_utc(date_from)
         date_to_utc = to_utc(date_to)
 
@@ -49,12 +48,12 @@ class TripService:
         )
         return [await self._build_out(t) for t in trips]
 
-    async def get_by_id(self, trip_id: int) -> TripOut | None:
+    async def get_by_id(self, trip_id: int) -> TripModel | None:
         trip: Trip | None = await self._repo.get_by_id(trip_id)
         return await self._build_out(trip) if trip else None
 
-    async def create(self, payload: "TripCreate") -> TripOut:
-        data = payload.model_dump()
+    async def create(self, payload: TripCreateModel) -> TripModel:
+        data = payload.to_dict()
         started_at = data.pop("started_at")
         ended_at = data.pop("ended_at")
 
@@ -64,12 +63,12 @@ class TripService:
         trip: Trip = await self._repo.create(data)
         return await self._build_out(trip)
 
-    async def update(self, trip_id: int, payload: "TripUpdate") -> TripOut | None:
+    async def update(self, trip_id: int, payload: TripUpdateModel) -> TripModel | None:
         trip = await self._repo.get_by_id(trip_id)
         if not trip:
             return None
 
-        payload_dump = payload.model_dump(exclude_unset=True)
+        payload_dump = dict(payload.changes)
 
         started_at_utc = trip.started_at_utc
         ended_at_utc = trip.ended_at_utc
@@ -91,11 +90,11 @@ class TripService:
     async def delete(self, trip_id: int) -> bool:
         return await self._repo.delete(trip_id)
 
-    async def _build_out(self, trip: "Trip") -> TripOut:
+    async def _build_out(self, trip: "Trip") -> TripModel:
         enterprise = trip.vehicle.enterprise if trip.vehicle else None
         tz = enterprise.timezone if enterprise else None
 
-        return TripOut(
+        return TripModel(
             id=trip.id,
             vehicle_id=trip.vehicle_id,
             started_at_utc=trip.started_at_utc,
@@ -111,7 +110,7 @@ class TripService:
         self,
         point: "VehicleGpsPoint",
         enterprise_tz: str | None,
-    ) -> TripPointOut:
+    ) -> TripPointModel:
         shapely_point = to_shape(point.position)
         if not isinstance(shapely_point, Point):
             raise ValueError("Expected Point geometry")
@@ -126,7 +125,7 @@ class TripService:
                 longitude=longitude,
             )
 
-        return TripPointOut(
+        return TripPointModel(
             id=point.id,
             recorded_at_utc=point.recorded_at_utc,
             recorded_at_enterprise=to_enterprise_tz(

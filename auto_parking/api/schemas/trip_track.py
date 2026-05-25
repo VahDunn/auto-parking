@@ -1,7 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import field_validator
 
+from auto_parking.api.schemas.base import ApiSchema
 from auto_parking.api.schemas.vehicle_track import GeoJSONFeatureCollection, VehicleTrackPointOut
 
 
@@ -11,9 +12,7 @@ def _ensure_aware(dt: datetime) -> datetime:
     return dt
 
 
-class TripTrackGroupOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class TripTrackGroupOut(ApiSchema):
     trip_id: int
     vehicle_id: int
 

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from auto_parking.core.domain import ReportPeriod, ReportType
+from auto_parking.core.enums import ReportPeriod, ReportType
 from auto_parking.db.models.base import BaseORM
 
 if TYPE_CHECKING:

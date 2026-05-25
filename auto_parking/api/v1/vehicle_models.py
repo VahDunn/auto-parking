@@ -1,23 +1,25 @@
-import sqlalchemy as sa
-from fastapi import APIRouter
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException
 
 from auto_parking.api.schemas.vehicle_model import VehicleModelOut
-from auto_parking.db.models import Vehicle, VehicleModel
-from auto_parking.deps.commons import depends_db
+from auto_parking.core.models import VehicleModelInfo
+from auto_parking.deps.services import dep_vehicle_model_service
+from auto_parking.service.vehicle_model import VehicleModelService
 
 router = APIRouter()
 
 
+def _vehicle_model_out(model: VehicleModelInfo) -> VehicleModelOut:
+    return VehicleModelOut(**model.to_dict())
+
+
 @router.get("", response_model=list[VehicleModelOut])
-async def get_vehicle_models(db: AsyncSession = depends_db):
-    stmt = sa.select(VehicleModel)
-    res = await db.execute(stmt)
-    return res.scalars().all()
+async def get_vehicle_models(service: VehicleModelService = dep_vehicle_model_service):
+    return [_vehicle_model_out(model) for model in await service.get_all()]
 
 
 @router.get("/{id}", response_model=VehicleModelOut)
-async def get_vehicle_model(id: int, db: AsyncSession = depends_db):
-    stmt = sa.select(VehicleModel).where(Vehicle.id == id)
-    res = await db.execute(stmt)
-    return res.scalar()
+async def get_vehicle_model(id: int, service: VehicleModelService = dep_vehicle_model_service):
+    model = await service.get_by_id(id)
+    if model is None:
+        raise HTTPException(status_code=404, detail="Vehicle model not found")
+    return _vehicle_model_out(model)

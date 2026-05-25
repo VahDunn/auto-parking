@@ -12,9 +12,9 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from shapely import Point
 
-from auto_parking.api.schemas.report import ReportCreate, ReportInfo
-from auto_parking.core.domain.report_period import ReportPeriod
-from auto_parking.core.domain.report_type import ReportType
+from auto_parking.core.enums.report_period import ReportPeriod
+from auto_parking.core.enums.report_type import ReportType
+from auto_parking.core.models import ReportCreateModel, ReportInfoModel, ReportModel
 from auto_parking.core.utils.datetime import to_utc
 from auto_parking.db.models import Report
 from auto_parking.filter import TripFilter
@@ -34,9 +34,9 @@ class ReportService:
         self._trip_repo = trip_repo
         self._vehicle_repo = vehicle_repo
 
-    async def get_available_reports(self) -> list[ReportInfo]:
+    async def get_available_reports(self) -> list[ReportInfoModel]:
         return [
-            ReportInfo(
+            ReportInfoModel(
                 type=ReportType.vehicle_mileage,
                 title="Пробег автомобиля за период",
                 description=(
@@ -44,13 +44,13 @@ class ReportService:
                 ),
                 parameters=["enterprise_id", "vehicle_id", "period", "date_from", "date_to"],
             ),
-            ReportInfo(
+            ReportInfoModel(
                 type=ReportType.vehicle_activity,
                 title="Активность автомобиля",
                 description="Считает время движения и простоя автомобиля за период.",
                 parameters=["enterprise_id", "vehicle_id", "period", "date_from", "date_to"],
             ),
-            ReportInfo(
+            ReportInfoModel(
                 type=ReportType.vehicle_geography,
                 title="География поездок автомобиля",
                 description="Показывает распределение поездок по географическим зонам.",
@@ -58,16 +58,18 @@ class ReportService:
             ),
         ]
 
-    async def get_all(self, enterprise_ids: set[int] | None = None):
-        return await self._report_repo.get_all(enterprise_ids)
+    async def get_all(self, enterprise_ids: set[int] | None = None) -> list[ReportModel]:
+        reports = await self._report_repo.get_all(enterprise_ids)
+        return [self._build_report_model(report) for report in reports]
 
-    async def get_by_id(self, report_id: int) -> Report | None:
-        return await self._report_repo.get_by_id(report_id)
+    async def get_by_id(self, report_id: int) -> ReportModel | None:
+        report = await self._report_repo.get_by_id(report_id)
+        return self._build_report_model(report) if report is not None else None
 
-    async def create(self, payload: ReportCreate) -> Report:
+    async def create(self, payload: ReportCreateModel) -> ReportModel:
         result_json = await self._build_result(payload)
 
-        return await self._report_repo.create(
+        report = await self._report_repo.create(
             {
                 "name": payload.name,
                 "report_type": payload.report_type,
@@ -80,13 +82,14 @@ class ReportService:
                 "result_json": result_json,
             }
         )
+        return self._build_report_model(report)
 
-    async def rebuild(self, report_id: int) -> Report | None:
+    async def rebuild(self, report_id: int) -> ReportModel | None:
         report = await self._report_repo.get_by_id(report_id)
         if report is None:
             return None
 
-        payload = ReportCreate(
+        payload = ReportCreateModel(
             name=report.name,
             report_type=report.report_type,
             period=report.period,
@@ -98,12 +101,29 @@ class ReportService:
         )
 
         result_json = await self._build_result(payload)
-        return await self._report_repo.update(report_id, result_json)
+        updated = await self._report_repo.update(report_id, result_json)
+        return self._build_report_model(updated) if updated is not None else None
 
     async def delete(self, report_id: int) -> bool:
         return await self._report_repo.delete(report_id)
 
-    async def _build_result(self, payload: ReportCreate) -> list[dict[str, Any]]:
+    @staticmethod
+    def _build_report_model(report: Report) -> ReportModel:
+        return ReportModel(
+            id=report.id,
+            name=report.name,
+            report_type=report.report_type,
+            period=report.period,
+            date_from=report.date_from,
+            date_to=report.date_to,
+            enterprise_id=report.enterprise_id,
+            vehicle_id=report.vehicle_id,
+            params_json=report.params_json,
+            result_json=report.result_json,
+            created_at=report.created_at,
+        )
+
+    async def _build_result(self, payload: ReportCreateModel) -> list[dict[str, Any]]:
         if payload.vehicle_id is None:
             raise ValueError("vehicle_id is required for this report type")
 
@@ -125,7 +145,7 @@ class ReportService:
 
         raise ValueError("Unsupported report type")
 
-    async def _get_trips(self, payload: ReportCreate):
+    async def _get_trips(self, payload: ReportCreateModel):
         date_from_utc = to_utc(payload.date_from)
         date_to_utc = to_utc(payload.date_to)
 
@@ -139,7 +159,7 @@ class ReportService:
             )
         )
 
-    async def _build_vehicle_mileage(self, payload: ReportCreate) -> list[dict[str, Any]]:
+    async def _build_vehicle_mileage(self, payload: ReportCreateModel) -> list[dict[str, Any]]:
         grouped: dict[str, float] = defaultdict(float)
 
         for trip in await self._get_trips(payload):
@@ -155,7 +175,7 @@ class ReportService:
             for key, value in sorted(grouped.items())
         ]
 
-    async def _build_vehicle_activity(self, payload: ReportCreate) -> list[dict[str, Any]]:
+    async def _build_vehicle_activity(self, payload: ReportCreateModel) -> list[dict[str, Any]]:
         trips = await self._get_trips(payload)
 
         moving_by_period: dict[str, float] = defaultdict(float)
@@ -189,7 +209,7 @@ class ReportService:
 
         return result
 
-    async def _build_vehicle_geography(self, payload: ReportCreate) -> list[dict[str, Any]]:
+    async def _build_vehicle_geography(self, payload: ReportCreateModel) -> list[dict[str, Any]]:
         trips = await self._get_trips(payload)
 
         zones: dict[tuple[str, str], int] = defaultdict(int)

@@ -1,12 +1,11 @@
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from auto_parking.api.schemas.vehicle import VehicleOut
+from auto_parking.core.models import VehicleCreateModel, VehicleModel, VehicleUpdateModel
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
 from auto_parking.filter import VehicleFilter
 
 if TYPE_CHECKING:
-    from auto_parking.api.schemas.vehicle import VehicleCreate, VehicleUpdate
     from auto_parking.db.models import Vehicle
     from auto_parking.repo.vehicle import VehicleRepository
 
@@ -15,24 +14,24 @@ class VehicleService:
     def __init__(self, repo: "VehicleRepository") -> None:
         self._repo = repo
 
-    async def get(self, filter_obj: VehicleFilter) -> list[VehicleOut]:
+    async def get(self, filter_obj: VehicleFilter) -> list[VehicleModel]:
         vehicles: Sequence[Vehicle] = await self._repo.get(filter_obj)
         return [self._build_out(v) for v in vehicles]
 
-    async def get_by_id(self, id: int) -> VehicleOut | None:
+    async def get_by_id(self, id: int) -> VehicleModel | None:
         vehicle: Vehicle | None = await self._repo.get_by_id(id)
         return self._build_out(vehicle) if vehicle else None
 
-    async def create(self, vehicle_payload: "VehicleCreate") -> VehicleOut:
-        data = vehicle_payload.model_dump()
+    async def create(self, vehicle_payload: VehicleCreateModel) -> VehicleModel:
+        data = vehicle_payload.to_dict()
         purchased_at = data.pop("purchased_at")
         data["purchased_at_utc"] = to_utc(purchased_at)
 
         vehicle: Vehicle = await self._repo.create(data)
         return self._build_out(vehicle)
 
-    async def update(self, id: int, payload: "VehicleUpdate") -> VehicleOut | None:
-        data = payload.model_dump(exclude_unset=True)
+    async def update(self, id: int, payload: VehicleUpdateModel) -> VehicleModel | None:
+        data = dict(payload.changes)
 
         if "purchased_at" in data:
             data["purchased_at_utc"] = to_utc(data.pop("purchased_at"))
@@ -43,13 +42,13 @@ class VehicleService:
     async def delete(self, id: int) -> bool:
         return await self._repo.delete(id)
 
-    def _build_out(self, vehicle: "Vehicle") -> VehicleOut:
+    def _build_out(self, vehicle: "Vehicle") -> VehicleModel:
         enterprise = vehicle.enterprise
         tz = enterprise.timezone if enterprise else None
 
         purchased_at_utc = vehicle.purchased_at_utc
 
-        return VehicleOut(
+        return VehicleModel(
             id=vehicle.id,
             price=vehicle.price,
             mileage=vehicle.mileage,

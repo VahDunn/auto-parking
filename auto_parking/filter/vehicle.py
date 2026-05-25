@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 
+from auto_parking.filter.base import BaseFilter
+
 
 @dataclass(slots=True)
-class VehicleFilter:
+class VehicleFilter(BaseFilter):
     id: list[int] | None = None
     enterprise_ids: list[int] | None = None
     driver_id: int | None = None

@@ -2,7 +2,7 @@ from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 
-from auto_parking.core.domain.user_role import UserRole
+from auto_parking.core.enums.user_role import UserRole
 from auto_parking.core.security.jwt import decode_access_token
 
 

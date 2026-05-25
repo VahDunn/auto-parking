@@ -2,12 +2,12 @@ import json
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from auto_parking.api.schemas.vehicle_track import (
-    GeoJSONFeature,
-    GeoJSONFeatureCollection,
-    GeoJSONGeometry,
-    TrackFormat,
-    VehicleTrackPointOut,
+from auto_parking.core.enums import TrackFormat
+from auto_parking.core.models import (
+    GeoJSONFeatureCollectionModel,
+    GeoJSONFeatureModel,
+    GeoJSONGeometryModel,
+    VehicleTrackPointModel,
 )
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
 
@@ -32,7 +32,10 @@ class VehicleTrackService:
         date_from: datetime,
         date_to: datetime,
         format: TrackFormat,
-    ) -> tuple[list[VehicleTrackPointOut] | GeoJSONFeatureCollection | None, "Vehicle | None"]:
+    ) -> tuple[
+        list[VehicleTrackPointModel] | GeoJSONFeatureCollectionModel | None,
+        "Vehicle | None",
+    ]:
         vehicle = await self._vehicle_repo.get_by_id(vehicle_id)
         if not vehicle:
             return None, None
@@ -50,17 +53,17 @@ class VehicleTrackService:
         )
 
         if format == TrackFormat.geojson:
-            features: list[GeoJSONFeature] = []
+            features: list[GeoJSONFeatureModel] = []
 
             for row in rows:
                 raw_geometry = json.loads(row.geojson)
 
-                geometry = GeoJSONGeometry(
+                geometry = GeoJSONGeometryModel(
                     type=raw_geometry["type"],
                     coordinates=raw_geometry["coordinates"],
                 )
 
-                feature = GeoJSONFeature(
+                feature = GeoJSONFeatureModel(
                     type="Feature",
                     geometry=geometry,
                     properties={
@@ -76,7 +79,7 @@ class VehicleTrackService:
                 features.append(feature)
 
             return (
-                GeoJSONFeatureCollection(
+                GeoJSONFeatureCollectionModel(
                     type="FeatureCollection",
                     features=features,
                 ),
@@ -85,7 +88,7 @@ class VehicleTrackService:
 
         return (
             [
-                VehicleTrackPointOut(
+                VehicleTrackPointModel(
                     id=vehicle_id,
                     recorded_at_utc=row.recorded_at_utc,
                     recorded_at_enterprise=to_enterprise_tz(

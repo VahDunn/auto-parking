@@ -2,13 +2,13 @@ import json
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from auto_parking.api.schemas.trip_track import TripTrackGroupOut
-from auto_parking.api.schemas.vehicle_track import (
-    GeoJSONFeature,
-    GeoJSONFeatureCollection,
-    GeoJSONGeometry,
-    TrackFormat,
-    VehicleTrackPointOut,
+from auto_parking.core.enums import TrackFormat
+from auto_parking.core.models import (
+    GeoJSONFeatureCollectionModel,
+    GeoJSONFeatureModel,
+    GeoJSONGeometryModel,
+    TripTrackGroupModel,
+    VehicleTrackPointModel,
 )
 from auto_parking.core.errors import NotFoundError
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
@@ -37,7 +37,7 @@ class TripTrackService:
         date_from: datetime,
         date_to: datetime,
         format: TrackFormat,
-    ) -> list[VehicleTrackPointOut] | GeoJSONFeatureCollection:
+    ) -> list[VehicleTrackPointModel] | GeoJSONFeatureCollectionModel:
         vehicle = await self._vehicle_repo.get_by_id(vehicle_id)
         if not vehicle:
             raise NotFoundError("Vehicle not found")
@@ -71,7 +71,7 @@ class TripTrackService:
         flat_rows.sort(key=lambda item: item[0].recorded_at_utc)
 
         if format == TrackFormat.geojson:
-            return GeoJSONFeatureCollection(
+            return GeoJSONFeatureCollectionModel(
                 type="FeatureCollection",
                 features=[
                     self._row_to_geojson_feature(
@@ -100,7 +100,7 @@ class TripTrackService:
         date_from: datetime,
         date_to: datetime,
         format: TrackFormat,
-    ) -> list[TripTrackGroupOut] | list[dict[str, Any]]:
+    ) -> list[TripTrackGroupModel]:
         vehicle = await self._vehicle_repo.get_by_id(vehicle_id)
         if not vehicle:
             raise NotFoundError("Vehicle not found")
@@ -122,7 +122,7 @@ class TripTrackService:
         )
 
         if format == TrackFormat.geojson:
-            result_geojson: list[dict[str, Any]] = []
+            result_geojson: list[TripTrackGroupModel] = []
 
             for trip in trips:
                 rows = await self._track_repo.get_points(
@@ -133,23 +133,23 @@ class TripTrackService:
                 rows = sorted(rows, key=lambda row: row.recorded_at_utc)
 
                 result_geojson.append(
-                    {
-                        "trip_id": trip.id,
-                        "vehicle_id": vehicle_id,
-                        "started_at_utc": trip.started_at_utc.isoformat(),
-                        "ended_at_utc": trip.ended_at_utc.isoformat(),
-                        "started_at_enterprise": to_enterprise_tz(
+                    TripTrackGroupModel(
+                        trip_id=trip.id,
+                        vehicle_id=vehicle_id,
+                        started_at_utc=trip.started_at_utc,
+                        ended_at_utc=trip.ended_at_utc,
+                        started_at_enterprise=to_enterprise_tz(
                             trip.started_at_utc,
                             enterprise_tz,
-                        ).isoformat(),
-                        "ended_at_enterprise": to_enterprise_tz(
+                        ),
+                        ended_at_enterprise=to_enterprise_tz(
                             trip.ended_at_utc,
                             enterprise_tz,
-                        ).isoformat(),
-                        "enterprise_timezone": enterprise_tz,
-                        "track": {
-                            "type": "FeatureCollection",
-                            "features": [
+                        ),
+                        enterprise_timezone=enterprise_tz,
+                        track=GeoJSONFeatureCollectionModel(
+                            type="FeatureCollection",
+                            features=[
                                 self._row_to_geojson_feature(
                                     row=row,
                                     vehicle_id=vehicle_id,
@@ -158,13 +158,13 @@ class TripTrackService:
                                 )
                                 for row in rows
                             ],
-                        },
-                    }
+                        ),
+                    )
                 )
 
             return result_geojson
 
-        result_json: list[TripTrackGroupOut] = []
+        result_json: list[TripTrackGroupModel] = []
 
         for trip in trips:
             rows = await self._track_repo.get_points(
@@ -185,7 +185,7 @@ class TripTrackService:
             ]
 
             result_json.append(
-                TripTrackGroupOut(
+                TripTrackGroupModel(
                     trip_id=trip.id,
                     vehicle_id=vehicle_id,
                     started_at_utc=trip.started_at_utc,
@@ -212,8 +212,8 @@ class TripTrackService:
         vehicle_id: int,
         trip_id: int | None,
         enterprise_tz: str,
-    ) -> VehicleTrackPointOut:
-        return VehicleTrackPointOut(
+    ) -> VehicleTrackPointModel:
+        return VehicleTrackPointModel(
             id=vehicle_id,
             trip_id=trip_id,
             recorded_at_utc=row.recorded_at_utc,
@@ -232,12 +232,12 @@ class TripTrackService:
         vehicle_id: int,
         trip_id: int | None,
         enterprise_tz: str,
-    ) -> GeoJSONFeature:
+    ) -> GeoJSONFeatureModel:
         raw_geometry = json.loads(row.geojson)
 
-        return GeoJSONFeature(
+        return GeoJSONFeatureModel(
             type="Feature",
-            geometry=GeoJSONGeometry(
+            geometry=GeoJSONGeometryModel(
                 type=raw_geometry["type"],
                 coordinates=raw_geometry["coordinates"],
             ),

@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+from auto_parking.filter.base import BaseFilter
+
 
 @dataclass(slots=True)
-class TripFilter:
+class TripFilter(BaseFilter):
     vehicle_id: int | None = None
     vehicle_ids: list[int] | None = None
 

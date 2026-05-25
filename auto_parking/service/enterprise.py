@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING
 
-from auto_parking.api.schemas.enterprise import EnterpriseOut
-from auto_parking.core.domain.user_role import UserRole
+from auto_parking.core.enums.user_role import UserRole
 from auto_parking.core.errors import ConflictError, ForbiddenError, NotFoundError
+from auto_parking.core.models import EnterpriseModel
 from auto_parking.filter import EnterpriseFilter
 
 if TYPE_CHECKING:
@@ -14,13 +14,13 @@ class EnterpriseService:
     def __init__(self, repo: "EnterpriseRepository"):
         self._repo = repo
 
-    async def get_by_id(self, id: int) -> EnterpriseOut:
+    async def get_by_id(self, id: int) -> EnterpriseModel:
         enterprise = await self._repo.get_by_id(id)
         if enterprise is None:
             raise NotFoundError(f"Enterprise with id {id} not found")
         return self._build_out(enterprise)
 
-    async def get(self, filter_obj: EnterpriseFilter) -> list[EnterpriseOut]:
+    async def get(self, filter_obj: EnterpriseFilter) -> list[EnterpriseModel]:
         enterprises = await self._repo.get(filter_obj)
         return [self._build_out(e) for e in enterprises]
 
@@ -51,10 +51,10 @@ class EnterpriseService:
             raise NotFoundError("Enterprise not found")
 
     @staticmethod
-    def _build_out(enterprise: "Enterprise") -> EnterpriseOut:
+    def _build_out(enterprise: "Enterprise") -> EnterpriseModel:
         managers = [u.id for u in enterprise.users if getattr(u, "role", None) == UserRole.manager]
 
-        return EnterpriseOut(
+        return EnterpriseModel(
             id=enterprise.id,
             name=enterprise.name,
             settlement=enterprise.settlement,

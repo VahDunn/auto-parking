@@ -1,12 +1,17 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from auto_parking.api.schemas.driver import DriverOut
+from auto_parking.core.models import DriverModel
 from auto_parking.deps.commons import dep_actor
 from auto_parking.deps.services import dep_driver_service, dep_user_service
 from auto_parking.filter import DriverFilter
 from auto_parking.service.driver import DriverService
 
 router = APIRouter()
+
+
+def _driver_out(driver: DriverModel) -> DriverOut:
+    return DriverOut(**driver.to_dict())
 
 
 def _parse_int_list(value: str | None) -> list[int] | None:
@@ -45,7 +50,7 @@ async def get_drivers(
         enterprise_ids=parsed_enterprise_ids,
         vehicle_id=vehicle_id,
     )
-    return await service.get(filter_obj)
+    return [_driver_out(driver) for driver in await service.get(filter_obj)]
 
 
 @router.get("/{id}", response_model=DriverOut)
@@ -65,4 +70,4 @@ async def get_driver(
         if driver.enterprise_id not in visible:
             raise HTTPException(status_code=404)
 
-    return driver
+    return _driver_out(driver)

@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, TypedDict
 
-from auto_parking.core.domain.import_export_format import ExportFormat
+from auto_parking.core.enums.import_export_format import ExportFormat
 from auto_parking.core.errors import NotFoundError
 from auto_parking.core.utils.datetime import to_utc
 from auto_parking.db.models import Driver, Trip, Vehicle

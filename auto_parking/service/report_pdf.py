@@ -11,7 +11,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from auto_parking.core.domain.report_type import ReportType
+from auto_parking.core.enums.report_type import ReportType
 
 
 class ReportPdfBuilder:

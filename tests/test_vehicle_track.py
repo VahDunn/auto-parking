@@ -1,8 +1,15 @@
 from types import SimpleNamespace
+from datetime import datetime
 
 import pytest
 
-from auto_parking.core.domain.user_role import UserRole
+from auto_parking.core.enums.user_role import UserRole
+from auto_parking.core.models import (
+    GeoJSONFeatureCollectionModel,
+    GeoJSONFeatureModel,
+    GeoJSONGeometryModel,
+    VehicleTrackPointModel,
+)
 from tests.conftest import (
     set_actor_override,
     set_vehicle_track_service_override,
@@ -19,6 +26,37 @@ def make_vehicle_stub(vehicle_id: int = 1, enterprise_id: int = 10):
     )
 
 
+def make_track_point_stub() -> VehicleTrackPointModel:
+    return VehicleTrackPointModel(
+        id=1,
+        recorded_at_utc=datetime.fromisoformat("2026-04-10T08:00:00+00:00"),
+        recorded_at_enterprise=datetime.fromisoformat("2026-04-10T11:00:00+03:00"),
+        latitude=55.75,
+        longitude=37.61,
+    )
+
+
+def make_geojson_stub() -> GeoJSONFeatureCollectionModel:
+    return GeoJSONFeatureCollectionModel(
+        type="FeatureCollection",
+        features=[
+            GeoJSONFeatureModel(
+                type="Feature",
+                geometry=GeoJSONGeometryModel(
+                    type="Point",
+                    coordinates=[37.61, 55.75],
+                ),
+                properties={
+                    "vehicle_id": 1,
+                    "recorded_at_utc": "2026-04-10T08:00:00+00:00",
+                    "recorded_at_enterprise": "2026-04-10T11:00:00+03:00",
+                    "enterprise_timezone": "Europe/Moscow",
+                },
+            )
+        ],
+    )
+
+
 async def test_get_vehicle_track_json_success(
     client,
     overrides,
@@ -31,15 +69,7 @@ async def test_get_vehicle_track_json_success(
     vehicle = make_vehicle_stub(vehicle_id=1, enterprise_id=10)
 
     vehicle_track_service_mock.get_track.return_value = (
-        [
-            {
-                "id": 1,
-                "recorded_at_utc": "2026-04-10T08:00:00+00:00",
-                "recorded_at_enterprise": "2026-04-10T11:00:00+03:00",
-                "latitude": 55.75,
-                "longitude": 37.61,
-            }
-        ],
+        [make_track_point_stub()],
         vehicle,
     )
 
@@ -77,24 +107,7 @@ async def test_get_vehicle_track_geojson_success(
     vehicle = make_vehicle_stub(vehicle_id=1, enterprise_id=10)
 
     vehicle_track_service_mock.get_track.return_value = (
-        {
-            "type": "FeatureCollection",
-            "features": [
-                {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": [37.61, 55.75],
-                    },
-                    "properties": {
-                        "vehicle_id": 1,
-                        "recorded_at_utc": "2026-04-10T08:00:00+00:00",
-                        "recorded_at_enterprise": "2026-04-10T11:00:00+03:00",
-                        "enterprise_timezone": "Europe/Moscow",
-                    },
-                }
-            ],
-        },
+        make_geojson_stub(),
         vehicle,
     )
 
@@ -246,10 +259,7 @@ async def test_get_vehicle_track_geojson_returns_empty_feature_collection_when_n
 
     vehicle = make_vehicle_stub(vehicle_id=1, enterprise_id=10)
     vehicle_track_service_mock.get_track.return_value = (
-        {
-            "type": "FeatureCollection",
-            "features": [],
-        },
+        GeoJSONFeatureCollectionModel(type="FeatureCollection", features=[]),
         vehicle,
     )
 

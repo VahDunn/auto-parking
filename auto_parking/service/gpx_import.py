@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 from xml.etree import ElementTree
 
 if TYPE_CHECKING:
-    from auto_parking.db.models import Trip
     from auto_parking.repo.trip import TripRepository
     from auto_parking.repo.vehicle import VehicleRepository
     from auto_parking.repo.vehicle_track import VehicleTrackRepository
@@ -33,7 +32,7 @@ class GpxImportService:
         *,
         vehicle_id: int,
         raw_gpx: bytes,
-    ) -> "Trip":
+    ) -> int:
         vehicle = await self._vehicle_repo.get_by_id(vehicle_id)
         if vehicle is None:
             raise ValueError("Vehicle not found")
@@ -124,7 +123,7 @@ class GpxImportService:
             )
         ]
 
-        return await self._trip_repo.create(
+        trip = await self._trip_repo.create(
             {
                 "vehicle_id": vehicle_id,
                 "started_at_utc": started_at_utc,
@@ -133,6 +132,7 @@ class GpxImportService:
                 "end_point_id": end_point_id,
             }
         )
+        return trip.id
 
     def _parse_gpx(self, raw_gpx: bytes) -> list[GpxTrackPoint]:
         try:

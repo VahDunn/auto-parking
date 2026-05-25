@@ -1,26 +1,27 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import Field, field_validator
 
-from auto_parking.core.domain.report_period import ReportPeriod
-from auto_parking.core.domain.report_type import ReportType
+from auto_parking.api.schemas.base import ApiSchema
+from auto_parking.core.enums.report_period import ReportPeriod
+from auto_parking.core.enums.report_type import ReportType
 
 
-class ReportInfo(BaseModel):
+class ReportInfo(ApiSchema):
     type: ReportType
     title: str
     description: str
     parameters: list[str]
 
 
-class ReportPoint(BaseModel):
+class ReportPoint(ApiSchema):
     time: str
     value: float | int
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
-class ReportCreate(BaseModel):
+class ReportCreate(ApiSchema):
     name: str
     report_type: ReportType
     period: ReportPeriod
@@ -38,9 +39,7 @@ class ReportCreate(BaseModel):
         return value
 
 
-class ReportOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class ReportOut(ApiSchema):
     id: int
     name: str
     report_type: ReportType

@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException, status
 
-from auto_parking.api.schemas.vehicle import VehicleOut
-from auto_parking.core.domain.user_role import UserRole
+from auto_parking.core.enums.user_role import UserRole
 from auto_parking.core.errors import ConflictError
+from auto_parking.core.models import VehicleModel
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.services import dep_enterprise_service, dep_vehicle_service
 from auto_parking.deps.visibility import get_visible_enterprise_ids
@@ -110,8 +110,8 @@ async def test_all_required_status_codes(client, overrides):
     }
     updated_dict = {**created_dict, "price": 999}
 
-    created = VehicleOut(**created_dict)
-    updated = VehicleOut(**updated_dict)
+    created = VehicleModel(**created_dict)
+    updated = VehicleModel(**updated_dict)
 
     vehicle_svc.create.return_value = created
     vehicle_svc.get_by_id.return_value = created

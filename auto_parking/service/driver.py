@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from auto_parking.api.schemas.driver import DriverOut
+from auto_parking.core.models import DriverModel
 from auto_parking.db.models import Driver
 from auto_parking.filter import DriverFilter
 from auto_parking.repo.driver import DriverRepository
@@ -10,10 +10,10 @@ class DriverService:
     def __init__(self, repo: DriverRepository):
         self.repo = repo
 
-    async def get(self, filter: DriverFilter) -> list[DriverOut]:
+    async def get(self, filter: DriverFilter) -> list[DriverModel]:
         drivers: Sequence[Driver] = await self.repo.get(filter)
         return [
-            DriverOut(
+            DriverModel(
                 id=driver.id,
                 name=driver.name,
                 salary_rub=driver.salary_rub,
@@ -24,11 +24,11 @@ class DriverService:
             for driver in drivers
         ]
 
-    async def get_by_id(self, id: int) -> DriverOut | None:
+    async def get_by_id(self, id: int) -> DriverModel | None:
         driver = await self.repo.get_by_id(id)
         if not driver:
             return None
-        return DriverOut(
+        return DriverModel(
             id=driver.id,
             name=driver.name,
             salary_rub=driver.salary_rub,

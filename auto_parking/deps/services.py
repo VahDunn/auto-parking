@@ -7,6 +7,7 @@ from auto_parking.deps.repos import (
     dep_manager_repo,
     dep_report_repo,
     dep_track_repo,
+    dep_vehicle_model_repo,
     dep_trip_repo,
     dep_vehicle_repo,
 )
@@ -16,6 +17,7 @@ from auto_parking.repo.report import ReportRepository
 from auto_parking.repo.trip import TripRepository
 from auto_parking.repo.user import UserRepository
 from auto_parking.repo.vehicle import VehicleRepository
+from auto_parking.repo.vehicle_model import VehicleModelRepository
 from auto_parking.repo.vehicle_track import VehicleTrackRepository
 from auto_parking.service.driver import DriverService
 from auto_parking.service.enterprise import EnterpriseService
@@ -28,6 +30,7 @@ from auto_parking.service.trip import TripService
 from auto_parking.service.trip_track import TripTrackService
 from auto_parking.service.user import UserService
 from auto_parking.service.vehicle import VehicleService
+from auto_parking.service.vehicle_model import VehicleModelService
 from auto_parking.service.vehicle_track import VehicleTrackService
 
 
@@ -43,6 +46,12 @@ def get_driver_service(repo: DriverRepository = dep_driver_repo) -> DriverServic
 
 def get_vehicle_service(repo: VehicleRepository = dep_vehicle_repo) -> VehicleService:
     return VehicleService(repo)
+
+
+def get_vehicle_model_service(
+    repo: VehicleModelRepository = dep_vehicle_model_repo,
+) -> VehicleModelService:
+    return VehicleModelService(repo)
 
 
 def get_user_service(repo: UserRepository = dep_manager_repo) -> UserService:
@@ -132,6 +141,7 @@ dep_vehicle_track_service = Depends(get_vehicle_track_service)
 dep_enterprise_service = Depends(get_enterprise_service)
 dep_driver_service = Depends(get_driver_service)
 dep_vehicle_service = Depends(get_vehicle_service)
+dep_vehicle_model_service = Depends(get_vehicle_model_service)
 dep_user_service = Depends(get_user_service)
 dep_trip_track_service = Depends(get_trip_track_service)
 dep_export_service = Depends(get_export_service)

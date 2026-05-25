@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from auto_parking.api.schemas.base import ApiSchema
 
 
-class EnterpriseOut(BaseModel):
+class EnterpriseOut(ApiSchema):
     id: int
     name: str
     settlement: str
