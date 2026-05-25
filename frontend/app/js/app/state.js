@@ -1,0 +1,52 @@
+const loginForm = document.getElementById("loginForm");
+const loginCard = document.getElementById("loginCard");
+const enterpriseCard = document.getElementById("enterpriseCard");
+const vehicleCard = document.getElementById("vehicleCard");
+const messageBox = document.getElementById("messageBox");
+const enterpriseMessage = document.getElementById("enterpriseMessage");
+const vehicleMessage = document.getElementById("vehicleMessage");
+const reloadBtn = document.getElementById("reloadBtn");
+const showCreateFormBtn = document.getElementById("showCreateFormBtn");
+const cancelVehicleFormBtn = document.getElementById("cancelVehicleFormBtn");
+const vehicleForm = document.getElementById("vehicleForm");
+const vehicleEnterpriseTitle = document.getElementById("vehicleEnterpriseTitle");
+const loadTripsBtn = document.getElementById("loadTripsBtn");
+const showAllTripsMapBtn = document.getElementById("showAllTripsMapBtn");
+const exportFullJsonBtn = document.getElementById("exportFullJsonBtn");
+const exportFullCsvBtn = document.getElementById("exportFullCsvBtn");
+const exportVehiclesJsonBtn = document.getElementById("exportVehiclesJsonBtn");
+const exportVehiclesCsvBtn = document.getElementById("exportVehiclesCsvBtn");
+const exportVehicleTripsJsonBtn = document.getElementById("exportVehicleTripsJsonBtn");
+const exportVehicleTripsCsvBtn = document.getElementById("exportVehicleTripsCsvBtn");
+const importDropZone = document.getElementById("importDropZone");
+const importFileInput = document.getElementById("importFileInput");
+const importBtn = document.getElementById("importBtn");
+const importFileName = document.getElementById("importFileName");
+const reportMessage = document.getElementById("reportMessage");
+const reportForm = document.getElementById("reportForm");
+const reloadReportsBtn = document.getElementById("reloadReportsBtn");
+const exportReportJsonBtn = document.getElementById("exportReportJsonBtn");
+const exportReportCsvBtn = document.getElementById("exportReportCsvBtn");
+const reportsCard = document.getElementById("reportsCard");
+const exportReportPdfBtn = document.getElementById("exportReportPdfBtn");
+const gpxFileInput = document.getElementById("gpxFileInput");
+const importGpxBtn = document.getElementById("importGpxBtn");
+
+let selectedReport = null;
+let reportsState = [];
+let selectedImportFile = null;
+let enterprisesState = [];
+let selectedEnterprise = null;
+let selectedEnterpriseVehicles = [];
+let vehicleModels = [];
+let vehicleModelsMap = new Map();
+
+let selectedVehicle = null;
+let selectedVehicleTrips = [];
+let selectedVehicleGroupedTracks = [];
+
+let vehiclePage = 1;
+const vehiclePageSize = 10;
+
+let leafletMap = null;
+let leafletLayers = [];
