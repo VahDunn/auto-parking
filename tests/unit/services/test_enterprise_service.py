@@ -11,7 +11,7 @@ from auto_parking.service.enterprise import EnterpriseService
 pytestmark = pytest.mark.asyncio
 
 
-def enterprise_orm():
+def enterprise_orm(users=None):
     return SimpleNamespace(
         id=10,
         name="Enterprise",
@@ -19,7 +19,9 @@ def enterprise_orm():
         timezone="Europe/Moscow",
         vehicles=[SimpleNamespace(id=1)],
         drivers=[SimpleNamespace(id=11)],
-        users=[
+        users=users
+        if users is not None
+        else [
             SimpleNamespace(id=5, role=UserRole.manager),
             SimpleNamespace(id=6, role=UserRole.user),
         ],
@@ -57,24 +59,25 @@ async def test_enterprise_service_delete_allows_admin():
     await service.delete(10, SimpleNamespace(id=1, role=UserRole.admin))
 
     repo.delete.assert_awaited_once_with(10)
-    repo.is_user_linked.assert_not_called()
 
 
 async def test_enterprise_service_delete_rejects_unlinked_manager():
     repo = AsyncMock()
     repo.get_by_id.return_value = enterprise_orm()
-    repo.is_user_linked.return_value = False
     service = EnterpriseService(repo)
 
     with pytest.raises(ForbiddenError):
-        await service.delete(10, SimpleNamespace(id=5, role=UserRole.manager))
+        await service.delete(10, SimpleNamespace(id=99, role=UserRole.manager))
 
 
 async def test_enterprise_service_delete_rejects_shared_enterprise():
     repo = AsyncMock()
-    repo.get_by_id.return_value = enterprise_orm()
-    repo.is_user_linked.return_value = True
-    repo.count_enterprise_managers.return_value = 2
+    repo.get_by_id.return_value = enterprise_orm(
+        users=[
+            SimpleNamespace(id=5, role=UserRole.manager),
+            SimpleNamespace(id=6, role=UserRole.manager),
+        ]
+    )
     service = EnterpriseService(repo)
 
     with pytest.raises(ConflictError):

@@ -1,8 +1,9 @@
+from fastapi import Depends, HTTPException
+
 from auto_parking.api.schemas.report import ReportInfo, ReportOut
 from auto_parking.core.domain.models import ReportInfoModel, ReportModel
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.visibility import get_visible_enterprise_ids
-from fastapi import Depends, HTTPException
 
 dep_actor_guard = Depends(require_manager_or_higher)
 dep_visible_ids = Depends(get_visible_enterprise_ids)

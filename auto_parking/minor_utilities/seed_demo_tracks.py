@@ -95,9 +95,7 @@ async def get_vehicle_ids(
     enterprise_id: int,
 ) -> list[int]:
     result = await db.execute(
-        select(Vehicle.id)
-        .where(Vehicle.enterprise_id == enterprise_id)
-        .order_by(Vehicle.id)
+        select(Vehicle.id).where(Vehicle.enterprise_id == enterprise_id).order_by(Vehicle.id)
     )
     vehicle_ids = list(result.scalars().all())
 
@@ -109,9 +107,7 @@ async def get_vehicle_ids(
 
 async def clear_old_data(db: AsyncSession, vehicle_ids: list[int]) -> None:
     await db.execute(delete(Trip).where(Trip.vehicle_id.in_(vehicle_ids)))
-    await db.execute(
-        delete(VehicleGpsPoint).where(VehicleGpsPoint.vehicle_id.in_(vehicle_ids))
-    )
+    await db.execute(delete(VehicleGpsPoint).where(VehicleGpsPoint.vehicle_id.in_(vehicle_ids)))
     await db.commit()
 
 
@@ -196,9 +192,7 @@ async def seed_demo_tracks(
 
                 for point_index, (lat, lon) in enumerate(route):
                     recorded_at = started_at + (
-                        (ended_at - started_at)
-                        * point_index
-                        / max(points_per_trip - 1, 1)
+                        (ended_at - started_at) * point_index / max(points_per_trip - 1, 1)
                     )
 
                     points_to_insert.append(
@@ -309,9 +303,7 @@ def generate(
         parsed_date_from = date.fromisoformat(date_from)
         parsed_date_to = date.fromisoformat(date_to)
     except ValueError as exc:
-        raise typer.BadParameter(
-            "date_from/date_to должны быть в формате YYYY-MM-DD"
-        ) from exc
+        raise typer.BadParameter("date_from/date_to должны быть в формате YYYY-MM-DD") from exc
 
     asyncio.run(
         seed_demo_tracks(

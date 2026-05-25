@@ -5,7 +5,12 @@ from typing import TYPE_CHECKING
 from geoalchemy2.shape import to_shape
 from shapely.geometry import Point
 
-from auto_parking.core.domain.models import TripCreateModel, TripModel, TripPointModel, TripUpdateModel
+from auto_parking.core.domain.models import (
+    TripCreateModel,
+    TripModel,
+    TripPointModel,
+    TripUpdateModel,
+)
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
 from auto_parking.filter import TripFilter
 

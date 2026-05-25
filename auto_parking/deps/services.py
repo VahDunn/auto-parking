@@ -7,8 +7,8 @@ from auto_parking.deps.repos import (
     dep_manager_repo,
     dep_report_repo,
     dep_track_repo,
-    dep_vehicle_model_repo,
     dep_trip_repo,
+    dep_vehicle_model_repo,
     dep_vehicle_repo,
 )
 from auto_parking.repo.driver import DriverRepository

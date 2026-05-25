@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from auto_parking.core.domain.enums import ReportPeriod, ReportType
 from auto_parking.core.domain.models import (
@@ -24,8 +24,8 @@ def vehicle_model(vehicle_id: int = 1, enterprise_id: int = 10) -> VehicleModel:
         enterprise_id=enterprise_id,
         drivers=[11],
         active_driver_id=11,
-        purchased_at_utc=datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc),
-        purchased_at_enterprise=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
+        purchased_at_utc=datetime(2026, 1, 1, 9, 0, tzinfo=UTC),
+        purchased_at_enterprise=datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
         enterprise_timezone="UTC",
     )
 
@@ -43,8 +43,8 @@ def enterprise_model(enterprise_id: int = 10) -> EnterpriseModel:
 
 
 def trip_model(trip_id: int = 7, vehicle_id: int = 1) -> TripModel:
-    start = datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc)
-    end = datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
+    end = datetime(2026, 1, 1, 10, 0, tzinfo=UTC)
     point = TripPointModel(
         id=101,
         recorded_at_utc=start,
@@ -71,11 +71,11 @@ def report_model(report_id: int = 3, enterprise_id: int = 10) -> ReportModel:
         name="Mileage",
         report_type=ReportType.vehicle_mileage,
         period=ReportPeriod.day,
-        date_from=datetime(2026, 1, 1, tzinfo=timezone.utc),
-        date_to=datetime(2026, 1, 2, tzinfo=timezone.utc),
+        date_from=datetime(2026, 1, 1, tzinfo=UTC),
+        date_to=datetime(2026, 1, 2, tzinfo=UTC),
         enterprise_id=enterprise_id,
         vehicle_id=1,
         params_json={},
         result_json=[{"time": "2026-01-01", "value": 12.5, "extra": {"unit": "km"}}],
-        created_at=datetime(2026, 1, 3, tzinfo=timezone.utc),
+        created_at=datetime(2026, 1, 3, tzinfo=UTC),
     )

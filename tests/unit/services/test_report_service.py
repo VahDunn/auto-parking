@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -24,8 +24,8 @@ def payload(vehicle_id: int | None = 1) -> ReportCreateModel:
         name="Mileage",
         report_type=ReportType.vehicle_mileage,
         period=ReportPeriod.day,
-        date_from=datetime(2026, 1, 1, tzinfo=timezone.utc),
-        date_to=datetime(2026, 1, 2, tzinfo=timezone.utc),
+        date_from=datetime(2026, 1, 1, tzinfo=UTC),
+        date_to=datetime(2026, 1, 2, tzinfo=UTC),
         enterprise_id=10,
         vehicle_id=vehicle_id,
         params_json={},

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -205,8 +205,8 @@ async def test_get_vehicle_track_by_trips_success(
     vehicle_service_mock.get_by_id.return_value = vehicle_model()
     point = VehicleTrackPointModel(
         id=1,
-        recorded_at_utc=datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc),
-        recorded_at_enterprise=datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc),
+        recorded_at_utc=datetime(2026, 1, 1, 9, 0, tzinfo=UTC),
+        recorded_at_enterprise=datetime(2026, 1, 1, 9, 0, tzinfo=UTC),
         latitude=55.75,
         longitude=37.61,
     )
@@ -214,10 +214,10 @@ async def test_get_vehicle_track_by_trips_success(
         TripTrackGroupModel(
             trip_id=7,
             vehicle_id=1,
-            started_at_utc=datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc),
-            ended_at_utc=datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc),
-            started_at_enterprise=datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc),
-            ended_at_enterprise=datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc),
+            started_at_utc=datetime(2026, 1, 1, 9, 0, tzinfo=UTC),
+            ended_at_utc=datetime(2026, 1, 1, 10, 0, tzinfo=UTC),
+            started_at_enterprise=datetime(2026, 1, 1, 9, 0, tzinfo=UTC),
+            ended_at_enterprise=datetime(2026, 1, 1, 10, 0, tzinfo=UTC),
             enterprise_timezone="UTC",
             points=[point],
             track=None,

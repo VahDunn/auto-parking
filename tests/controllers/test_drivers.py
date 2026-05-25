@@ -22,9 +22,7 @@ async def test_drivers_list_and_detail_apply_manager_visibility(
         return SimpleNamespace(id=5, role="manager")
 
     overrides[get_current_actor] = _actor
-    user_service_mock.get_by_id.return_value = SimpleNamespace(
-        enterprises=[SimpleNamespace(id=10)]
-    )
+    user_service_mock.get_by_id.return_value = SimpleNamespace(enterprises=[SimpleNamespace(id=10)])
     driver = DriverModel(
         id=11,
         name="Driver",

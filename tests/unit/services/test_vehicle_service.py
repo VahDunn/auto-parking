@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -25,7 +25,7 @@ def vehicle_orm(**overrides):
         "enterprise_id": 10,
         "drivers": [SimpleNamespace(id=11)],
         "active_driver_id": 11,
-        "purchased_at_utc": datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc),
+        "purchased_at_utc": datetime(2026, 1, 1, 9, 0, tzinfo=UTC),
         "enterprise": SimpleNamespace(timezone="Europe/Moscow"),
     }
     data.update(overrides)
@@ -68,7 +68,7 @@ async def test_vehicle_service_create_converts_purchase_datetime_to_utc():
 
     data = repo.create.await_args.args[0]
     assert "purchased_at" not in data
-    assert data["purchased_at_utc"] == datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc)
+    assert data["purchased_at_utc"] == datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
 
 
 async def test_vehicle_service_update_converts_purchase_datetime_to_utc():
@@ -84,5 +84,5 @@ async def test_vehicle_service_update_converts_purchase_datetime_to_utc():
     )
 
     data = repo.update.await_args.args[1]
-    assert data["purchased_at_utc"] == datetime(2026, 1, 1, 9, 0, tzinfo=timezone.utc)
+    assert data["purchased_at_utc"] == datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
     assert "purchased_at" not in data

@@ -1,5 +1,4 @@
 from collections.abc import Sequence
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -88,24 +87,6 @@ class TripRepository:
 
         if filter_obj.limit is not None:
             stmt = stmt.limit(filter_obj.limit)
-
-        result = await self.db.execute(stmt)
-        return result.unique().scalars().all()
-
-    async def get_overlapping_trips(
-        self,
-        vehicle_id: int,
-        started_at_utc: datetime,
-        ended_at_utc: datetime,
-    ) -> Sequence[Trip]:
-        stmt = (
-            select(Trip)
-            .where(Trip.vehicle_id == vehicle_id)
-            .where(Trip.started_at_utc <= ended_at_utc)
-            .where(Trip.ended_at_utc >= started_at_utc)
-            .options(*self._base_options())
-            .order_by(Trip.started_at_utc.asc(), Trip.id.asc())
-        )
 
         result = await self.db.execute(stmt)
         return result.unique().scalars().all()

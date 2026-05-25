@@ -6,8 +6,8 @@ from auto_parking.api.schemas.enterprise import EnterpriseOut
 from auto_parking.api.v1.enterprises.common import (
     dep_actor_guard,
     dep_visible_ids,
-    enterprise_out,
     ensure_enterprise_visible,
+    enterprise_out,
 )
 from auto_parking.deps.services import dep_enterprise_service
 from auto_parking.filter import EnterpriseFilter
@@ -26,8 +26,7 @@ async def get_enterprises(
 ):
     ids = None if visible_enterprise_ids is None else list(visible_enterprise_ids)
     return [
-        enterprise_out(enterprise)
-        for enterprise in await service.get(EnterpriseFilter(ids=ids))
+        enterprise_out(enterprise) for enterprise in await service.get(EnterpriseFilter(ids=ids))
     ]
 
 

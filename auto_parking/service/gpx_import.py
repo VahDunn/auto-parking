@@ -1,7 +1,9 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from xml.etree import ElementTree
+
+from auto_parking.filter import TripFilter
 
 if TYPE_CHECKING:
     from auto_parking.repo.trip import TripRepository
@@ -48,11 +50,25 @@ class GpxImportService:
         if ended_at_utc < started_at_utc:
             raise ValueError("GPX track time range is invalid")
 
-        overlapping = await self._trip_repo.get_overlapping_trips(
-            vehicle_id=vehicle_id,
-            started_at_utc=started_at_utc,
-            ended_at_utc=ended_at_utc,
+        candidate_trips = await self._trip_repo.get(
+            TripFilter(
+                vehicle_id=vehicle_id,
+                started_to=ended_at_utc,
+                limit=None,
+                offset=None,
+            )
         )
+
+        overlapping = [
+            trip
+            for trip in candidate_trips
+            if self._trip_overlaps(
+                trip_started_at_utc=trip.started_at_utc,
+                trip_ended_at_utc=trip.ended_at_utc,
+                started_at_utc=started_at_utc,
+                ended_at_utc=ended_at_utc,
+            )
+        ]
 
         if overlapping:
             raise ValueError("GPX не может перекрывать существующие поездки")
@@ -201,6 +217,16 @@ class GpxImportService:
         )
 
     @staticmethod
+    def _trip_overlaps(
+        *,
+        trip_started_at_utc: datetime,
+        trip_ended_at_utc: datetime,
+        started_at_utc: datetime,
+        ended_at_utc: datetime,
+    ) -> bool:
+        return trip_started_at_utc <= ended_at_utc and trip_ended_at_utc >= started_at_utc
+
+    @staticmethod
     def _local_name(tag: str) -> str:
         return tag.rsplit("}", 1)[-1]
 
@@ -227,4 +253,4 @@ class GpxImportService:
         if parsed.tzinfo is None or parsed.utcoffset() is None:
             raise ValueError("GPX point time must be timezone-aware")
 
-        return parsed.astimezone(timezone.utc)
+        return parsed.astimezone(UTC)

@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING
 
 from auto_parking.core.domain.enums.user_role import UserRole
-from auto_parking.core.errors import ConflictError, ForbiddenError, NotFoundError
 from auto_parking.core.domain.models import EnterpriseModel
+from auto_parking.core.errors import ConflictError, ForbiddenError, NotFoundError
 from auto_parking.filter import EnterpriseFilter
 
 if TYPE_CHECKING:
@@ -38,11 +38,11 @@ class EnterpriseService:
         if actor.role != UserRole.manager:
             raise ForbiddenError("Forbidden")
 
-        linked = await self._repo.is_user_linked(enterprise_id=enterprise_id, user_id=actor.id)
+        linked = any(user.id == actor.id for user in enterprise.users)
         if not linked:
             raise ForbiddenError("Forbidden")
 
-        managers_count = await self._repo.count_enterprise_managers(enterprise_id)
+        managers_count = self._count_managers(enterprise)
         if managers_count > 1:
             raise ConflictError("Enterprise is visible to other managers")
 
@@ -62,4 +62,10 @@ class EnterpriseService:
             drivers=[d.id for d in enterprise.drivers],
             managers=managers,
             timezone=enterprise.timezone,
+        )
+
+    @staticmethod
+    def _count_managers(enterprise: "Enterprise") -> int:
+        return sum(
+            1 for user in enterprise.users if getattr(user, "role", None) == UserRole.manager
         )

@@ -94,8 +94,8 @@ class VehicleTrackRepository:
         return point
 
     async def create_points_bulk(
-            self,
-            points_data: Sequence[dict[str, Any]],
+        self,
+        points_data: Sequence[dict[str, Any]],
     ) -> Sequence[VehicleGpsPoint]:
         if not points_data:
             return []

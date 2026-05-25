@@ -1,11 +1,10 @@
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload
 
-from auto_parking.core.domain.enums.user_role import UserRole
 from auto_parking.db.models import Driver, Enterprise, User, Vehicle
 
 if TYPE_CHECKING:
@@ -105,24 +104,3 @@ class EnterpriseRepository:
             await self.db.rollback()
             raise
         return True
-
-    async def is_user_linked(self, enterprise_id: int, user_id: int) -> bool:
-        stmt = (
-            select(User.id)
-            .select_from(Enterprise)
-            .join(Enterprise.users)
-            .where(Enterprise.id == enterprise_id, User.id == user_id)
-            .limit(1)
-        )
-        res = await self.db.execute(stmt)
-        return res.scalar_one_or_none() is not None
-
-    async def count_enterprise_managers(self, enterprise_id: int) -> int:
-        stmt = (
-            select(func.count(User.id))
-            .select_from(Enterprise)
-            .join(Enterprise.users)
-            .where(Enterprise.id == enterprise_id, User.role == UserRole.manager)
-        )
-        res = await self.db.execute(stmt)
-        return int(res.scalar_one())

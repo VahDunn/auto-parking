@@ -4,8 +4,8 @@ import pytest
 from fastapi import HTTPException, status
 
 from auto_parking.core.domain.enums.user_role import UserRole
-from auto_parking.core.errors import ConflictError
 from auto_parking.core.domain.models import VehicleModel
+from auto_parking.core.errors import ConflictError
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.services import dep_enterprise_service, dep_vehicle_service
 from auto_parking.deps.visibility import get_visible_enterprise_ids

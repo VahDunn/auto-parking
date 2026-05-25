@@ -78,9 +78,7 @@ def trip_track_group_out(group: TripTrackGroupModel) -> TripTrackGroupOut:
         ended_at_enterprise=group.ended_at_enterprise,
         enterprise_timezone=group.enterprise_timezone,
         points=(
-            [track_point_out(point) for point in group.points]
-            if group.points is not None
-            else None
+            [track_point_out(point) for point in group.points] if group.points is not None else None
         ),
         track=geojson_collection_out(group.track) if group.track is not None else None,
     )
