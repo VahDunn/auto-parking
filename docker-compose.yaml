@@ -38,6 +38,28 @@ services:
     expose:
       - "8000"
 
+  telegram-bot:
+    build: .
+    container_name: auto_parking_telegram_bot
+    profiles:
+      - bot
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      auto-parking:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      APP_ENV: ${APP_ENV}
+      DEBUG: ${DEBUG}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      BOT_API_BASE_URL: http://auto-parking:8000/api
+    command: >
+      python -m auto_parking.bot.main
+
   frontend:
     build: ./frontend
     container_name: auto_parking_frontend
@@ -70,6 +92,8 @@ services:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      DEBUG: "false"
+      LOG_LEVEL: WARNING
     command: >
       python -m auto_parking.minor_utilities.vehicle_generator
       --count 120
@@ -89,6 +113,8 @@ services:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      DEBUG: "false"
+      LOG_LEVEL: WARNING
     command: >
       python -m auto_parking.minor_utilities.seed_demo_tracks
       --enterprise-id 2
