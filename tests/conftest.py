@@ -13,6 +13,7 @@ from auto_parking.deps.services import (
     dep_export_service,
     dep_gpx_import_service,
     dep_import_service,
+    dep_notification_service,
     dep_report_service,
     dep_reports_pdf_service,
     dep_trip_service,
@@ -156,6 +157,16 @@ def report_service_mock():
 
 
 @pytest.fixture
+def notification_service_mock():
+    svc = AsyncMock()
+    svc.get_for_user = AsyncMock()
+    svc.mark_read = AsyncMock()
+    svc.mark_all_read = AsyncMock()
+    svc.unread_count = AsyncMock()
+    return svc
+
+
+@pytest.fixture
 def reports_pdf_service_mock():
     svc = Mock()
     svc.build.return_value = b"%PDF-1.4 test"
@@ -258,6 +269,13 @@ def set_report_service_override(overrides, mock):
         return mock
 
     overrides[dep_callable(dep_report_service)] = _dep
+
+
+def set_notification_service_override(overrides, mock):
+    async def _dep():
+        return mock
+
+    overrides[dep_callable(dep_notification_service)] = _dep
 
 
 def set_reports_pdf_service_override(overrides, mock):

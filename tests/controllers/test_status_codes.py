@@ -103,7 +103,7 @@ async def test_all_required_status_codes(client, overrides):
         "color": "black",
         "enterprise_id": 4,
         "drivers": [],
-        "active_driver_id": -1,
+        "active_driver_id": None,
         "purchased_at_utc": None,
         "purchased_at_enterprise": None,
         "enterprise_timezone": "UTC",

@@ -1,8 +1,8 @@
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from auto_parking.core.domain.models import VehicleCreateModel, VehicleModel, VehicleUpdateModel
-from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
+from auto_parking.core.domain.models import VehicleModel
+from auto_parking.core.utils.datetime import to_enterprise_tz
 from auto_parking.filter import VehicleFilter
 
 if TYPE_CHECKING:
@@ -22,20 +22,13 @@ class VehicleService:
         vehicle: Vehicle | None = await self._repo.get_by_id(id)
         return self._build_out(vehicle) if vehicle else None
 
-    async def create(self, vehicle_payload: VehicleCreateModel) -> VehicleModel:
-        data = vehicle_payload.to_dict()
-        purchased_at = data.pop("purchased_at")
-        data["purchased_at_utc"] = to_utc(purchased_at)
-
+    async def create(self, vehicle: VehicleModel) -> VehicleModel:
+        data = self._persistence_data(vehicle)
         vehicle: Vehicle = await self._repo.create(data)
         return self._build_out(vehicle)
 
-    async def update(self, id: int, payload: VehicleUpdateModel) -> VehicleModel | None:
-        data = dict(payload.changes)
-
-        if "purchased_at" in data:
-            data["purchased_at_utc"] = to_utc(data.pop("purchased_at"))
-
+    async def update(self, id: int, vehicle: VehicleModel) -> VehicleModel | None:
+        data = self._persistence_data(vehicle)
         vehicle = await self._repo.update(id, data)
         return self._build_out(vehicle) if vehicle else None
 
@@ -60,10 +53,26 @@ class VehicleService:
             color=vehicle.color,
             enterprise_id=vehicle.enterprise_id,
             drivers=[d.id for d in vehicle.drivers],
-            active_driver_id=vehicle.active_driver_id or -1,
+            active_driver_id=vehicle.active_driver_id,
             purchased_at_utc=purchased_at_utc,
             purchased_at_enterprise=(
                 to_enterprise_tz(purchased_at_utc, tz) if purchased_at_utc else None
             ),
             enterprise_timezone=tz or "UTC",
         )
+
+    @staticmethod
+    def _persistence_data(vehicle: VehicleModel) -> dict:
+        return {
+            "price": vehicle.price,
+            "mileage": vehicle.mileage,
+            "vehicle_number": vehicle.vehicle_number,
+            "owners_count": vehicle.owners_count,
+            "accident_number": vehicle.accident_number,
+            "manufacture_year": vehicle.manufacture_year,
+            "model_id": vehicle.model_id,
+            "enterprise_id": vehicle.enterprise_id,
+            "active_driver_id": vehicle.active_driver_id,
+            "color": vehicle.color,
+            "purchased_at_utc": vehicle.purchased_at_utc,
+        }

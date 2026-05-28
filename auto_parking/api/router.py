@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from auto_parking.api.v1.auth import router as auth_router
 from auto_parking.api.v1.drivers import router as drivers_router
 from auto_parking.api.v1.enterprises import router as enterprises_router
+from auto_parking.api.v1.notifications import router as notifications_router
 from auto_parking.api.v1.reports import router as reports_router
 from auto_parking.api.v1.vehicle_models import router as vehicle_models_router
 from auto_parking.api.v1.vehicles import router as vehicles_router
@@ -18,6 +19,11 @@ api_router.include_router(
 )
 api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
 api_router.include_router(reports_router, prefix="/reports", tags=["reports"])
+api_router.include_router(
+    notifications_router,
+    prefix="/notifications",
+    tags=["notifications"],
+)
 
 
 @api_router.get("/health")

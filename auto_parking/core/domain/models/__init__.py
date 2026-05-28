@@ -1,7 +1,7 @@
 from .base import DomainModel as DomainModel
 from .driver import DriverModel as DriverModel
 from .enterprise import EnterpriseModel as EnterpriseModel
-from .report import ReportCreateModel as ReportCreateModel
+from .notification import NotificationModel as NotificationModel
 from .report import ReportInfoModel as ReportInfoModel
 from .report import ReportModel as ReportModel
 from .track import GeoJSONFeatureCollectionModel as GeoJSONFeatureCollectionModel
@@ -9,11 +9,7 @@ from .track import GeoJSONFeatureModel as GeoJSONFeatureModel
 from .track import GeoJSONGeometryModel as GeoJSONGeometryModel
 from .track import TripTrackGroupModel as TripTrackGroupModel
 from .track import VehicleTrackPointModel as VehicleTrackPointModel
-from .trip import TripCreateModel as TripCreateModel
 from .trip import TripModel as TripModel
 from .trip import TripPointModel as TripPointModel
-from .trip import TripUpdateModel as TripUpdateModel
-from .vehicle import VehicleCreateModel as VehicleCreateModel
 from .vehicle import VehicleModel as VehicleModel
-from .vehicle import VehicleUpdateModel as VehicleUpdateModel
 from .vehicle_model import VehicleModelInfo as VehicleModelInfo

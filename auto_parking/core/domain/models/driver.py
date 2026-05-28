@@ -5,9 +5,9 @@ from auto_parking.core.domain.models.base import DomainModel
 
 @dataclass(slots=True)
 class DriverModel(DomainModel):
-    id: int
+    id: int | None
     name: str
     salary_rub: int
     enterprise_id: int
     vehicles: list[int] = field(default_factory=list)
-    active_vehicle_id: int | None = -1
+    active_vehicle_id: int | None = None

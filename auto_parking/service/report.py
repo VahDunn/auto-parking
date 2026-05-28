@@ -14,7 +14,7 @@ from shapely import Point
 
 from auto_parking.core.domain.enums.report_period import ReportPeriod
 from auto_parking.core.domain.enums.report_type import ReportType
-from auto_parking.core.domain.models import ReportCreateModel, ReportInfoModel, ReportModel
+from auto_parking.core.domain.models import ReportInfoModel, ReportModel
 from auto_parking.core.utils.datetime import to_utc
 from auto_parking.db.models import Report
 from auto_parking.filter import TripFilter
@@ -66,19 +66,19 @@ class ReportService:
         report = await self._report_repo.get_by_id(report_id)
         return self._build_report_model(report) if report is not None else None
 
-    async def create(self, payload: ReportCreateModel) -> ReportModel:
-        result_json = await self._build_result(payload)
+    async def create(self, report_model: ReportModel) -> ReportModel:
+        result_json = await self._build_result(report_model)
 
         report = await self._report_repo.create(
             {
-                "name": payload.name,
-                "report_type": payload.report_type,
-                "period": payload.period,
-                "date_from": payload.date_from,
-                "date_to": payload.date_to,
-                "enterprise_id": payload.enterprise_id,
-                "vehicle_id": payload.vehicle_id,
-                "params_json": payload.params_json,
+                "name": report_model.name,
+                "report_type": report_model.report_type,
+                "period": report_model.period,
+                "date_from": report_model.date_from,
+                "date_to": report_model.date_to,
+                "enterprise_id": report_model.enterprise_id,
+                "vehicle_id": report_model.vehicle_id,
+                "params_json": report_model.params_json,
                 "result_json": result_json,
             }
         )
@@ -89,7 +89,8 @@ class ReportService:
         if report is None:
             return None
 
-        payload = ReportCreateModel(
+        report_model = ReportModel(
+            id=report.id,
             name=report.name,
             report_type=report.report_type,
             period=report.period,
@@ -100,7 +101,7 @@ class ReportService:
             params_json=report.params_json,
         )
 
-        result_json = await self._build_result(payload)
+        result_json = await self._build_result(report_model)
         updated = await self._report_repo.update(report_id, result_json)
         return self._build_report_model(updated) if updated is not None else None
 
@@ -123,35 +124,35 @@ class ReportService:
             created_at=report.created_at,
         )
 
-    async def _build_result(self, payload: ReportCreateModel) -> list[dict[str, Any]]:
-        if payload.vehicle_id is None:
+    async def _build_result(self, report_model: ReportModel) -> list[dict[str, Any]]:
+        if report_model.vehicle_id is None:
             raise ValueError("vehicle_id is required for this report type")
 
-        vehicle = await self._vehicle_repo.get_by_id(payload.vehicle_id)
+        vehicle = await self._vehicle_repo.get_by_id(report_model.vehicle_id)
         if vehicle is None:
             raise ValueError("Vehicle not found")
 
-        if vehicle.enterprise_id != payload.enterprise_id:
+        if vehicle.enterprise_id != report_model.enterprise_id:
             raise ValueError("Vehicle does not belong to enterprise")
 
-        if payload.report_type == ReportType.vehicle_mileage:
-            return await self._build_vehicle_mileage(payload)
+        if report_model.report_type == ReportType.vehicle_mileage:
+            return await self._build_vehicle_mileage(report_model)
 
-        if payload.report_type == ReportType.vehicle_activity:
-            return await self._build_vehicle_activity(payload)
+        if report_model.report_type == ReportType.vehicle_activity:
+            return await self._build_vehicle_activity(report_model)
 
-        if payload.report_type == ReportType.vehicle_geography:
-            return await self._build_vehicle_geography(payload)
+        if report_model.report_type == ReportType.vehicle_geography:
+            return await self._build_vehicle_geography(report_model)
 
         raise ValueError("Unsupported report type")
 
-    async def _get_trips(self, payload: ReportCreateModel):
-        date_from_utc = to_utc(payload.date_from)
-        date_to_utc = to_utc(payload.date_to)
+    async def _get_trips(self, report_model: ReportModel):
+        date_from_utc = to_utc(report_model.date_from)
+        date_to_utc = to_utc(report_model.date_to)
 
         return await self._trip_repo.get(
             TripFilter(
-                vehicle_id=payload.vehicle_id,
+                vehicle_id=report_model.vehicle_id,
                 started_from=date_from_utc,
                 ended_to=date_to_utc,
                 limit=1000,
@@ -159,12 +160,12 @@ class ReportService:
             )
         )
 
-    async def _build_vehicle_mileage(self, payload: ReportCreateModel) -> list[dict[str, Any]]:
+    async def _build_vehicle_mileage(self, report_model: ReportModel) -> list[dict[str, Any]]:
         grouped: dict[str, float] = defaultdict(float)
 
-        for trip in await self._get_trips(payload):
+        for trip in await self._get_trips(report_model):
             distance_km = self._trip_distance_km(trip)
-            grouped[self._period_key(trip.started_at_utc, payload.period)] += distance_km
+            grouped[self._period_key(trip.started_at_utc, report_model.period)] += distance_km
 
         return [
             {
@@ -175,22 +176,22 @@ class ReportService:
             for key, value in sorted(grouped.items())
         ]
 
-    async def _build_vehicle_activity(self, payload: ReportCreateModel) -> list[dict[str, Any]]:
-        trips = await self._get_trips(payload)
+    async def _build_vehicle_activity(self, report_model: ReportModel) -> list[dict[str, Any]]:
+        trips = await self._get_trips(report_model)
 
         moving_by_period: dict[str, float] = defaultdict(float)
 
         for trip in trips:
-            key = self._period_key(trip.started_at_utc, payload.period)
+            key = self._period_key(trip.started_at_utc, report_model.period)
             duration_hours = (trip.ended_at_utc - trip.started_at_utc).total_seconds() / 3600
             moving_by_period[key] += duration_hours
 
         result = []
 
         for key, period_hours in self._period_total_hours(
-            payload.date_from,
-            payload.date_to,
-            payload.period,
+            report_model.date_from,
+            report_model.date_to,
+            report_model.period,
         ).items():
             moving_hours = moving_by_period.get(key, 0.0)
             idle_hours = max(period_hours - moving_hours, 0.0)
@@ -209,8 +210,8 @@ class ReportService:
 
         return result
 
-    async def _build_vehicle_geography(self, payload: ReportCreateModel) -> list[dict[str, Any]]:
-        trips = await self._get_trips(payload)
+    async def _build_vehicle_geography(self, report_model: ReportModel) -> list[dict[str, Any]]:
+        trips = await self._get_trips(report_model)
 
         zones: dict[tuple[str, str], int] = defaultdict(int)
 
@@ -219,9 +220,9 @@ class ReportService:
                 continue
 
             lat, lon = self._point_lat_lon(trip.start_point)
-            precision = int(payload.params_json.get("precision", 2))
+            precision = int(report_model.params_json.get("precision", 2))
 
-            time_key = self._period_key(trip.started_at_utc, payload.period)
+            time_key = self._period_key(trip.started_at_utc, report_model.period)
             zone = f"{round(lat, precision)}_{round(lon, precision)}"
 
             zones[(time_key, zone)] += 1

@@ -4,6 +4,8 @@ from datetime import datetime
 from pydantic import Field, field_validator
 
 from auto_parking.api.schemas.base import ApiSchema
+from auto_parking.core.domain.models import VehicleModel
+from auto_parking.core.utils.datetime import to_utc
 
 PLATE_RE = re.compile(r"^(?i:[АВЕКМНОРСТУХ])\d{3}(?i:[АВЕКМНОРСТУХ]){2}\d{2,3}$")
 
@@ -64,6 +66,21 @@ class VehicleCreate(ApiSchema):
             raise ValueError("Datetime must be timezone-aware (with timezone)")
         return v
 
+    def to_domain_model(self) -> VehicleModel:
+        return VehicleModel(
+            id=None,
+            price=self.price,
+            mileage=self.mileage,
+            vehicle_number=self.vehicle_number,
+            owners_count=self.owners_count,
+            accident_number=self.accident_number,
+            manufacture_year=self.manufacture_year,
+            model_id=self.model_id,
+            enterprise_id=self.enterprise_id,
+            color=self.color,
+            purchased_at_utc=to_utc(self.purchased_at),
+        )
+
 
 class VehicleUpdate(ApiSchema):
     price: int | None = None
@@ -86,3 +103,14 @@ class VehicleUpdate(ApiSchema):
         if v.tzinfo is None or v.utcoffset() is None:
             raise ValueError("Datetime must be timezone-aware (with timezone)")
         return v
+
+    def apply_to_domain_model(self, vehicle: VehicleModel) -> VehicleModel:
+        data = vehicle.to_dict()
+        changes = self.model_dump(exclude_unset=True)
+
+        if "purchased_at" in changes:
+            data["purchased_at_utc"] = to_utc(changes.pop("purchased_at"))
+            data["purchased_at_enterprise"] = None
+
+        data.update(changes)
+        return VehicleModel(**data)

@@ -155,15 +155,17 @@ async def test_gpx_import_service_uses_standard_trip_filter_for_overlap_candidat
     vehicle_repo = AsyncMock()
     trip_repo = AsyncMock()
     track_repo = AsyncMock()
+    trip_service = AsyncMock()
     service = GpxImportService(
         vehicle_repo=vehicle_repo,
         trip_repo=trip_repo,
         track_repo=track_repo,
+        trip_service=trip_service,
     )
 
     vehicle_repo.get_by_id.return_value = SimpleNamespace(id=3213)
     trip_repo.get.return_value = []
-    trip_repo.create.return_value = SimpleNamespace(id=7)
+    trip_service.create.return_value = SimpleNamespace(id=7)
     track_repo.get_points_by_intervals.return_value = []
     track_repo.create_points_bulk.return_value = [
         SimpleNamespace(id=101),
@@ -190,6 +192,8 @@ async def test_gpx_import_service_uses_standard_trip_filter_for_overlap_candidat
     assert filter_obj.started_to == datetime(2026, 4, 21, 11, 41, tzinfo=UTC)
     assert filter_obj.limit is None
     assert filter_obj.offset is None
+    trip_service.create.assert_awaited_once()
+    trip_repo.create.assert_not_called()
 
 
 async def test_gpx_import_service_detects_trip_overlap_in_service_layer():

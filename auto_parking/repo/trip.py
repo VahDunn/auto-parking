@@ -17,7 +17,7 @@ class TripRepository:
     def _base_options():
         return (
             selectinload(Trip.vehicle).options(
-                load_only(Vehicle.id, Vehicle.enterprise_id),
+                load_only(Vehicle.id, Vehicle.enterprise_id, Vehicle.vehicle_number),
                 selectinload(Vehicle.enterprise).options(
                     load_only(Enterprise.id, Enterprise.timezone)
                 ),

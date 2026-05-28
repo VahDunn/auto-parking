@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from auto_parking.core.domain.enums import ReportPeriod, ReportType
-from auto_parking.core.domain.models import ReportCreateModel
+from auto_parking.core.domain.models import ReportModel
 from auto_parking.filter import TripFilter
 from auto_parking.service.report import ReportService
 
@@ -19,8 +19,9 @@ def service_with_mocks():
     return ReportService(report_repo, trip_repo, vehicle_repo), report_repo, trip_repo, vehicle_repo
 
 
-def payload(vehicle_id: int | None = 1) -> ReportCreateModel:
-    return ReportCreateModel(
+def payload(vehicle_id: int | None = 1) -> ReportModel:
+    return ReportModel(
+        id=None,
         name="Mileage",
         report_type=ReportType.vehicle_mileage,
         period=ReportPeriod.day,

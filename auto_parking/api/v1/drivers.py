@@ -11,7 +11,10 @@ router = APIRouter()
 
 
 def _driver_out(driver: DriverModel) -> DriverOut:
-    return DriverOut(**driver.to_dict())
+    data = driver.to_dict()
+    if data["active_vehicle_id"] is None:
+        data["active_vehicle_id"] = -1
+    return DriverOut(**data)
 
 
 def _parse_int_list(value: str | None) -> list[int] | None:

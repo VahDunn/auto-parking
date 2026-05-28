@@ -3,12 +3,14 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from xml.etree import ElementTree
 
+from auto_parking.core.domain.models import TripModel
 from auto_parking.filter import TripFilter
 
 if TYPE_CHECKING:
     from auto_parking.repo.trip import TripRepository
     from auto_parking.repo.vehicle import VehicleRepository
     from auto_parking.repo.vehicle_track import VehicleTrackRepository
+    from auto_parking.service.trip import TripService
 
 
 @dataclass(frozen=True)
@@ -24,10 +26,12 @@ class GpxImportService:
         vehicle_repo: "VehicleRepository",
         trip_repo: "TripRepository",
         track_repo: "VehicleTrackRepository",
+        trip_service: "TripService",
     ) -> None:
         self._vehicle_repo = vehicle_repo
         self._trip_repo = trip_repo
         self._track_repo = track_repo
+        self._trip_service = trip_service
 
     async def import_vehicle_trip(
         self,
@@ -139,14 +143,16 @@ class GpxImportService:
             )
         ]
 
-        trip = await self._trip_repo.create(
-            {
-                "vehicle_id": vehicle_id,
-                "started_at_utc": started_at_utc,
-                "ended_at_utc": ended_at_utc,
-                "start_point_id": start_point_id,
-                "end_point_id": end_point_id,
-            }
+        trip = await self._trip_service.create(
+            TripModel(
+                id=None,
+                vehicle_id=vehicle_id,
+                started_at_utc=started_at_utc,
+                ended_at_utc=ended_at_utc,
+                start_point_id=start_point_id,
+                end_point_id=end_point_id,
+            ),
+            include_addresses=False,
         )
         return trip.id
 

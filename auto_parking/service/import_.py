@@ -5,10 +5,11 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
+from auto_parking.core.domain.models import TripModel
 from auto_parking.repo.enterprise import EnterpriseRepository
-from auto_parking.repo.trip import TripRepository
 from auto_parking.repo.vehicle import VehicleRepository
 from auto_parking.repo.vehicle_track import VehicleTrackRepository
+from auto_parking.service.trip import TripService
 
 
 class ImportService:
@@ -16,13 +17,13 @@ class ImportService:
         self,
         enterprise_repo: EnterpriseRepository,
         vehicle_repo: VehicleRepository,
-        trip_repo: TripRepository,
         track_repo: VehicleTrackRepository,
+        trip_service: TripService,
     ) -> None:
         self._enterprise_repo = enterprise_repo
         self._vehicle_repo = vehicle_repo
-        self._trip_repo = trip_repo
         self._track_repo = track_repo
+        self._trip_service = trip_service
 
     async def import_enterprise_json(self, raw: bytes) -> dict[str, Any]:
         payload = json.loads(raw.decode("utf-8"))
@@ -78,14 +79,16 @@ class ImportService:
                 if not created_points:
                     continue
 
-                await self._trip_repo.create(
-                    {
-                        "vehicle_id": vehicle.id,
-                        "started_at_utc": self._parse_dt(trip_data["started_at_utc"]),
-                        "ended_at_utc": self._parse_dt(trip_data["ended_at_utc"]),
-                        "start_point_id": created_points[0].id,
-                        "end_point_id": created_points[-1].id,
-                    }
+                await self._trip_service.create(
+                    TripModel(
+                        id=None,
+                        vehicle_id=vehicle.id,
+                        started_at_utc=self._parse_dt(trip_data["started_at_utc"]),
+                        ended_at_utc=self._parse_dt(trip_data["ended_at_utc"]),
+                        start_point_id=created_points[0].id,
+                        end_point_id=created_points[-1].id,
+                    ),
+                    include_addresses=False,
                 )
 
                 imported_trips += 1
@@ -170,14 +173,16 @@ class ImportService:
 
             first_row = trip_rows[0]
 
-            await self._trip_repo.create(
-                {
-                    "vehicle_id": vehicle.id,
-                    "started_at_utc": self._parse_dt(first_row["trip_started_at_utc"]),
-                    "ended_at_utc": self._parse_dt(first_row["trip_ended_at_utc"]),
-                    "start_point_id": created_points[0].id,
-                    "end_point_id": created_points[-1].id,
-                }
+            await self._trip_service.create(
+                TripModel(
+                    id=None,
+                    vehicle_id=vehicle.id,
+                    started_at_utc=self._parse_dt(first_row["trip_started_at_utc"]),
+                    ended_at_utc=self._parse_dt(first_row["trip_ended_at_utc"]),
+                    start_point_id=created_points[0].id,
+                    end_point_id=created_points[-1].id,
+                ),
+                include_addresses=False,
             )
 
             imported_trips += 1

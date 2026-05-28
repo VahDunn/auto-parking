@@ -5,14 +5,17 @@ from auto_parking.deps.repos import (
     dep_driver_repo,
     dep_enterprise_repo,
     dep_manager_repo,
+    dep_notification_repo,
     dep_report_repo,
     dep_track_repo,
     dep_trip_repo,
     dep_vehicle_model_repo,
     dep_vehicle_repo,
 )
+from auto_parking.deps.notifications import notification_publisher
 from auto_parking.repo.driver import DriverRepository
 from auto_parking.repo.enterprise import EnterpriseRepository
+from auto_parking.repo.notification import NotificationRepository
 from auto_parking.repo.report import ReportRepository
 from auto_parking.repo.trip import TripRepository
 from auto_parking.repo.user import UserRepository
@@ -24,6 +27,7 @@ from auto_parking.service.enterprise import EnterpriseService
 from auto_parking.service.export import ExportService
 from auto_parking.service.gpx_import import GpxImportService
 from auto_parking.service.import_ import ImportService
+from auto_parking.service.notification import NotificationService
 from auto_parking.service.report import ReportService
 from auto_parking.service.report_pdf import ReportPdfBuilder
 from auto_parking.service.trip import TripService
@@ -65,8 +69,26 @@ def get_vehicle_track_service(
     return VehicleTrackService(vehicle_repo=vehicle_repo, track_repo=track_repo)
 
 
-def get_trip_service(repo: TripRepository = dep_trip_repo) -> TripService:
-    return TripService(repo, geocoder=get_reverse_geocoder())
+def get_notification_service(
+    notification_repo: NotificationRepository = dep_notification_repo,
+    user_repo: UserRepository = dep_manager_repo,
+) -> NotificationService:
+    return NotificationService(
+        notification_repo=notification_repo,
+        user_repo=user_repo,
+        publisher=notification_publisher,
+    )
+
+
+def get_trip_service(
+    repo: TripRepository = dep_trip_repo,
+    notification_service: NotificationService = Depends(get_notification_service),
+) -> TripService:
+    return TripService(
+        repo,
+        geocoder=get_reverse_geocoder(),
+        notification_service=notification_service,
+    )
 
 
 def get_trip_track_service(
@@ -96,14 +118,14 @@ def get_export_service(
 def get_import_service(
     enterprise_repo: EnterpriseRepository = dep_enterprise_repo,
     vehicle_repo: VehicleRepository = dep_vehicle_repo,
-    trip_repo: TripRepository = dep_trip_repo,
     track_repo: VehicleTrackRepository = dep_track_repo,
+    trip_service: TripService = Depends(get_trip_service),
 ) -> ImportService:
     return ImportService(
         enterprise_repo=enterprise_repo,
         vehicle_repo=vehicle_repo,
-        trip_repo=trip_repo,
         track_repo=track_repo,
+        trip_service=trip_service,
     )
 
 
@@ -123,11 +145,13 @@ def get_gpx_import_service(
     vehicle_repo: VehicleRepository = dep_vehicle_repo,
     trip_repo: TripRepository = dep_trip_repo,
     track_repo: VehicleTrackRepository = dep_track_repo,
+    trip_service: TripService = Depends(get_trip_service),
 ) -> GpxImportService:
     return GpxImportService(
         vehicle_repo=vehicle_repo,
         trip_repo=trip_repo,
         track_repo=track_repo,
+        trip_service=trip_service,
     )
 
 
@@ -148,3 +172,4 @@ dep_export_service = Depends(get_export_service)
 dep_report_service = Depends(get_report_service)
 dep_reports_pdf_service = Depends(get_reports_pdf_service)
 dep_gpx_import_service = Depends(get_gpx_import_service)
+dep_notification_service = Depends(get_notification_service)

@@ -9,7 +9,6 @@ from auto_parking.api.v1.vehicles.common import (
     parse_int_list,
     vehicle_out,
 )
-from auto_parking.core.domain.models import VehicleCreateModel, VehicleUpdateModel
 from auto_parking.deps.services import dep_vehicle_service
 from auto_parking.filter import VehicleFilter
 from auto_parking.service.vehicle import VehicleService
@@ -92,7 +91,7 @@ async def create_vehicle(
     if visible_enterprise_ids is not None and payload.enterprise_id not in visible_enterprise_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
-    return vehicle_out(await service.create(VehicleCreateModel(**payload.model_dump())))
+    return vehicle_out(await service.create(payload.to_domain_model()))
 
 
 @router.patch(
@@ -114,7 +113,7 @@ async def update_vehicle(
 
     updated = await service.update(
         id,
-        VehicleUpdateModel(changes=payload.model_dump(exclude_unset=True)),
+        payload.apply_to_domain_model(current),
     )
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")

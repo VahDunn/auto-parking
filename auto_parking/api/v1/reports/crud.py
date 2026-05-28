@@ -8,7 +8,6 @@ from auto_parking.api.v1.reports.common import (
     report_info_out,
     report_out,
 )
-from auto_parking.core.domain.models import ReportCreateModel
 from auto_parking.deps.services import dep_report_service
 from auto_parking.service.report import ReportService
 
@@ -74,7 +73,7 @@ async def create_report(
         raise HTTPException(status_code=400, detail="date_to must be >= date_from")
 
     try:
-        return report_out(await service.create(ReportCreateModel(**payload.model_dump())))
+        return report_out(await service.create(payload.to_domain_model()))
     except ValueError as err:
         raise HTTPException(status_code=400, detail=str(err)) from err
 

@@ -6,10 +6,8 @@ from geoalchemy2.shape import to_shape
 from shapely.geometry import Point
 
 from auto_parking.core.domain.models import (
-    TripCreateModel,
     TripModel,
     TripPointModel,
-    TripUpdateModel,
 )
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
 from auto_parking.filter import TripFilter
@@ -18,6 +16,7 @@ if TYPE_CHECKING:
     from auto_parking.db.models import Trip, VehicleGpsPoint
     from auto_parking.integrations.geocoding.base import ReverseGeocoder
     from auto_parking.repo.trip import TripRepository
+    from auto_parking.service.notification import NotificationService
 
 
 class TripService:
@@ -25,9 +24,11 @@ class TripService:
         self,
         repo: "TripRepository",
         geocoder: "ReverseGeocoder | None" = None,
+        notification_service: "NotificationService | None" = None,
     ) -> None:
         self._repo = repo
         self._geocoder = geocoder
+        self._notification_service = notification_service
 
     async def get(self, filter_obj: TripFilter) -> list[TripModel]:
         trips: Sequence[Trip] = await self._repo.get(filter_obj)
@@ -58,39 +59,22 @@ class TripService:
         trip: Trip | None = await self._repo.get_by_id(trip_id)
         return await self._build_out(trip) if trip else None
 
-    async def create(self, payload: TripCreateModel) -> TripModel:
-        data = payload.to_dict()
-        started_at = data.pop("started_at")
-        ended_at = data.pop("ended_at")
+    async def create(
+        self,
+        trip_model: TripModel,
+        *,
+        include_addresses: bool = True,
+    ) -> TripModel:
+        trip: Trip = await self._repo.create(self._persistence_data(trip_model))
+        if self._notification_service is not None:
+            await self._notification_service.notify_trip_created(trip)
+        return await self._build_out(trip, include_addresses=include_addresses)
 
-        data["started_at_utc"] = to_utc(started_at)
-        data["ended_at_utc"] = to_utc(ended_at)
-
-        trip: Trip = await self._repo.create(data)
-        return await self._build_out(trip)
-
-    async def update(self, trip_id: int, payload: TripUpdateModel) -> TripModel | None:
-        trip = await self._repo.get_by_id(trip_id)
-        if not trip:
-            return None
-
-        payload_dump = dict(payload.changes)
-
-        started_at_utc = trip.started_at_utc
-        ended_at_utc = trip.ended_at_utc
-
-        if "started_at" in payload_dump:
-            started_at_utc = to_utc(payload_dump.pop("started_at"))
-            payload_dump["started_at_utc"] = started_at_utc
-
-        if "ended_at" in payload_dump:
-            ended_at_utc = to_utc(payload_dump.pop("ended_at"))
-            payload_dump["ended_at_utc"] = ended_at_utc
-
-        if ended_at_utc < started_at_utc:
+    async def update(self, trip_id: int, trip_model: TripModel) -> TripModel | None:
+        if trip_model.ended_at_utc < trip_model.started_at_utc:
             raise ValueError("ended_at must be greater than or equal to started_at")
 
-        trip = await self._repo.update(trip_id, payload_dump)
+        trip = await self._repo.update(trip_id, self._persistence_data(trip_model))
         return await self._build_out(trip) if trip else None
 
     async def delete(self, trip_id: int) -> bool:
@@ -105,6 +89,8 @@ class TripService:
             vehicle_id=trip.vehicle_id,
             started_at_utc=trip.started_at_utc,
             ended_at_utc=trip.ended_at_utc,
+            start_point_id=getattr(trip, "start_point_id", trip.start_point.id),
+            end_point_id=getattr(trip, "end_point_id", trip.end_point.id),
             started_at_enterprise=to_enterprise_tz(trip.started_at_utc, tz),
             ended_at_enterprise=to_enterprise_tz(trip.ended_at_utc, tz),
             enterprise_timezone=tz or "UTC",
@@ -119,6 +105,16 @@ class TripService:
                 include_address=include_addresses,
             ),
         )
+
+    @staticmethod
+    def _persistence_data(trip: TripModel) -> dict:
+        return {
+            "vehicle_id": trip.vehicle_id,
+            "started_at_utc": trip.started_at_utc,
+            "ended_at_utc": trip.ended_at_utc,
+            "start_point_id": trip.start_point_id,
+            "end_point_id": trip.end_point_id,
+        }
 
     async def _build_point_out(
         self,

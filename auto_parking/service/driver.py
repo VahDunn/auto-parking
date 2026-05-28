@@ -18,7 +18,7 @@ class DriverService:
                 name=driver.name,
                 salary_rub=driver.salary_rub,
                 enterprise_id=driver.enterprise_id,
-                active_vehicle_id=driver.active_vehicle.id if driver.active_vehicle else -1,
+                active_vehicle_id=driver.active_vehicle.id if driver.active_vehicle else None,
                 vehicles=[v.id for v in driver.vehicles],
             )
             for driver in drivers

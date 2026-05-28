@@ -35,6 +35,8 @@ def make_trip_stub(
         vehicle_id=vehicle_id,
         started_at_utc=datetime.fromisoformat("2026-04-21T11:35:56.802506+00:00"),
         ended_at_utc=datetime.fromisoformat("2026-04-21T11:36:42.072286+00:00"),
+        start_point_id=start_point_id,
+        end_point_id=end_point_id,
         started_at_enterprise=datetime.fromisoformat("2026-04-21T06:35:56.802506-05:00"),
         ended_at_enterprise=datetime.fromisoformat("2026-04-21T06:36:42.072286-05:00"),
         enterprise_timezone=enterprise_timezone,

@@ -5,7 +5,7 @@ from auto_parking.core.domain.models.base import DomainModel
 
 @dataclass(slots=True)
 class EnterpriseModel(DomainModel):
-    id: int
+    id: int | None
     name: str
     settlement: str
     vehicles: list[int] = field(default_factory=list)

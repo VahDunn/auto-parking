@@ -6,6 +6,7 @@ from pydantic import Field, field_validator
 from auto_parking.api.schemas.base import ApiSchema
 from auto_parking.core.domain.enums.report_period import ReportPeriod
 from auto_parking.core.domain.enums.report_type import ReportType
+from auto_parking.core.domain.models import ReportModel
 
 
 class ReportInfo(ApiSchema):
@@ -37,6 +38,19 @@ class ReportCreate(ApiSchema):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("Datetime must be timezone-aware")
         return value
+
+    def to_domain_model(self) -> ReportModel:
+        return ReportModel(
+            id=None,
+            name=self.name,
+            report_type=self.report_type,
+            period=self.period,
+            date_from=self.date_from,
+            date_to=self.date_to,
+            enterprise_id=self.enterprise_id,
+            vehicle_id=self.vehicle_id,
+            params_json=self.params_json,
+        )
 
 
 class ReportOut(ApiSchema):

@@ -57,6 +57,8 @@ def trip_model(trip_id: int = 7, vehicle_id: int = 1) -> TripModel:
         vehicle_id=vehicle_id,
         started_at_utc=start,
         ended_at_utc=end,
+        start_point_id=point.id,
+        end_point_id=point.id,
         started_at_enterprise=start,
         ended_at_enterprise=end,
         start_point=point,

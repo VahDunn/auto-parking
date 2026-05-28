@@ -5,7 +5,7 @@ from auto_parking.core.domain.models.base import DomainModel
 
 @dataclass(slots=True)
 class VehicleModelInfo(DomainModel):
-    id: int
+    id: int | None
     name: str
     type: str
     horse_powers: int

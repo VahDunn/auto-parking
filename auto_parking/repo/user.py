@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auto_parking.db.models import User
+from auto_parking.core.domain.enums import UserRole
+from auto_parking.db.models import Enterprise, User
 
 if TYPE_CHECKING:
     from auto_parking.filter import UserFilter
@@ -27,3 +28,22 @@ class UserRepository:
     async def get_by_id(self, manager_id: int) -> User | None:
         result = await self.db.execute(select(User).where(User.id == manager_id))
         return result.scalar_one_or_none()
+
+    async def get_notification_recipient_ids_by_enterprise(
+        self,
+        enterprise_id: int,
+    ) -> list[int]:
+        result = await self.db.execute(
+            select(User.id)
+            .outerjoin(User.enterprises)
+            .where(
+                (User.role == UserRole.admin)
+                | (
+                    (User.role == UserRole.manager)
+                    & (Enterprise.id == enterprise_id)
+                ),
+            )
+            .distinct()
+            .order_by(User.id)
+        )
+        return list(result.scalars().all())

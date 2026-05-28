@@ -7,7 +7,7 @@ from auto_parking.core.domain.models.base import DomainModel
 
 @dataclass(slots=True)
 class VehicleTrackPointModel(DomainModel):
-    id: int
+    id: int | None
     recorded_at_utc: datetime
     recorded_at_enterprise: datetime
     latitude: float
@@ -36,8 +36,8 @@ class GeoJSONFeatureCollectionModel(DomainModel):
 
 @dataclass(slots=True)
 class TripTrackGroupModel(DomainModel):
-    trip_id: int
-    vehicle_id: int
+    trip_id: int | None
+    vehicle_id: int | None
     started_at_utc: datetime
     ended_at_utc: datetime
     started_at_enterprise: datetime
