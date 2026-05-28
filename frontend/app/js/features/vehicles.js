@@ -4,6 +4,22 @@ async function loadVehicleModels() {
     renderVehicleModelOptions(vehicleModels);
 }
 
+function setDefaultTripDateRange() {
+    const now = new Date();
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const tripDateFrom = document.getElementById("tripDateFrom");
+    const tripDateTo = document.getElementById("tripDateTo");
+
+    if (tripDateFrom) {
+        tripDateFrom.value = toDateTimeLocalValue(monthAgo.toISOString());
+    }
+
+    if (tripDateTo) {
+        tripDateTo.value = toDateTimeLocalValue(now.toISOString());
+    }
+}
+
 async function loadEnterprises() {
     clearMessage(enterpriseMessage);
     renderEnterpriseInfo(null);
@@ -112,16 +128,15 @@ async function handleEnterpriseSelect(enterprise) {
     setDefaultTripDateRange();
     setDefaultReportDateRange();
     document.getElementById("reportVehicleId").value = "";
-    await loadReports();
-
     document.getElementById("vehicleTableBody").innerHTML = `
         <tr><td colspan="4">Загрузка...</td></tr>
     `;
 
+    await loadVehiclesForEnterprise(enterprise);
+    await loadReports();
+
     initMapIfNeeded();
     clearMapLayers();
-
-    await loadVehiclesForEnterprise(enterprise);
 }
 
 async function handleSelectVehicle(vehicle) {

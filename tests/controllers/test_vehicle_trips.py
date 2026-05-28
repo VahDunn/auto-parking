@@ -103,7 +103,48 @@ async def test_get_vehicle_trips_success(
     assert body[1]["end_point"]["id"] == 64470
 
     vehicle_service_mock.get_by_id.assert_awaited_once_with(3213)
-    trip_service_mock.get_vehicle_trips_in_range.assert_awaited_once()
+    trip_service_mock.get_vehicle_trips_in_range.assert_awaited_once_with(
+        vehicle_id=3213,
+        date_from=datetime.fromisoformat("2026-04-21T11:35:00+00:00"),
+        date_to=datetime.fromisoformat("2026-04-21T11:41:00+00:00"),
+        include_addresses=True,
+    )
+
+
+async def test_get_vehicle_trips_can_skip_addresses(
+    client,
+    overrides,
+    vehicle_service_mock,
+    trip_service_mock,
+):
+    set_actor_override(overrides, UserRole.manager)
+    set_visible_ids_override(overrides, {10})
+    set_vehicle_service_override(overrides, vehicle_service_mock)
+    set_trip_service_override(overrides, trip_service_mock)
+
+    vehicle_service_mock.get_by_id.return_value = make_vehicle_stub(
+        vehicle_id=3213,
+        enterprise_id=10,
+    )
+    trip_service_mock.get_vehicle_trips_in_range.return_value = []
+
+    response = await client.get(
+        "/api/vehicles/3213/trips",
+        params={
+            "date_from": "2026-04-21T11:35:00+00:00",
+            "date_to": "2026-04-21T11:41:00+00:00",
+            "include_addresses": "false",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+    trip_service_mock.get_vehicle_trips_in_range.assert_awaited_once_with(
+        vehicle_id=3213,
+        date_from=datetime.fromisoformat("2026-04-21T11:35:00+00:00"),
+        date_to=datetime.fromisoformat("2026-04-21T11:41:00+00:00"),
+        include_addresses=False,
+    )
 
 
 async def test_get_vehicle_trips_returns_404_when_vehicle_not_found(

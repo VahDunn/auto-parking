@@ -24,6 +24,7 @@ router = APIRouter()
 )
 async def get_vehicles(
     id: str | None = Query(None),
+    vehicle_number_prefix: str | None = Query(None),
     enterprise_ids: str | None = Query(None),
     driver_id: int | None = Query(None),
     limit: int = Query(50, ge=1, le=100),
@@ -48,6 +49,7 @@ async def get_vehicles(
         for vehicle in await service.get(
             VehicleFilter(
                 id=parsed_ids,
+                vehicle_number_prefix=vehicle_number_prefix,
                 enterprise_ids=parsed_enterprise_ids,
                 driver_id=driver_id,
                 limit=limit,

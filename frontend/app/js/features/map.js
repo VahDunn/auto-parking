@@ -12,7 +12,15 @@ function getTrackColor(index) {
     return colors[index % colors.length];
 }
 
+function isLeafletAvailable() {
+    return typeof L !== "undefined";
+}
+
 function initMapIfNeeded() {
+    if (!isLeafletAvailable()) {
+        return false;
+    }
+
     if (!leafletMap) {
         leafletMap = L.map("map").setView([55.75, 37.61], 11);
 
@@ -24,6 +32,8 @@ function initMapIfNeeded() {
     setTimeout(() => {
         leafletMap.invalidateSize();
     }, 100);
+
+    return true;
 }
 function clearMapLayers() {
     if (!leafletMap) {
@@ -34,7 +44,11 @@ function clearMapLayers() {
     leafletLayers = [];
 }
 function drawGroupedGeojsonTracks(groupedTracks) {
-    initMapIfNeeded();
+    if (!initMapIfNeeded()) {
+        renderTrackJson("Карта недоступна", groupedTracks);
+        return;
+    }
+
     clearMapLayers();
 
     const bounds = [];

@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_access_ttl_minutes: int = Field(default=30, alias="JWT_ACCESS_TTL_MINUTES")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
+    bot_api_base_url: str = Field(default="http://localhost:8000/api", alias="BOT_API_BASE_URL")
     model_config = {
         "env_file": str(ENV_FILE),
         "env_file_encoding": "utf-8",

@@ -38,6 +38,7 @@ class TripService:
         vehicle_id: int,
         date_from: datetime,
         date_to: datetime,
+        include_addresses: bool = True,
     ) -> list[TripModel]:
         date_from_utc = to_utc(date_from)
         date_to_utc = to_utc(date_to)
@@ -51,7 +52,7 @@ class TripService:
                 offset=None,
             )
         )
-        return [await self._build_out(t) for t in trips]
+        return [await self._build_out(t, include_addresses=include_addresses) for t in trips]
 
     async def get_by_id(self, trip_id: int) -> TripModel | None:
         trip: Trip | None = await self._repo.get_by_id(trip_id)
@@ -95,7 +96,7 @@ class TripService:
     async def delete(self, trip_id: int) -> bool:
         return await self._repo.delete(trip_id)
 
-    async def _build_out(self, trip: "Trip") -> TripModel:
+    async def _build_out(self, trip: "Trip", *, include_addresses: bool = True) -> TripModel:
         enterprise = trip.vehicle.enterprise if trip.vehicle else None
         tz = enterprise.timezone if enterprise else None
 
@@ -107,14 +108,24 @@ class TripService:
             started_at_enterprise=to_enterprise_tz(trip.started_at_utc, tz),
             ended_at_enterprise=to_enterprise_tz(trip.ended_at_utc, tz),
             enterprise_timezone=tz or "UTC",
-            start_point=await self._build_point_out(trip.start_point, tz),
-            end_point=await self._build_point_out(trip.end_point, tz),
+            start_point=await self._build_point_out(
+                trip.start_point,
+                tz,
+                include_address=include_addresses,
+            ),
+            end_point=await self._build_point_out(
+                trip.end_point,
+                tz,
+                include_address=include_addresses,
+            ),
         )
 
     async def _build_point_out(
         self,
         point: "VehicleGpsPoint",
         enterprise_tz: str | None,
+        *,
+        include_address: bool = True,
     ) -> TripPointModel:
         shapely_point = to_shape(point.position)
         if not isinstance(shapely_point, Point):
@@ -124,7 +135,7 @@ class TripService:
         longitude = shapely_point.x
 
         address: str | None = None
-        if self._geocoder is not None:
+        if include_address and self._geocoder is not None:
             address = await self._geocoder.reverse_geocode(
                 latitude=latitude,
                 longitude=longitude,

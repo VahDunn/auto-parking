@@ -6,6 +6,7 @@ from auto_parking.filter.base import BaseFilter
 @dataclass(slots=True)
 class VehicleFilter(BaseFilter):
     id: list[int] | None = None
+    vehicle_number_prefix: str | None = None
     enterprise_ids: list[int] | None = None
     driver_id: int | None = None
     limit: int | None = 50

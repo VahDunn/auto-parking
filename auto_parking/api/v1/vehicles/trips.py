@@ -35,6 +35,7 @@ async def get_vehicle_trips(
     id: int,
     date_from: datetime = Query(...),
     date_to: datetime = Query(...),
+    include_addresses: bool = Query(True),
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     vehicle_service: VehicleService = dep_vehicle_service,
     service: TripService = dep_trip_service,
@@ -56,6 +57,7 @@ async def get_vehicle_trips(
                 vehicle_id=id,
                 date_from=date_from,
                 date_to=date_to,
+                include_addresses=include_addresses,
             )
         ]
     except ValueError as err:

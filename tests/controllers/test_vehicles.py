@@ -33,6 +33,7 @@ async def test_get_vehicles_builds_filter_and_respects_visibility(
         "/api/vehicles",
         params={
             "id": "1,2",
+            "vehicle_number_prefix": "А123",
             "enterprise_ids": "10,30",
             "driver_id": 11,
             "limit": 10,
@@ -47,6 +48,7 @@ async def test_get_vehicles_builds_filter_and_respects_visibility(
     filter_obj = vehicle_service_mock.get.await_args.args[0]
     assert isinstance(filter_obj, VehicleFilter)
     assert filter_obj.id == [1, 2]
+    assert filter_obj.vehicle_number_prefix == "А123"
     assert filter_obj.enterprise_ids == [10]
     assert filter_obj.driver_id == 11
     assert filter_obj.limit == 10

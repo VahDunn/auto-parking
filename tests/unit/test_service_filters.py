@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from geoalchemy2.elements import WKTElement
 import pytest
 
 from auto_parking.api.schemas.vehicle_track import TrackFormat
@@ -38,6 +39,43 @@ async def test_trip_service_uses_trip_filter_for_range_query():
     assert filter_obj.ended_to == date_to
     assert filter_obj.limit is None
     assert filter_obj.offset is None
+
+
+async def test_trip_service_can_skip_reverse_geocoding_for_range_query():
+    repo = AsyncMock()
+    repo.get.return_value = [
+        SimpleNamespace(
+            id=1,
+            vehicle_id=3213,
+            vehicle=SimpleNamespace(enterprise=SimpleNamespace(timezone="UTC")),
+            started_at_utc=datetime(2026, 4, 21, 11, 35, tzinfo=UTC),
+            ended_at_utc=datetime(2026, 4, 21, 11, 41, tzinfo=UTC),
+            start_point=SimpleNamespace(
+                id=10,
+                recorded_at_utc=datetime(2026, 4, 21, 11, 35, tzinfo=UTC),
+                position=WKTElement("POINT(-90.0567 29.9321)", srid=4326),
+            ),
+            end_point=SimpleNamespace(
+                id=11,
+                recorded_at_utc=datetime(2026, 4, 21, 11, 41, tzinfo=UTC),
+                position=WKTElement("POINT(-90.0549 29.9271)", srid=4326),
+            ),
+        )
+    ]
+    geocoder = AsyncMock()
+    service = TripService(repo=repo, geocoder=geocoder)
+
+    result = await service.get_vehicle_trips_in_range(
+        vehicle_id=3213,
+        date_from=datetime(2026, 4, 21, 11, 35, tzinfo=UTC),
+        date_to=datetime(2026, 4, 21, 11, 41, tzinfo=UTC),
+        include_addresses=False,
+    )
+
+    assert len(result) == 1
+    assert result[0].start_point.address is None
+    assert result[0].end_point.address is None
+    geocoder.reverse_geocode.assert_not_awaited()
 
 
 async def test_trip_track_service_uses_trip_filter_for_grouped_track():
