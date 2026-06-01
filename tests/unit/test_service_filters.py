@@ -2,10 +2,11 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from geoalchemy2.elements import WKTElement
 import pytest
+from geoalchemy2.elements import WKTElement
 
 from auto_parking.api.schemas.vehicle_track import TrackFormat
+from auto_parking.core.domain.models import TripModel
 from auto_parking.filter import TripFilter, VehicleFilter
 from auto_parking.service.export import ExportService
 from auto_parking.service.gpx_import import GpxImportService

@@ -1,6 +1,7 @@
 from fastapi import Depends
 
 from auto_parking.deps.integrations import get_reverse_geocoder
+from auto_parking.deps.notifications import notification_publisher
 from auto_parking.deps.repos import (
     dep_driver_repo,
     dep_enterprise_repo,
@@ -12,7 +13,6 @@ from auto_parking.deps.repos import (
     dep_vehicle_model_repo,
     dep_vehicle_repo,
 )
-from auto_parking.deps.notifications import notification_publisher
 from auto_parking.repo.driver import DriverRepository
 from auto_parking.repo.enterprise import EnterpriseRepository
 from auto_parking.repo.notification import NotificationRepository

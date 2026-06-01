@@ -12,13 +12,13 @@ from auto_parking.bot.service import (
     month_range,
 )
 
-
 HELP_TEXT = """Выберите действие кнопками ниже или используйте команды:
 /login <логин> <пароль>
 /mileage_vehicle_day <начало_номера> <YYYY-MM-DD>
 /mileage_vehicle_month <начало_номера> <YYYY-MM>
 /mileage_enterprise_day <начало_названия> <YYYY-MM-DD>
 /mileage_enterprise_month <начало_названия> <YYYY-MM>
+/notifications
 /cancel
 
 Обычный текст бот пока возвращает эхом."""
@@ -78,6 +78,15 @@ class TelegramBotHandlers:
             self.states[chat_id] = DialogState(action="login", step="username")
             return BotReply("Введите логин менеджера.")
 
+        if data == "notifications":
+            return await self._handle_notifications(chat_id)
+
+        if data == "notifications:read_all":
+            return await self._handle_mark_all_notifications_read(chat_id)
+
+        if data.startswith("notification:read:"):
+            return await self._handle_mark_notification_read(chat_id, data)
+
         if data.startswith("enterprise:"):
             return await self._handle_enterprise_choice(chat_id, data)
 
@@ -113,6 +122,9 @@ class TelegramBotHandlers:
 
         if command == "/login":
             return await self._handle_login(chat_id, args)
+
+        if command == "/notifications":
+            return await self._handle_notifications(chat_id)
 
         if command.startswith("/mileage_vehicle_"):
             return await self._handle_vehicle_mileage(chat_id, command, args)
@@ -221,6 +233,50 @@ class TelegramBotHandlers:
 
         self.sessions[chat_id] = session
         return BotReply(f"Готово, вы вошли как {session.username}.", self._main_menu())
+
+    async def _handle_notifications(self, chat_id: int) -> BotReply:
+        session = self._get_session(chat_id)
+        if session is None:
+            return BotReply("Сначала выполните /login <логин> <пароль>.", self._main_menu())
+
+        notifications = await self.service.unread_notifications(session=session)
+        if not notifications:
+            return BotReply("Непрочитанных уведомлений нет.", self._main_menu())
+
+        return BotReply(
+            self._format_notifications(notifications),
+            self._notifications_menu(notifications),
+        )
+
+    async def _handle_mark_notification_read(self, chat_id: int, data: str) -> BotReply:
+        session = self._get_session(chat_id)
+        if session is None:
+            return BotReply("Сначала выполните /login <логин> <пароль>.", self._main_menu())
+
+        try:
+            notification_id = int(data.rsplit(":", 1)[1])
+        except ValueError:
+            return BotReply("Не понял уведомление.", self._main_menu())
+
+        notification = await self.service.mark_notification_read(
+            session=session,
+            notification_id=notification_id,
+        )
+        if notification is None:
+            return BotReply("Уведомление не найдено.", self._main_menu())
+
+        return await self._handle_notifications(chat_id)
+
+    async def _handle_mark_all_notifications_read(self, chat_id: int) -> BotReply:
+        session = self._get_session(chat_id)
+        if session is None:
+            return BotReply("Сначала выполните /login <логин> <пароль>.", self._main_menu())
+
+        ok = await self.service.mark_all_notifications_read(session=session)
+        if not ok:
+            return BotReply("Не получилось отметить уведомления прочитанными.", self._main_menu())
+
+        return BotReply("Все уведомления отмечены прочитанными.", self._main_menu())
 
     async def _handle_vehicle_mileage(
         self,
@@ -421,7 +477,9 @@ class TelegramBotHandlers:
             None,
         )
         if selected is None:
-            return BotReply("Выбранный автомобиль уже недоступен. Начните заново.", self._main_menu())
+            return BotReply(
+                "Выбранный автомобиль уже недоступен. Начните заново.", self._main_menu()
+            )
 
         state.target_id = vehicle_id
         state.target_name = str(selected.get("vehicle_number") or vehicle_id)
@@ -461,7 +519,9 @@ class TelegramBotHandlers:
             None,
         )
         if selected is None:
-            return BotReply("Выбранное предприятие уже недоступно. Начните заново.", self._main_menu())
+            return BotReply(
+                "Выбранное предприятие уже недоступно. Начните заново.", self._main_menu()
+            )
 
         state.target_id = enterprise_id
         state.target_name = str(selected.get("name") or enterprise_id)
@@ -498,6 +558,7 @@ class TelegramBotHandlers:
         return {
             "inline_keyboard": [
                 [{"text": "Войти", "callback_data": "login"}],
+                [{"text": "Уведомления", "callback_data": "notifications"}],
                 [
                     {"text": "Машина за сутки", "callback_data": "mileage:vehicle:day"},
                     {"text": "Машина за месяц", "callback_data": "mileage:vehicle:month"},
@@ -508,6 +569,37 @@ class TelegramBotHandlers:
                 ],
             ]
         }
+
+    @staticmethod
+    def _format_notifications(notifications: list[dict[str, Any]]) -> str:
+        lines = [f"Непрочитанные уведомления: {len(notifications)}"]
+        for notification in notifications[:10]:
+            lines.extend(
+                [
+                    "",
+                    f"#{notification['id']} {notification.get('title') or 'Уведомление'}",
+                    str(notification.get("body") or ""),
+                    f"Поездка: {notification.get('trip_id')}",
+                ]
+            )
+        if len(notifications) > 10:
+            lines.append(f"\nПоказаны первые 10 из {len(notifications)}.")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _notifications_menu(notifications: list[dict[str, Any]]) -> dict[str, Any]:
+        buttons = [
+            [
+                {
+                    "text": f"Прочитать #{notification['id']}",
+                    "callback_data": f"notification:read:{notification['id']}",
+                }
+            ]
+            for notification in notifications[:10]
+        ]
+        buttons.append([{"text": "Прочитать все", "callback_data": "notifications:read_all"}])
+        buttons.append([{"text": "Назад", "callback_data": "menu"}])
+        return {"inline_keyboard": buttons}
 
     @staticmethod
     def _enterprise_choices_menu(enterprises: list[dict[str, Any]]) -> dict[str, Any]:

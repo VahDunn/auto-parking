@@ -67,6 +67,16 @@ class AutoParkingApiClient:
 
         return response.json()
 
+    async def get_enterprise(self, token: str, enterprise_id: int) -> dict[str, Any] | None:
+        try:
+            async with self._client(token) as client:
+                response = await client.get(f"/enterprises/{enterprise_id}")
+            response.raise_for_status()
+        except httpx.HTTPError:
+            return None
+
+        return response.json()
+
     async def get_enterprise_vehicles(self, token: str, enterprise_id: int) -> list[dict[str, Any]]:
         vehicles: list[dict[str, Any]] = []
         limit = 100
@@ -118,6 +128,43 @@ class AutoParkingApiClient:
             return None
 
         return response.json()
+
+    async def get_unread_notifications(self, token: str) -> list[dict[str, Any]]:
+        try:
+            async with self._client(token) as client:
+                response = await client.get(
+                    "/notifications",
+                    params={"unread_only": "true"},
+                )
+            response.raise_for_status()
+        except httpx.HTTPError:
+            return []
+
+        return response.json()
+
+    async def mark_notification_read(
+        self,
+        token: str,
+        notification_id: int,
+    ) -> dict[str, Any] | None:
+        try:
+            async with self._client(token) as client:
+                response = await client.patch(f"/notifications/{notification_id}/read")
+            response.raise_for_status()
+        except httpx.HTTPError:
+            return None
+
+        return response.json()
+
+    async def mark_all_notifications_read(self, token: str) -> bool:
+        try:
+            async with self._client(token) as client:
+                response = await client.patch("/notifications/read-all")
+            response.raise_for_status()
+        except httpx.HTTPError:
+            return False
+
+        return True
 
     def _client(self, token: str | None = None) -> httpx.AsyncClient:
         headers = {"Authorization": f"Bearer {token}"} if token else None

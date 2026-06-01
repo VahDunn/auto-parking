@@ -43,7 +43,6 @@ class TripService:
     ) -> list[TripModel]:
         date_from_utc = to_utc(date_from)
         date_to_utc = to_utc(date_to)
-
         trips = await self._repo.get(
             TripFilter(
                 vehicle_id=vehicle_id,

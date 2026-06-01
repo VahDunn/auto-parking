@@ -9,6 +9,7 @@ from auto_parking.core.logger import setup_logging
 from auto_parking.db.admin import setup_admin
 from auto_parking.db.engine import engine
 from auto_parking.db.events import register_listeners
+from auto_parking.integrations.monitoring import setup_metrics
 
 
 @asynccontextmanager
@@ -35,6 +36,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    setup_metrics(main_app)
     register_exception_handlers(main_app)
     setup_admin(main_app)
     main_app.include_router(api_router, prefix="/api")

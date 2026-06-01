@@ -31,7 +31,15 @@ const reportsCard = document.getElementById("reportsCard");
 const exportReportPdfBtn = document.getElementById("exportReportPdfBtn");
 const gpxFileInput = document.getElementById("gpxFileInput");
 const importGpxBtn = document.getElementById("importGpxBtn");
+const notificationCard = document.getElementById("notificationCard");
+const notificationMessage = document.getElementById("notificationMessage");
+const reloadNotificationsBtn = document.getElementById("reloadNotificationsBtn");
+const markAllNotificationsReadBtn = document.getElementById("markAllNotificationsReadBtn");
+const notificationList = document.getElementById("notificationList");
 
+let accessToken = null;
+let notificationsState = [];
+let notificationSocket = null;
 let selectedReport = null;
 let reportsState = [];
 let selectedImportFile = null;

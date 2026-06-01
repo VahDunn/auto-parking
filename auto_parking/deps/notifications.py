@@ -42,9 +42,7 @@ class WebSocketNotificationPublisher:
 
         payload = {
             "event": "notification.created",
-            "notification": NotificationOut.model_validate(notification).model_dump(
-                mode="json"
-            ),
+            "notification": NotificationOut.model_validate(notification).model_dump(mode="json"),
         }
         try:
             await websocket.send_json(payload)

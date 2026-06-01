@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Any
 
 import httpx
 
 from auto_parking.bot.handlers import BotReply, TelegramBotHandlers
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramLongPollingClient:
@@ -16,10 +20,22 @@ class TelegramLongPollingClient:
     async def run(self) -> None:
         async with httpx.AsyncClient(timeout=35) as client:
             while True:
-                updates = await self._get_updates(client)
+                try:
+                    updates = await self._get_updates(client)
+                except httpx.HTTPError as exc:
+                    logger.warning("Telegram polling failed: %s", exc)
+                    await asyncio.sleep(1)
+                    continue
+
                 for update in updates:
                     self._offset = update["update_id"] + 1
-                    await self._handle_update(client, update)
+                    try:
+                        await self._handle_update(client, update)
+                    except Exception:
+                        logger.exception(
+                            "Telegram update handling failed: update_id=%s",
+                            update["update_id"],
+                        )
 
     async def _get_updates(self, client: httpx.AsyncClient) -> list[dict[str, Any]]:
         response = await client.get(

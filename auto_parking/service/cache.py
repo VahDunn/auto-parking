@@ -1,0 +1,23 @@
+from typing import Protocol
+
+
+class CacheClient(Protocol):
+    async def get_text(self, key: str) -> str | None:
+        pass
+
+    async def set_text(self, key: str, value: str, *, ttl_seconds: int) -> None:
+        pass
+
+    async def delete_prefix(self, prefix: str) -> None:
+        pass
+
+
+class NullCacheClient:
+    async def get_text(self, key: str) -> str | None:
+        return None
+
+    async def set_text(self, key: str, value: str, *, ttl_seconds: int) -> None:
+        return None
+
+    async def delete_prefix(self, prefix: str) -> None:
+        return None

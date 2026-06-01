@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+import json
 from math import atan2, cos, radians, sin, sqrt
 
 from auto_parking.bot.api_client import AutoParkingApiClient
+from auto_parking.service.cache import CacheClient, NullCacheClient
 
 
 @dataclass(slots=True)
@@ -35,8 +37,15 @@ class VehicleLookup:
 
 
 class BotService:
-    def __init__(self, api_client: AutoParkingApiClient) -> None:
+    def __init__(
+        self,
+        api_client: AutoParkingApiClient,
+        cache: CacheClient | None = None,
+        cache_ttl_seconds: int = 300,
+    ) -> None:
         self._api_client = api_client
+        self._cache = cache or NullCacheClient()
+        self._cache_ttl_seconds = cache_ttl_seconds
 
     async def login(self, username: str, password: str) -> BotSession | None:
         token = await self._api_client.login(username=username, password=password)
@@ -57,6 +66,17 @@ class BotService:
         if vehicle is None:
             return None
 
+        cache_key = self._mileage_cache_key(
+            session=session,
+            target="vehicle",
+            target_id=vehicle_id,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        cached = await self._get_cached_summary(cache_key)
+        if cached is not None:
+            return cached
+
         trips = await self._api_client.get_vehicle_trips(
             token=session.access_token,
             vehicle_id=vehicle_id,
@@ -66,13 +86,15 @@ class BotService:
         if trips is None:
             return None
 
-        return MileageSummary(
+        summary = MileageSummary(
             title=f"Автомобиль #{vehicle_id}",
             date_from=date_from,
             date_to=date_to,
             trips_count=len(trips),
             distance_km=self._trips_distance_km(trips),
         )
+        await self._cache_summary(cache_key, summary)
+        return summary
 
     async def find_vehicle_by_number_prefix(
         self,
@@ -101,18 +123,35 @@ class BotService:
         date_from: datetime,
         date_to: datetime,
     ) -> MileageSummary | None:
+        enterprise = await self._api_client.get_enterprise(session.access_token, enterprise_id)
+        if enterprise is None:
+            return None
+
+        cache_key = self._mileage_cache_key(
+            session=session,
+            target="enterprise",
+            target_id=enterprise_id,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        cached = await self._get_cached_summary(cache_key)
+        if cached is not None:
+            return cached
+
         vehicles = await self._api_client.get_enterprise_vehicles(
             token=session.access_token,
             enterprise_id=enterprise_id,
         )
         if not vehicles:
-            return MileageSummary(
+            summary = MileageSummary(
                 title=f"Предприятие #{enterprise_id}",
                 date_from=date_from,
                 date_to=date_to,
                 trips_count=0,
                 distance_km=0.0,
             )
+            await self._cache_summary(cache_key, summary)
+            return summary
 
         all_trips: list[dict] = []
         for vehicle in vehicles:
@@ -125,13 +164,15 @@ class BotService:
             if trips:
                 all_trips.extend(trips)
 
-        return MileageSummary(
+        summary = MileageSummary(
             title=f"Предприятие #{enterprise_id}",
             date_from=date_from,
             date_to=date_to,
             trips_count=len(all_trips),
             distance_km=self._trips_distance_km(all_trips),
         )
+        await self._cache_summary(cache_key, summary)
+        return summary
 
     async def find_enterprise_by_name_prefix(
         self,
@@ -154,6 +195,74 @@ class BotService:
             return EnterpriseLookup(enterprise=matches[0], matches=matches)
 
         return EnterpriseLookup(enterprise=None, matches=matches)
+
+    async def unread_notifications(self, *, session: BotSession) -> list[dict]:
+        return await self._api_client.get_unread_notifications(session.access_token)
+
+    async def mark_notification_read(
+        self,
+        *,
+        session: BotSession,
+        notification_id: int,
+    ) -> dict | None:
+        return await self._api_client.mark_notification_read(
+            session.access_token,
+            notification_id,
+        )
+
+    async def mark_all_notifications_read(self, *, session: BotSession) -> bool:
+        return await self._api_client.mark_all_notifications_read(session.access_token)
+
+    @staticmethod
+    def _mileage_cache_key(
+        *,
+        session: BotSession,
+        target: str,
+        target_id: int,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> str:
+        return (
+            f"bot:mileage:{session.username}:{target}:{target_id}:"
+            f"{date_from.isoformat()}:{date_to.isoformat()}"
+        )
+
+    async def _get_cached_summary(self, key: str) -> MileageSummary | None:
+        try:
+            cached = await self._cache.get_text(key)
+        except Exception:
+            return None
+
+        if cached is None:
+            return None
+
+        data = json.loads(cached)
+        return MileageSummary(
+            title=data["title"],
+            date_from=datetime.fromisoformat(data["date_from"]),
+            date_to=datetime.fromisoformat(data["date_to"]),
+            trips_count=data["trips_count"],
+            distance_km=data["distance_km"],
+        )
+
+    async def _cache_summary(self, key: str, summary: MileageSummary) -> None:
+        value = json.dumps(
+            {
+                "title": summary.title,
+                "date_from": summary.date_from.isoformat(),
+                "date_to": summary.date_to.isoformat(),
+                "trips_count": summary.trips_count,
+                "distance_km": summary.distance_km,
+            }
+        )
+        try:
+            await self._cache.set_text(
+                key,
+                value,
+                ttl_seconds=self._cache_ttl_seconds,
+            )
+        except Exception:
+            return None
 
     @classmethod
     def _trips_distance_km(cls, trips: list[dict]) -> float:

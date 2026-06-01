@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING, Any, Protocol
 
-from auto_parking.core.domain.enums import NotificationType
+from auto_parking.core.domain.enums import NotificationType, UserRole
 from auto_parking.core.domain.models import NotificationModel
+from auto_parking.filter import UserFilter
 
 if TYPE_CHECKING:
     from auto_parking.db.models import Notification, Trip
@@ -20,7 +21,7 @@ class NotificationService:
         notification_repo: "NotificationRepository",
         user_repo: "UserRepository",
         publisher: NotificationPublisher | None = None,
-    ) -> None:
+    ):
         self._notification_repo = notification_repo
         self._user_repo = user_repo
         self._publisher = publisher
@@ -61,23 +62,26 @@ class NotificationService:
 
     async def notify_trip_created(self, trip: "Trip") -> list[NotificationModel]:
         enterprise_id = trip.vehicle.enterprise_id
-        recipient_ids = await self._user_repo.get_notification_recipient_ids_by_enterprise(
-            enterprise_id
+        recipients = await self._user_repo.get(
+            UserFilter(
+                role=UserRole.manager,
+                enterprise_id=enterprise_id,
+            )
         )
-        if not recipient_ids:
+        if not recipients:
             return []
 
         trip_id = trip.id
         vehicle_number = trip.vehicle.vehicle_number
         payloads = [
             self._trip_created_payload(
-                recipient_user_id=recipient_id,
+                recipient_user_id=recipient.id,
                 enterprise_id=enterprise_id,
                 trip_id=trip_id,
                 vehicle_id=trip.vehicle_id,
                 vehicle_number=vehicle_number,
             )
-            for recipient_id in recipient_ids
+            for recipient in recipients
         ]
         notifications = [
             self._to_domain(notification)

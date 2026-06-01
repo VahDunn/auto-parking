@@ -223,6 +223,38 @@
                 </div>
             </div>
 
+            <div class="card shadow-sm d-none mb-4" id="notificationCard">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                        <div>
+                            <h2 class="card-title mb-0">
+                                Уведомления
+                                <span class="badge text-bg-primary align-middle" id="notificationUnreadBadge">0</span>
+                            </h2>
+                            <div class="text-muted small" id="notificationStatus">
+                                Подключение не открыто
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-outline-secondary btn-sm" id="reloadNotificationsBtn"
+                                    type="button">
+                                Обновить
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm" id="markAllNotificationsReadBtn"
+                                    type="button">
+                                Прочитать все
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="notificationMessage"></div>
+                    <div id="notificationList" class="list-group">
+                        <div class="list-group-item text-muted">Уведомлений пока нет</div>
+                    </div>
+                </div>
+            </div>
+
 
             <div class="card shadow-sm d-none mb-4" id="vehicleCard">
                 <div class="card-body p-4">
@@ -473,17 +505,20 @@
 <script src="./js/api/enterprises.js"></script>
 <script src="./js/api/vehicles.js"></script>
 <script src="./js/api/reports.js"></script>
+<script src="./js/api/notifications.js"></script>
 <script src="./js/ui/messages.js"></script>
 <script src="./js/ui/datetime.js"></script>
 <script src="./js/ui/enterprises.js"></script>
 <script src="./js/ui/vehicles.js"></script>
 <script src="./js/ui/reports.js"></script>
+<script src="./js/ui/notifications.js"></script>
 <script src="./js/app/state.js"></script>
 <script src="./js/features/map.js?v=20260527"></script>
 <script src="./js/features/imports.js"></script>
 <script src="./js/features/exports.js"></script>
 <script src="./js/features/vehicles.js?v=20260527"></script>
 <script src="./js/features/reports.js"></script>
+<script src="./js/features/notifications.js"></script>
 <script src="./js/app/bootstrap.js"></script>
 </body>
 </html>

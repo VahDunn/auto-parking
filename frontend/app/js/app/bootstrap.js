@@ -6,20 +6,48 @@ loginForm.addEventListener("submit", async (e) => {
     const password = document.getElementById("password").value;
 
     try {
-        await loginRequest(username, password);
+        const loginData = await loginRequest(username, password);
+        accessToken = loginData.access_token;
 
         showMessage(messageBox, "success", "Успешный вход");
 
         loginCard.classList.add("d-none");
         enterpriseCard.classList.remove("d-none");
+        notificationCard.classList.remove("d-none");
 
         await loadVehicleModels();
         await loadEnterprises();
         setDefaultReportDateRange();
         await loadReports();
+        await loadNotifications();
+        startNotificationsRealtime();
     } catch (error) {
         showMessage(messageBox, "danger", error.message);
     }
+});
+
+reloadNotificationsBtn.addEventListener("click", async () => {
+    await loadNotifications();
+});
+
+markAllNotificationsReadBtn.addEventListener("click", async () => {
+    clearMessage(notificationMessage);
+
+    try {
+        await markAllNotificationsReadRequest();
+        await loadNotifications();
+    } catch (error) {
+        showMessage(notificationMessage, "danger", error.message);
+    }
+});
+
+notificationList.addEventListener("click", async (event) => {
+    const item = event.target.closest("[data-notification-id]");
+    if (!item) {
+        return;
+    }
+
+    await handleNotificationClick(Number(item.dataset.notificationId));
 });
 
 reloadBtn.addEventListener("click", async () => {

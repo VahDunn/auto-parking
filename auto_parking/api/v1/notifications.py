@@ -50,9 +50,7 @@ async def get_unread_count(
     actor: Actor = dep_actor_guard,
     service: NotificationService = dep_notification_service,
 ):
-    return NotificationUnreadCountOut(
-        unread_count=await service.unread_count(user_id=actor.id)
-    )
+    return NotificationUnreadCountOut(unread_count=await service.unread_count(user_id=actor.id))
 
 
 @router.patch(
@@ -84,9 +82,7 @@ async def mark_all_notifications_read(
     actor: Actor = dep_actor_guard,
     service: NotificationService = dep_notification_service,
 ):
-    return NotificationReadAllOut(
-        updated_count=await service.mark_all_read(user_id=actor.id)
-    )
+    return NotificationReadAllOut(updated_count=await service.mark_all_read(user_id=actor.id))
 
 
 @router.websocket("/ws")
