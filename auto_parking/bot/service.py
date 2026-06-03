@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-import json
 from math import atan2, cos, radians, sin, sqrt
+from time import perf_counter
 
 from auto_parking.bot.api_client import AutoParkingApiClient
-from auto_parking.service.cache import CacheClient, NullCacheClient
+from auto_parking.observability.performance import log_cache_lookup
+from auto_parking.ports.cache import CacheClient
 
 
 @dataclass(slots=True)
@@ -44,7 +46,7 @@ class BotService:
         cache_ttl_seconds: int = 300,
     ) -> None:
         self._api_client = api_client
-        self._cache = cache or NullCacheClient()
+        self._cache = cache
         self._cache_ttl_seconds = cache_ttl_seconds
 
     async def login(self, username: str, password: str) -> BotSession | None:
@@ -228,14 +230,33 @@ class BotService:
         )
 
     async def _get_cached_summary(self, key: str) -> MileageSummary | None:
+        if self._cache is None:
+            return None
+
+        started_at = perf_counter()
         try:
             cached = await self._cache.get_text(key)
         except Exception:
+            log_cache_lookup(
+                operation="bot_mileage_summary",
+                result="error",
+                duration_seconds=perf_counter() - started_at,
+            )
             return None
 
         if cached is None:
+            log_cache_lookup(
+                operation="bot_mileage_summary",
+                result="miss",
+                duration_seconds=perf_counter() - started_at,
+            )
             return None
 
+        log_cache_lookup(
+            operation="bot_mileage_summary",
+            result="hit",
+            duration_seconds=perf_counter() - started_at,
+        )
         data = json.loads(cached)
         return MileageSummary(
             title=data["title"],
@@ -246,6 +267,9 @@ class BotService:
         )
 
     async def _cache_summary(self, key: str, summary: MileageSummary) -> None:
+        if self._cache is None:
+            return None
+
         value = json.dumps(
             {
                 "title": summary.title,

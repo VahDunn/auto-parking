@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload
 
 from auto_parking.db.models import Enterprise, User
 
@@ -17,6 +18,8 @@ class UserRepository:
     async def get(self, filter_obj: "UserFilter | None" = None) -> Sequence[User]:
         stmt = select(User).order_by(User.id)
         if filter_obj:
+            if not filter_obj.load_relations:
+                stmt = stmt.options(noload(User.enterprises))
             if filter_obj.enterprise_id is not None:
                 stmt = stmt.join(User.enterprises).where(
                     Enterprise.id == filter_obj.enterprise_id

@@ -14,6 +14,7 @@ from auto_parking.api.schemas.vehicle_track import (
 )
 from auto_parking.core.domain.enums.import_export_format import ExportFormat
 from auto_parking.core.domain.models import (
+    EnterpriseModel,
     GeoJSONFeatureCollectionModel,
     GeoJSONFeatureModel,
     GeoJSONGeometryModel,
@@ -24,13 +25,29 @@ from auto_parking.core.domain.models import (
 )
 from auto_parking.deps.access import require_manager_or_higher
 from auto_parking.deps.visibility import get_visible_enterprise_ids
+from auto_parking.core.utils.datetime import to_enterprise_tz
 
 dep_actor_guard = Depends(require_manager_or_higher)
 dep_visible_ids = Depends(get_visible_enterprise_ids)
 
 
-def vehicle_out(vehicle: VehicleModel) -> VehicleOut:
-    return VehicleOut(**vehicle.to_dict())
+def vehicle_out(vehicle: VehicleModel, enterprise_timezone: str | None) -> VehicleOut:
+    purchased_at_utc = vehicle.purchased_at_utc
+    return VehicleOut(
+        **vehicle.to_dict(),
+        purchased_at_enterprise=(
+            to_enterprise_tz(purchased_at_utc, enterprise_timezone) if purchased_at_utc else None
+        ),
+        enterprise_timezone=enterprise_timezone or "UTC",
+    )
+
+
+def enterprise_timezones(enterprises: list[EnterpriseModel]) -> dict[int, str | None]:
+    return {
+        enterprise.id: enterprise.timezone
+        for enterprise in enterprises
+        if enterprise.id is not None
+    }
 
 
 def trip_out(trip: TripModel) -> TripOut:

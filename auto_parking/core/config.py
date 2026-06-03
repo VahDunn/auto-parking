@@ -17,10 +17,28 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_access_ttl_minutes: int = Field(default=30, alias="JWT_ACCESS_TTL_MINUTES")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    performance_log_path: str = Field(
+        default="logs/performance.jsonl",
+        alias="PERFORMANCE_LOG_PATH",
+    )
+    performance_log_max_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        alias="PERFORMANCE_LOG_MAX_BYTES",
+    )
+    performance_log_backup_count: int = Field(default=5, alias="PERFORMANCE_LOG_BACKUP_COUNT")
     telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
     bot_api_base_url: str = Field(default="http://localhost:8000/api", alias="BOT_API_BASE_URL")
     redis_url: str | None = Field(default=None, alias="REDIS_URL")
     bot_summary_cache_ttl_seconds: int = Field(default=300, alias="BOT_SUMMARY_CACHE_TTL_SECONDS")
+    entity_cache_ttl_seconds: int = Field(default=300, alias="ENTITY_CACHE_TTL_SECONDS")
+    vehicle_model_cache_ttl_seconds: int = Field(
+        default=3600,
+        alias="VEHICLE_MODEL_CACHE_TTL_SECONDS",
+    )
+    vehicle_track_cache_ttl_seconds: int = Field(
+        default=300,
+        alias="VEHICLE_TRACK_CACHE_TTL_SECONDS",
+    )
     model_config = {
         "env_file": str(ENV_FILE),
         "env_file_encoding": "utf-8",

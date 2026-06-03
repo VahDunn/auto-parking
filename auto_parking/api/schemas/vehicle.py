@@ -110,7 +110,6 @@ class VehicleUpdate(ApiSchema):
 
         if "purchased_at" in changes:
             data["purchased_at_utc"] = to_utc(changes.pop("purchased_at"))
-            data["purchased_at_enterprise"] = None
 
         data.update(changes)
         return VehicleModel(**data)

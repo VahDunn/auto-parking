@@ -69,7 +69,7 @@ def vehicle_service_mock():
 @pytest.fixture
 def vehicle_track_service_mock():
     svc = AsyncMock()
-    svc.get_track = AsyncMock()
+    svc.get_payload = AsyncMock()
     return svc
 
 
@@ -123,6 +123,7 @@ def vehicle_model_service_mock():
     svc = AsyncMock()
     svc.get_all = AsyncMock()
     svc.get_by_id = AsyncMock()
+    svc.get_by_name = AsyncMock()
     return svc
 
 

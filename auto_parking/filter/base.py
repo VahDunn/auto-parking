@@ -3,4 +3,4 @@ from dataclasses import dataclass
 
 @dataclass(slots=True)
 class BaseFilter:
-    pass
+    load_relations: bool = True

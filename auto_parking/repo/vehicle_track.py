@@ -35,6 +35,27 @@ class VehicleTrackRepository:
         result = await self.db.execute(stmt)
         return result.all()
 
+    async def get_coordinates(
+        self,
+        vehicle_id: int,
+        date_from_utc: datetime,
+        date_to_utc: datetime,
+    ) -> Sequence[Any]:
+        stmt = (
+            select(
+                VehicleGpsPoint.recorded_at_utc,
+                func.ST_Y(VehicleGpsPoint.position).label("latitude"),
+                func.ST_X(VehicleGpsPoint.position).label("longitude"),
+            )
+            .where(VehicleGpsPoint.vehicle_id == vehicle_id)
+            .where(VehicleGpsPoint.recorded_at_utc >= date_from_utc)
+            .where(VehicleGpsPoint.recorded_at_utc <= date_to_utc)
+            .order_by(VehicleGpsPoint.recorded_at_utc.asc())
+        )
+
+        result = await self.db.execute(stmt)
+        return result.all()
+
     async def get_points_by_intervals(
         self,
         vehicle_id: int,

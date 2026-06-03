@@ -1,4 +1,5 @@
 from unittest.mock import AsyncMock
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException, status
@@ -105,8 +106,6 @@ async def test_all_required_status_codes(client, overrides):
         "drivers": [],
         "active_driver_id": None,
         "purchased_at_utc": None,
-        "purchased_at_enterprise": None,
-        "enterprise_timezone": "UTC",
     }
     updated_dict = {**created_dict, "price": 999}
 
@@ -117,6 +116,9 @@ async def test_all_required_status_codes(client, overrides):
     vehicle_svc.get_by_id.return_value = created
     vehicle_svc.update.return_value = updated
     vehicle_svc.delete.return_value = True
+    enterprise_svc.get.return_value = [
+        SimpleNamespace(id=4, timezone="UTC")
+    ]
 
     post_payload = {
         "price": 100,

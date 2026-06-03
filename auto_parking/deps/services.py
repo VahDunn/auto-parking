@@ -1,5 +1,7 @@
 from fastapi import Depends
 
+from auto_parking.core.config import settings
+from auto_parking.deps.cache import get_cache_client
 from auto_parking.deps.integrations import get_reverse_geocoder
 from auto_parking.deps.notifications import notification_publisher
 from auto_parking.deps.repos import (
@@ -49,13 +51,21 @@ def get_driver_service(repo: DriverRepository = dep_driver_repo) -> DriverServic
 
 
 def get_vehicle_service(repo: VehicleRepository = dep_vehicle_repo) -> VehicleService:
-    return VehicleService(repo)
+    return VehicleService(
+        repo,
+        cache=get_cache_client(),
+        cache_ttl_seconds=settings.entity_cache_ttl_seconds,
+    )
 
 
 def get_vehicle_model_service(
     repo: VehicleModelRepository = dep_vehicle_model_repo,
 ) -> VehicleModelService:
-    return VehicleModelService(repo)
+    return VehicleModelService(
+        repo,
+        cache=get_cache_client(),
+        cache_ttl_seconds=settings.vehicle_model_cache_ttl_seconds,
+    )
 
 
 def get_user_service(repo: UserRepository = dep_manager_repo) -> UserService:
@@ -63,10 +73,13 @@ def get_user_service(repo: UserRepository = dep_manager_repo) -> UserService:
 
 
 def get_vehicle_track_service(
-    vehicle_repo: VehicleRepository = dep_vehicle_repo,
     track_repo: VehicleTrackRepository = dep_track_repo,
 ) -> VehicleTrackService:
-    return VehicleTrackService(vehicle_repo=vehicle_repo, track_repo=track_repo)
+    return VehicleTrackService(
+        track_repo=track_repo,
+        cache=get_cache_client(),
+        cache_ttl_seconds=settings.vehicle_track_cache_ttl_seconds,
+    )
 
 
 def get_notification_service(

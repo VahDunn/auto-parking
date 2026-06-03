@@ -7,13 +7,18 @@ from geoalchemy2.elements import WKTElement
 
 from auto_parking.api.schemas.vehicle_track import TrackFormat
 from auto_parking.core.domain.models import TripModel
-from auto_parking.filter import TripFilter, VehicleFilter
+from auto_parking.filter import EnterpriseFilter, TripFilter, VehicleFilter
 from auto_parking.service.export import ExportService
 from auto_parking.service.gpx_import import GpxImportService
 from auto_parking.service.trip import TripService
 from auto_parking.service.trip_track import TripTrackService
 
 pytestmark = pytest.mark.asyncio
+
+
+async def test_base_filter_loads_relations_by_default():
+    assert EnterpriseFilter().load_relations is True
+    assert EnterpriseFilter(load_relations=False).load_relations is False
 
 
 async def test_trip_service_uses_trip_filter_for_range_query():

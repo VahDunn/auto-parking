@@ -3,8 +3,8 @@ from functools import lru_cache
 from redis.asyncio import Redis
 
 from auto_parking.core.config import settings
-from auto_parking.integrations.cache import RedisCacheClient
-from auto_parking.service.cache import CacheClient, NullCacheClient
+from auto_parking.integrations.cache import NullCacheClient, RedisCacheClient
+from auto_parking.ports.cache import CacheClient
 
 
 @lru_cache

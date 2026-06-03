@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 
 from auto_parking.db.models import Driver, Enterprise, User, Vehicle
 
@@ -14,6 +14,31 @@ if TYPE_CHECKING:
 class EnterpriseRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    @staticmethod
+    def _relation_options():
+        return (
+            selectinload(Enterprise.vehicles).options(
+                load_only(Vehicle.id, Vehicle.enterprise_id, Vehicle.active_driver_id),
+                selectinload(Vehicle.drivers).options(
+                    load_only(Driver.id),
+                ),
+            ),
+            selectinload(Enterprise.drivers).options(
+                load_only(Driver.id, Driver.enterprise_id),
+            ),
+            selectinload(Enterprise.users).options(
+                load_only(User.id, User.role),
+            ),
+        )
+
+    @staticmethod
+    def _without_relations_options():
+        return (
+            noload(Enterprise.vehicles),
+            noload(Enterprise.drivers),
+            noload(Enterprise.users),
+        )
 
     async def get(
         self,
@@ -28,21 +53,16 @@ class EnterpriseRepository:
                     Enterprise.settlement,
                     Enterprise.timezone,
                 ),
-                selectinload(Enterprise.vehicles).options(
-                    load_only(Vehicle.id, Vehicle.enterprise_id, Vehicle.active_driver_id),
-                    selectinload(Vehicle.drivers).options(
-                        load_only(Driver.id),
-                    ),
-                ),
-                selectinload(Enterprise.drivers).options(
-                    load_only(Driver.id, Driver.enterprise_id),
-                ),
-                selectinload(Enterprise.users).options(
-                    load_only(User.id, User.role),
-                ),
             )
             .order_by(Enterprise.id)
         )
+
+        relation_options = (
+            self._relation_options()
+            if filter_obj is None or filter_obj.load_relations
+            else self._without_relations_options()
+        )
+        stmt = stmt.options(*relation_options)
 
         if filter_obj is not None and filter_obj.ids is not None:
             stmt = stmt.where(Enterprise.id.in_(filter_obj.ids))
@@ -61,18 +81,7 @@ class EnterpriseRepository:
                     Enterprise.settlement,
                     Enterprise.timezone,
                 ),
-                selectinload(Enterprise.vehicles).options(
-                    load_only(Vehicle.id, Vehicle.enterprise_id, Vehicle.active_driver_id),
-                    selectinload(Vehicle.drivers).options(
-                        load_only(Driver.id),
-                    ),
-                ),
-                selectinload(Enterprise.drivers).options(
-                    load_only(Driver.id, Driver.enterprise_id),
-                ),
-                selectinload(Enterprise.users).options(
-                    load_only(User.id, User.role),
-                ),
+                *self._relation_options(),
             )
         )
         return result.scalar_one_or_none()

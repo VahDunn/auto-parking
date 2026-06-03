@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 
 from auto_parking.db.models import Driver, Vehicle
 from auto_parking.filter import DriverFilter
@@ -13,10 +13,19 @@ class DriverRepository:
         self.db = db
 
     async def get(self, filter_obj: DriverFilter) -> Sequence[Driver]:
-        stmt = select(Driver).options(
-            selectinload(Driver.vehicles).options(load_only(Vehicle.id)),
-            selectinload(Driver.active_vehicle).options(load_only(Vehicle.id)),
+        relation_options = (
+            (
+                selectinload(Driver.vehicles).options(load_only(Vehicle.id)),
+                selectinload(Driver.active_vehicle).options(load_only(Vehicle.id)),
+            )
+            if filter_obj.load_relations
+            else (
+                noload(Driver.enterprise),
+                noload(Driver.vehicles),
+                noload(Driver.active_vehicle),
+            )
         )
+        stmt = select(Driver).options(*relation_options)
 
         if filter_obj:
             if filter_obj.id:

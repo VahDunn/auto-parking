@@ -3,7 +3,7 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 
 from auto_parking.db.models import Enterprise, Trip, Vehicle, VehicleGpsPoint
 from auto_parking.filter import TripFilter
@@ -40,8 +40,21 @@ class TripRepository:
             ),
         )
 
+    @staticmethod
+    def _without_relations_options():
+        return (
+            noload(Trip.vehicle),
+            noload(Trip.start_point),
+            noload(Trip.end_point),
+        )
+
     async def get(self, filter_obj: TripFilter) -> Sequence[Trip]:
-        stmt = select(Trip).options(*self._base_options())
+        relation_options = (
+            self._base_options()
+            if filter_obj.load_relations
+            else self._without_relations_options()
+        )
+        stmt = select(Trip).options(*relation_options)
 
         if filter_obj.vehicle_id is not None:
             stmt = stmt.where(Trip.vehicle_id == filter_obj.vehicle_id)

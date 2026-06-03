@@ -19,5 +19,3 @@ class VehicleModel(DomainModel):
     drivers: list[int] = field(default_factory=list)
     active_driver_id: int | None = None
     purchased_at_utc: datetime | None = None
-    purchased_at_enterprise: datetime | None = None
-    enterprise_timezone: str = "UTC"

@@ -5,12 +5,14 @@ from auto_parking.api.v1.vehicles.common import (
     apply_enterprise_visibility,
     dep_actor_guard,
     dep_visible_ids,
+    enterprise_timezones,
     ensure_vehicle_visible,
     parse_int_list,
     vehicle_out,
 )
-from auto_parking.deps.services import dep_vehicle_service
-from auto_parking.filter import VehicleFilter
+from auto_parking.deps.services import dep_enterprise_service, dep_vehicle_service
+from auto_parking.filter import EnterpriseFilter, VehicleFilter
+from auto_parking.service.enterprise import EnterpriseService
 from auto_parking.service.vehicle import VehicleService
 
 router = APIRouter()
@@ -31,6 +33,7 @@ async def get_vehicles(
     sort_by: str | None = Query(None),
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
+    enterprise_service: EnterpriseService = dep_enterprise_service,
 ):
     parsed_ids = parse_int_list(id)
     parsed_enterprise_ids = parse_int_list(enterprise_ids)
@@ -43,19 +46,28 @@ async def get_vehicles(
     if visible_enterprise_ids is not None and parsed_enterprise_ids == []:
         return []
 
-    return [
-        vehicle_out(vehicle)
-        for vehicle in await service.get(
-            VehicleFilter(
-                id=parsed_ids,
-                vehicle_number_prefix=vehicle_number_prefix,
-                enterprise_ids=parsed_enterprise_ids,
-                driver_id=driver_id,
-                limit=limit,
-                offset=offset,
-                sort_by=sort_by,
+    vehicles = await service.get(
+        VehicleFilter(
+            id=parsed_ids,
+            vehicle_number_prefix=vehicle_number_prefix,
+            enterprise_ids=parsed_enterprise_ids,
+            driver_id=driver_id,
+            limit=limit,
+            offset=offset,
+            sort_by=sort_by,
+        )
+    )
+    timezone_by_enterprise_id = enterprise_timezones(
+        await enterprise_service.get(
+            EnterpriseFilter(
+                ids=list({vehicle.enterprise_id for vehicle in vehicles}),
+                load_relations=False,
             )
         )
+    )
+    return [
+        vehicle_out(vehicle, timezone_by_enterprise_id.get(vehicle.enterprise_id))
+        for vehicle in vehicles
     ]
 
 
@@ -68,13 +80,19 @@ async def get_vehicle(
     id: int,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
+    enterprise_service: EnterpriseService = dep_enterprise_service,
 ):
     vehicle = await service.get_by_id(id)
     if not vehicle:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
 
     ensure_vehicle_visible(vehicle, visible_enterprise_ids)
-    return vehicle_out(vehicle)
+    timezone_by_enterprise_id = enterprise_timezones(
+        await enterprise_service.get(
+            EnterpriseFilter(ids=[vehicle.enterprise_id], load_relations=False)
+        )
+    )
+    return vehicle_out(vehicle, timezone_by_enterprise_id.get(vehicle.enterprise_id))
 
 
 @router.post(
@@ -87,11 +105,18 @@ async def create_vehicle(
     payload: VehicleCreate,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
+    enterprise_service: EnterpriseService = dep_enterprise_service,
 ):
     if visible_enterprise_ids is not None and payload.enterprise_id not in visible_enterprise_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
-    return vehicle_out(await service.create(payload.to_domain_model()))
+    vehicle = await service.create(payload.to_domain_model())
+    timezone_by_enterprise_id = enterprise_timezones(
+        await enterprise_service.get(
+            EnterpriseFilter(ids=[vehicle.enterprise_id], load_relations=False)
+        )
+    )
+    return vehicle_out(vehicle, timezone_by_enterprise_id.get(vehicle.enterprise_id))
 
 
 @router.patch(
@@ -104,6 +129,7 @@ async def update_vehicle(
     payload: VehicleUpdate,
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
+    enterprise_service: EnterpriseService = dep_enterprise_service,
 ):
     current = await service.get_by_id(id)
     if not current:
@@ -118,7 +144,12 @@ async def update_vehicle(
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
 
-    return vehicle_out(updated)
+    timezone_by_enterprise_id = enterprise_timezones(
+        await enterprise_service.get(
+            EnterpriseFilter(ids=[updated.enterprise_id], load_relations=False)
+        )
+    )
+    return vehicle_out(updated, timezone_by_enterprise_id.get(updated.enterprise_id))
 
 
 @router.delete(

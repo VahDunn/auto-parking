@@ -24,6 +24,8 @@ services:
     command: >
       redis-server
       --appendonly yes
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
@@ -45,6 +47,13 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       APP_ENV: ${APP_ENV}
       DEBUG: ${DEBUG}
+      REDIS_URL: ${REDIS_URL}
+      ENTITY_CACHE_TTL_SECONDS: ${ENTITY_CACHE_TTL_SECONDS:-300}
+      VEHICLE_MODEL_CACHE_TTL_SECONDS: ${VEHICLE_MODEL_CACHE_TTL_SECONDS:-3600}
+      VEHICLE_TRACK_CACHE_TTL_SECONDS: ${VEHICLE_TRACK_CACHE_TTL_SECONDS:-300}
+      PERFORMANCE_LOG_PATH: /app/logs/performance.jsonl
+    volumes:
+      - ./logs:/app/logs
     command: >
       uvicorn auto_parking.main:app
       --host 0.0.0.0
@@ -75,6 +84,9 @@ services:
       BOT_API_BASE_URL: http://auto-parking:8000/api
       REDIS_URL: ${REDIS_URL}
       BOT_SUMMARY_CACHE_TTL_SECONDS: ${BOT_SUMMARY_CACHE_TTL_SECONDS}
+      PERFORMANCE_LOG_PATH: /app/logs/performance-bot.jsonl
+    volumes:
+      - ./logs:/app/logs
     command: >
       python -m auto_parking.bot.main
 

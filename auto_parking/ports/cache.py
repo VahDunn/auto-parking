@@ -8,16 +8,8 @@ class CacheClient(Protocol):
     async def set_text(self, key: str, value: str, *, ttl_seconds: int) -> None:
         pass
 
-    async def delete_prefix(self, prefix: str) -> None:
+    async def delete_text(self, key: str) -> None:
         pass
 
-
-class NullCacheClient:
-    async def get_text(self, key: str) -> str | None:
-        return None
-
-    async def set_text(self, key: str, value: str, *, ttl_seconds: int) -> None:
-        return None
-
     async def delete_prefix(self, prefix: str) -> None:
-        return None
+        pass

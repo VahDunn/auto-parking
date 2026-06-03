@@ -25,8 +25,6 @@ def vehicle_model(vehicle_id: int = 1, enterprise_id: int = 10) -> VehicleModel:
         drivers=[11],
         active_driver_id=11,
         purchased_at_utc=datetime(2026, 1, 1, 9, 0, tzinfo=UTC),
-        purchased_at_enterprise=datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
-        enterprise_timezone="UTC",
     )
 
 

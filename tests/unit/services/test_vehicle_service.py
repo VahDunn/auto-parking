@@ -42,7 +42,7 @@ async def test_vehicle_service_maps_repo_results_to_domain_models():
     assert len(result) == 1
     assert result[0].id == 1
     assert result[0].drivers == [11]
-    assert result[0].enterprise_timezone == "Europe/Moscow"
+    assert result[0].enterprise_id == 10
     repo.get.assert_awaited_once()
 
 

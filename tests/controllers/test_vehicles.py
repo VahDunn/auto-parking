@@ -1,13 +1,15 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import pytest
 
 from auto_parking.core.domain.enums import UserRole
 from auto_parking.core.domain.models import TripTrackGroupModel, VehicleTrackPointModel
-from auto_parking.filter import VehicleFilter
+from auto_parking.filter import EnterpriseFilter, VehicleFilter
 from tests.conftest import (
     set_actor_override,
     set_export_service_override,
+    set_enterprise_service_override,
     set_gpx_import_service_override,
     set_trip_service_override,
     set_trip_track_service_override,
@@ -22,12 +24,17 @@ pytestmark = pytest.mark.asyncio
 async def test_get_vehicles_builds_filter_and_respects_visibility(
     client,
     overrides,
+    enterprise_service_mock,
     vehicle_service_mock,
 ):
     set_actor_override(overrides, UserRole.manager)
     set_visible_ids_override(overrides, {10, 20})
     set_vehicle_service_override(overrides, vehicle_service_mock)
+    set_enterprise_service_override(overrides, enterprise_service_mock)
     vehicle_service_mock.get.return_value = [vehicle_model(enterprise_id=10)]
+    enterprise_service_mock.get.return_value = [
+        SimpleNamespace(id=10, timezone="Europe/Moscow")
+    ]
 
     response = await client.get(
         "/api/vehicles",
@@ -54,12 +61,25 @@ async def test_get_vehicles_builds_filter_and_respects_visibility(
     assert filter_obj.limit == 10
     assert filter_obj.offset == 5
     assert filter_obj.sort_by == "id"
+    enterprise_filter = enterprise_service_mock.get.await_args.args[0]
+    assert isinstance(enterprise_filter, EnterpriseFilter)
+    assert enterprise_filter.ids == [10]
+    assert enterprise_filter.load_relations is False
 
 
-async def test_vehicle_crud_success(client, overrides, vehicle_service_mock):
+async def test_vehicle_crud_success(
+    client,
+    overrides,
+    enterprise_service_mock,
+    vehicle_service_mock,
+):
     set_actor_override(overrides, UserRole.manager)
     set_visible_ids_override(overrides, {10})
     set_vehicle_service_override(overrides, vehicle_service_mock)
+    set_enterprise_service_override(overrides, enterprise_service_mock)
+    enterprise_service_mock.get.return_value = [
+        SimpleNamespace(id=10, timezone="Europe/Moscow")
+    ]
     vehicle = vehicle_model()
     vehicle_service_mock.get_by_id.return_value = vehicle
     vehicle_service_mock.create.return_value = vehicle

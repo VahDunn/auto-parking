@@ -17,6 +17,17 @@ async def get_vehicle_models(service: VehicleModelService = dep_vehicle_model_se
     return [_vehicle_model_out(model) for model in await service.get_all()]
 
 
+@router.get("/by-name/{name}", response_model=VehicleModelOut)
+async def get_vehicle_model_by_name(
+    name: str,
+    service: VehicleModelService = dep_vehicle_model_service,
+):
+    model = await service.get_by_name(name)
+    if model is None:
+        raise HTTPException(status_code=404, detail="Vehicle model not found")
+    return _vehicle_model_out(model)
+
+
 @router.get("/{id}", response_model=VehicleModelOut)
 async def get_vehicle_model(id: int, service: VehicleModelService = dep_vehicle_model_service):
     model = await service.get_by_id(id)
