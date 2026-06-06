@@ -1,8 +1,9 @@
-from time import perf_counter
+from time import perf_counter, time
 
 from fastapi import FastAPI, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
+from auto_parking.observability.access_log import log_access_request
 from auto_parking.observability.performance import log_http_request
 
 REQUESTS_TOTAL = Counter(
@@ -21,34 +22,41 @@ REQUEST_DURATION_SECONDS = Histogram(
 def setup_metrics(app: FastAPI) -> None:
     @app.middleware("http")
     async def metrics_middleware(request: Request, call_next):
-        if request.url.path == "/metrics":
-            return await call_next(request)
-
         started_at = perf_counter()
+        request.scope["time"] = int(time())
         status_code = 500
+        bytes_sent = 0
 
         try:
             response = await call_next(request)
             status_code = response.status_code
+            bytes_sent = _response_size(response)
             return response
         finally:
             path = _route_path(request)
             duration_seconds = perf_counter() - started_at
-            REQUESTS_TOTAL.labels(
-                method=request.method,
-                path=path,
-                status=str(status_code),
-            ).inc()
-            REQUEST_DURATION_SECONDS.labels(
-                method=request.method,
-                path=path,
-            ).observe(duration_seconds)
-            log_http_request(
-                method=request.method,
-                path=path,
+            log_access_request(
+                request=request,
                 status=status_code,
+                bytes_sent=bytes_sent,
                 duration_seconds=duration_seconds,
             )
+            if request.url.path != "/metrics":
+                REQUESTS_TOTAL.labels(
+                    method=request.method,
+                    path=path,
+                    status=str(status_code),
+                ).inc()
+                REQUEST_DURATION_SECONDS.labels(
+                    method=request.method,
+                    path=path,
+                ).observe(duration_seconds)
+                log_http_request(
+                    method=request.method,
+                    path=path,
+                    status=status_code,
+                    duration_seconds=duration_seconds,
+                )
 
     @app.get("/metrics", include_in_schema=False)
     async def metrics() -> Response:
@@ -61,3 +69,13 @@ def _route_path(request: Request) -> str:
     if isinstance(path, str):
         return path
     return request.url.path
+
+
+def _response_size(response: Response) -> int:
+    raw_size = response.headers.get("content-length")
+    if raw_size is None:
+        return 0
+    try:
+        return int(raw_size)
+    except ValueError:
+        return 0

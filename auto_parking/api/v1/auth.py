@@ -1,22 +1,12 @@
 from fastapi import APIRouter, HTTPException, Response, status
-from pydantic import BaseModel
 
+from auto_parking.api.schemas.auth import LoginRequest, TokenResponse
 from auto_parking.core.security.jwt import create_access_token
 from auto_parking.core.security.passwords import verify_password
 from auto_parking.deps.services import dep_user_service
 from auto_parking.filter import UserFilter
 
 router = APIRouter()
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
 
 
 @router.post("/login", response_model=TokenResponse)

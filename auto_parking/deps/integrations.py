@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from auto_parking.integrations.geocoding.geoapify import GeoapifyReverseGeocoder
 
 if TYPE_CHECKING:
-    from auto_parking.integrations.geocoding.base import ReverseGeocoder
+    from auto_parking.ports.geocoding import ReverseGeocoder
 
 GEOAPIFY_API_KEY = os.getenv("GEOAPIFY_API_KEY", "")
 

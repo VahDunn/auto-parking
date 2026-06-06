@@ -14,7 +14,7 @@ from auto_parking.filter import TripFilter
 
 if TYPE_CHECKING:
     from auto_parking.db.models import Trip, VehicleGpsPoint
-    from auto_parking.integrations.geocoding.base import ReverseGeocoder
+    from auto_parking.ports.geocoding import ReverseGeocoder
     from auto_parking.repo.trip import TripRepository
     from auto_parking.service.notification import NotificationService
 

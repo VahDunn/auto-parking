@@ -4,6 +4,12 @@ from time import perf_counter
 from typing import TYPE_CHECKING
 
 from auto_parking.core.domain.enums import TrackFormat
+from auto_parking.core.domain.models import (
+    GeoJSONFeatureCollectionModel,
+    GeoJSONFeatureModel,
+    GeoJSONGeometryModel,
+    VehicleTrackPointModel,
+)
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
 from auto_parking.observability.performance import log_cache_lookup
 from auto_parking.ports.cache import CacheClient
@@ -23,14 +29,14 @@ class VehicleTrackService:
         self._cache = cache
         self._cache_ttl_seconds = cache_ttl_seconds
 
-    async def get_payload(
+    async def get_track(
         self,
         vehicle_id: int,
         date_from: datetime,
         date_to: datetime,
         format: TrackFormat,
         enterprise_timezone: str,
-    ) -> str:
+    ) -> list[VehicleTrackPointModel] | GeoJSONFeatureCollectionModel:
         date_from_utc = to_utc(date_from)
         date_to_utc = to_utc(date_to)
         cache_key = self._cache_key(
@@ -41,7 +47,7 @@ class VehicleTrackService:
             enterprise_timezone,
         )
 
-        cached = await self._get_cached_payload(cache_key)
+        cached = await self._get_cached_track(cache_key, format)
         if cached is not None:
             return cached
 
@@ -50,16 +56,20 @@ class VehicleTrackService:
             date_from_utc=date_from_utc,
             date_to_utc=date_to_utc,
         )
-        payload = self._build_payload(
+        track = self._build_track(
             rows,
             vehicle_id=vehicle_id,
             format=format,
             enterprise_timezone=enterprise_timezone,
         )
-        await self._cache_payload(cache_key, payload)
-        return payload
+        await self._cache_track(cache_key, track)
+        return track
 
-    async def _get_cached_payload(self, key: str) -> str | None:
+    async def _get_cached_track(
+        self,
+        key: str,
+        format: TrackFormat,
+    ) -> list[VehicleTrackPointModel] | GeoJSONFeatureCollectionModel | None:
         if self._cache is None:
             return None
 
@@ -71,7 +81,9 @@ class VehicleTrackService:
                 result="hit" if cached is not None else "miss",
                 duration_seconds=perf_counter() - started_at,
             )
-            return cached
+            if cached is None:
+                return None
+            return self._track_from_cache(cached, format)
         except Exception:
             log_cache_lookup(
                 operation="vehicle_track_payload",
@@ -80,14 +92,18 @@ class VehicleTrackService:
             )
             return None
 
-    async def _cache_payload(self, key: str, payload: str) -> None:
+    async def _cache_track(
+        self,
+        key: str,
+        track: list[VehicleTrackPointModel] | GeoJSONFeatureCollectionModel,
+    ) -> None:
         if self._cache is None:
             return
 
         try:
             await self._cache.set_text(
                 key,
-                payload,
+                self._track_to_cache(track),
                 ttl_seconds=self._cache_ttl_seconds,
             )
         except Exception:
@@ -102,63 +118,107 @@ class VehicleTrackService:
         enterprise_timezone: str,
     ) -> str:
         return (
-            f"vehicle-track-response:{vehicle_id}:{format.value}:{enterprise_timezone}:"
+            f"vehicle-track-domain:{vehicle_id}:{format.value}:{enterprise_timezone}:"
             f"{date_from_utc.isoformat()}:{date_to_utc.isoformat()}"
         )
 
     @staticmethod
-    def _build_payload(
+    def _build_track(
         rows,
         *,
         vehicle_id: int,
         format: TrackFormat,
         enterprise_timezone: str,
-    ) -> str:
+    ) -> list[VehicleTrackPointModel] | GeoJSONFeatureCollectionModel:
         if format == TrackFormat.geojson:
-            return json.dumps(
-                {
-                    "type": "FeatureCollection",
-                    "features": [
-                        {
-                            "type": "Feature",
-                            "geometry": {
-                                "type": "Point",
-                                "coordinates": [row.longitude, row.latitude],
-                            },
-                            "properties": {
-                                "vehicle_id": vehicle_id,
-                                "recorded_at_utc": row.recorded_at_utc.isoformat(),
-                                "recorded_at_enterprise": to_enterprise_tz(
-                                    row.recorded_at_utc,
-                                    enterprise_timezone,
-                                ).isoformat(),
-                                "enterprise_timezone": enterprise_timezone,
-                            },
-                        }
-                        for row in rows
-                    ],
-                }
+            return GeoJSONFeatureCollectionModel(
+                type="FeatureCollection",
+                features=[
+                    GeoJSONFeatureModel(
+                        type="Feature",
+                        geometry=GeoJSONGeometryModel(
+                            type="Point",
+                            coordinates=[row.longitude, row.latitude],
+                        ),
+                        properties={
+                            "vehicle_id": vehicle_id,
+                            "recorded_at_utc": row.recorded_at_utc.isoformat(),
+                            "recorded_at_enterprise": to_enterprise_tz(
+                                row.recorded_at_utc,
+                                enterprise_timezone,
+                            ).isoformat(),
+                            "enterprise_timezone": enterprise_timezone,
+                        },
+                    )
+                    for row in rows
+                ],
             )
+
+        return [
+            VehicleTrackPointModel(
+                id=vehicle_id,
+                trip_id=None,
+                recorded_at_utc=row.recorded_at_utc,
+                recorded_at_enterprise=to_enterprise_tz(
+                    row.recorded_at_utc,
+                    enterprise_timezone,
+                ),
+                latitude=row.latitude,
+                longitude=row.longitude,
+            )
+            for row in rows
+        ]
+
+    @staticmethod
+    def _track_to_cache(
+        track: list[VehicleTrackPointModel] | GeoJSONFeatureCollectionModel,
+    ) -> str:
+        if isinstance(track, GeoJSONFeatureCollectionModel):
+            return json.dumps(track.to_dict())
 
         return json.dumps(
             [
                 {
-                    "id": vehicle_id,
-                    "trip_id": None,
-                    "recorded_at_utc": VehicleTrackService._api_datetime(row.recorded_at_utc),
-                    "recorded_at_enterprise": VehicleTrackService._api_datetime(
-                        to_enterprise_tz(
-                            row.recorded_at_utc,
-                            enterprise_timezone,
-                        )
-                    ),
-                    "latitude": row.latitude,
-                    "longitude": row.longitude,
+                    **point.to_dict(),
+                    "recorded_at_utc": point.recorded_at_utc.isoformat(),
+                    "recorded_at_enterprise": point.recorded_at_enterprise.isoformat(),
                 }
-                for row in rows
+                for point in track
             ]
         )
 
     @staticmethod
-    def _api_datetime(value: datetime) -> str:
-        return value.isoformat().replace("+00:00", "Z")
+    def _track_from_cache(
+        value: str,
+        format: TrackFormat,
+    ) -> list[VehicleTrackPointModel] | GeoJSONFeatureCollectionModel:
+        data = json.loads(value)
+        if format == TrackFormat.geojson:
+            return GeoJSONFeatureCollectionModel(
+                type=data["type"],
+                features=[
+                    GeoJSONFeatureModel(
+                        type=feature["type"],
+                        geometry=GeoJSONGeometryModel(
+                            type=feature["geometry"]["type"],
+                            coordinates=feature["geometry"]["coordinates"],
+                        ),
+                        properties=feature["properties"],
+                    )
+                    for feature in data["features"]
+                ],
+            )
+
+        return [
+            VehicleTrackPointModel(
+                id=point["id"],
+                trip_id=point["trip_id"],
+                recorded_at_utc=datetime.fromisoformat(point["recorded_at_utc"]),
+                recorded_at_enterprise=datetime.fromisoformat(
+                    point["recorded_at_enterprise"]
+                ),
+                latitude=point["latitude"],
+                longitude=point["longitude"],
+            )
+            for point in data
+        ]

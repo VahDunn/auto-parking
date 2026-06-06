@@ -6,7 +6,9 @@ from auto_parking.core.config import settings
 
 def get_logging_config():
     performance_log_path = Path(settings.performance_log_path)
+    app_access_log_path = Path(settings.app_access_log_path)
     performance_log_path.parent.mkdir(parents=True, exist_ok=True)
+    app_access_log_path.parent.mkdir(parents=True, exist_ok=True)
 
     return {
         "version": 1,
@@ -17,6 +19,9 @@ def get_logging_config():
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
             "performance": {
+                "format": "%(message)s",
+            },
+            "access": {
                 "format": "%(message)s",
             },
         },
@@ -32,6 +37,14 @@ def get_logging_config():
                 "backupCount": settings.performance_log_backup_count,
                 "encoding": "utf-8",
                 "formatter": "performance",
+            },
+            "app_access": {
+                "class": "logging.handlers.RotatingFileHandler",
+                "filename": str(app_access_log_path),
+                "maxBytes": settings.performance_log_max_bytes,
+                "backupCount": settings.performance_log_backup_count,
+                "encoding": "utf-8",
+                "formatter": "access",
             },
         },
         "root": {
@@ -67,6 +80,11 @@ def get_logging_config():
             "auto_parking.performance": {
                 "level": "INFO",
                 "handlers": ["performance"],
+                "propagate": False,
+            },
+            "auto_parking.access": {
+                "level": "INFO",
+                "handlers": ["app_access"],
                 "propagate": False,
             },
         },

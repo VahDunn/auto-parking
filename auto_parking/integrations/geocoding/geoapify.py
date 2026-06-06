@@ -2,7 +2,7 @@ from typing import Any, override
 
 import httpx
 
-from auto_parking.integrations.geocoding.base import ReverseGeocoder
+from auto_parking.ports.geocoding import ReverseGeocoder
 
 
 class GeoapifyReverseGeocoder(ReverseGeocoder):

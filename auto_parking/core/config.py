@@ -21,6 +21,10 @@ class Settings(BaseSettings):
         default="logs/performance.jsonl",
         alias="PERFORMANCE_LOG_PATH",
     )
+    app_access_log_path: str = Field(
+        default="logs/app-access.log",
+        alias="APP_ACCESS_LOG_PATH",
+    )
     performance_log_max_bytes: int = Field(
         default=10 * 1024 * 1024,
         alias="PERFORMANCE_LOG_MAX_BYTES",

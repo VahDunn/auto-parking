@@ -52,6 +52,7 @@ services:
       VEHICLE_MODEL_CACHE_TTL_SECONDS: ${VEHICLE_MODEL_CACHE_TTL_SECONDS:-3600}
       VEHICLE_TRACK_CACHE_TTL_SECONDS: ${VEHICLE_TRACK_CACHE_TTL_SECONDS:-300}
       PERFORMANCE_LOG_PATH: /app/logs/performance.jsonl
+      APP_ACCESS_LOG_PATH: /app/logs/app-access.log
     volumes:
       - ./logs:/app/logs
     command: >

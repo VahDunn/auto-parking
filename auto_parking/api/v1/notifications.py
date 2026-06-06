@@ -87,7 +87,7 @@ async def mark_all_notifications_read(
 
 @router.websocket("/ws")
 async def notifications_websocket(websocket: WebSocket):
-    token = websocket.query_params.get("token")
+    token = websocket.cookies.get("access_token")
     if not token:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
