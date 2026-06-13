@@ -21,6 +21,7 @@ loginForm.addEventListener("submit", async (e) => {
         await loadReports();
         await loadNotifications();
         startNotificationsRealtime();
+        startLiveTracking();
     } catch (error) {
         showMessage(messageBox, "danger", error.message);
     }

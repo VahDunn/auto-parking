@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auto_parking.db.engine import AsyncSessionLocal
 from auto_parking.db.models import Enterprise, Trip, Vehicle, VehicleGpsPoint
+from auto_parking.realtime.gps import create_gps_redis, publish_gps_point
 
 app = typer.Typer(help="Утилита генерации GPS-треков и поездок для существующих машин")
 
@@ -601,6 +602,8 @@ async def generate_live_track(
     if seed is not None:
         random.seed(seed)
 
+    gps_redis = create_gps_redis()
+
     async with AsyncSessionLocal() as db:
         vehicle = await _get_vehicle_with_enterprise(db, vehicle_id)
         enterprise = vehicle.enterprise
@@ -670,6 +673,15 @@ async def generate_live_track(
                     lat=lat,
                 )
                 inserted_points.append(point)
+                await publish_gps_point(
+                    gps_redis,
+                    vehicle_id=vehicle_id,
+                    vehicle_number=vehicle.vehicle_number,
+                    enterprise_id=enterprise.id,
+                    recorded_at_utc=now_utc,
+                    latitude=lat,
+                    longitude=lon,
+                )
 
                 typer.echo(
                     f"[route {route_number}][{idx}/{len(resampled_route)}] "
@@ -707,12 +719,15 @@ async def generate_live_track(
             if not loop and routes_count is not None:
                 continue
 
+    if gps_redis is not None:
+        await gps_redis.aclose()
     typer.echo("Генерация live-трека и поездок завершена")
 
 
 async def generate_enterprise_live_tracks(
     *,
     enterprise_id: int,
+    vehicles_count: int | None,
     center_lat: float | None,
     center_lon: float | None,
     radius_km: float,
@@ -737,9 +752,22 @@ async def generate_enterprise_live_tracks(
         raise ValueError("step_jitter_m не может быть отрицательным")
     if routes_count is not None and routes_count <= 0:
         raise ValueError("routes_count должен быть больше 0")
+    if vehicles_count is not None and vehicles_count <= 0:
+        raise ValueError("vehicles_count должен быть больше 0")
 
     async with AsyncSessionLocal() as db:
         vehicle_ids = await _get_vehicle_ids_by_enterprise(db, enterprise_id)
+        if vehicles_count is not None:
+            vehicle_ids = vehicle_ids[:vehicles_count]
+        vehicle_numbers = dict(
+            (
+                await db.execute(
+                    select(Vehicle.id, Vehicle.vehicle_number).where(
+                        Vehicle.id.in_(vehicle_ids)
+                    )
+                )
+            ).all()
+        )
 
         if clear_before:
             await db.execute(delete(Trip).where(Trip.vehicle_id.in_(vehicle_ids)))
@@ -747,6 +775,8 @@ async def generate_enterprise_live_tracks(
                 delete(VehicleGpsPoint).where(VehicleGpsPoint.vehicle_id.in_(vehicle_ids))
             )
             await db.commit()
+
+    gps_redis = create_gps_redis()
 
     typer.echo(
         f"Запуск live-генерации для enterprise_id={enterprise_id}. "
@@ -788,7 +818,9 @@ async def generate_enterprise_live_tracks(
                 break
 
             now_utc = datetime.now(UTC)
-            pending_insertions: list[tuple[VehicleRouteState, VehicleGpsPoint]] = []
+            pending_insertions: list[
+                tuple[VehicleRouteState, VehicleGpsPoint, float, float]
+            ] = []
 
             for i, state in enumerate(active_states):
                 if _is_route_limit_reached(state.completed_routes, routes_count):
@@ -832,16 +864,18 @@ async def generate_enterprise_live_tracks(
                             lon=lon,
                             lat=lat,
                         ),
+                        lon,
+                        lat,
                     )
                 )
 
             async with AsyncSessionLocal() as db:
-                points = [point for _, point in pending_insertions]
+                points = [point for _, point, _, _ in pending_insertions]
                 await _insert_track_points_batch(db, points)
 
                 completed_trips: list[Trip] = []
 
-                for state, point in pending_insertions:
+                for state, point, _, _ in pending_insertions:
                     if state.current_trip_start_point_id is None:
                         state.current_trip_start_point_id = point.id
                         state.current_trip_started_at_utc = point.recorded_at_utc
@@ -867,10 +901,21 @@ async def generate_enterprise_live_tracks(
 
                 await _insert_trips_batch(db, completed_trips)
 
+            for state, point, lon, lat in pending_insertions:
+                await publish_gps_point(
+                    gps_redis,
+                    vehicle_id=state.vehicle_id,
+                    vehicle_number=vehicle_numbers[state.vehicle_id],
+                    enterprise_id=enterprise_id,
+                    recorded_at_utc=point.recorded_at_utc,
+                    latitude=lat,
+                    longitude=lon,
+                )
+
             if pending_insertions:
                 created_trips = sum(
                     1
-                    for state, _ in pending_insertions
+                    for state, _, _, _ in pending_insertions
                     if state.point_index >= len(state.route_points)
                 )
                 typer.echo(
@@ -890,6 +935,8 @@ async def generate_enterprise_live_tracks(
     except KeyboardInterrupt:
         typer.echo("Остановка генерации enterprise...")
 
+    if gps_redis is not None:
+        await gps_redis.aclose()
     typer.echo("Генерация enterprise-треков и поездок завершена")
 
 
@@ -997,6 +1044,10 @@ def track_generate_enterprise_live(
         int,
         typer.Option("--enterprise-id", help="ID предприятия"),
     ],
+    vehicles_count: Annotated[
+        int | None,
+        typer.Option("--vehicles-count", help="Количество машин для генерации"),
+    ] = None,
     radius_km: Annotated[
         float,
         typer.Option("--radius-km", help="Радиус зоны генерации в километрах"),
@@ -1050,6 +1101,7 @@ def track_generate_enterprise_live(
     asyncio.run(
         generate_enterprise_live_tracks(
             enterprise_id=enterprise_id,
+            vehicles_count=vehicles_count,
             center_lat=center_lat,
             center_lon=center_lon,
             radius_km=radius_km,

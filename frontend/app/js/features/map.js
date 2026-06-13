@@ -43,6 +43,47 @@ function clearMapLayers() {
     leafletLayers.forEach(layer => leafletMap.removeLayer(layer));
     leafletLayers = [];
 }
+
+function clearLiveVehicleMarkers() {
+    if (!leafletMap) {
+        liveVehicleMarkers.clear();
+        return;
+    }
+
+    liveVehicleMarkers.forEach(marker => leafletMap.removeLayer(marker));
+    liveVehicleMarkers.clear();
+}
+
+function updateLiveVehicleMarker(point) {
+    if (!selectedEnterprise || Number(point.enterprise_id) !== Number(selectedEnterprise.id)) {
+        return;
+    }
+    if (!initMapIfNeeded()) {
+        return;
+    }
+
+    const latlng = [point.latitude, point.longitude];
+    let marker = liveVehicleMarkers.get(point.vehicle_id);
+    const label = point.vehicle_number;
+
+    if (!marker) {
+        const firstLiveMarker = liveVehicleMarkers.size === 0;
+        marker = L.circleMarker(latlng, {
+            radius: 9,
+            color: "#ffffff",
+            weight: 3,
+            fillColor: getTrackColor(liveVehicleMarkers.size),
+            fillOpacity: 1
+        }).addTo(leafletMap);
+        marker.bindTooltip(label, {permanent: true, direction: "top"});
+        liveVehicleMarkers.set(point.vehicle_id, marker);
+        if (firstLiveMarker) {
+            leafletMap.setView(latlng, 14);
+        }
+    } else {
+        marker.setLatLng(latlng);
+    }
+}
 function drawGroupedGeojsonTracks(groupedTracks) {
     if (!initMapIfNeeded()) {
         renderTrackJson("Карта недоступна", groupedTracks);

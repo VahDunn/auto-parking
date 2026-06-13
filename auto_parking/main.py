@@ -10,14 +10,15 @@ from auto_parking.db.admin import setup_admin
 from auto_parking.db.engine import engine
 from auto_parking.db.events import register_listeners
 from auto_parking.integrations.monitoring import setup_metrics
+from auto_parking.realtime.gps import gps_realtime_hub
 
 
 @asynccontextmanager
 async def lifespan(app_main: FastAPI):
     register_listeners()
-    # startup
+    await gps_realtime_hub.start()
     yield
-    # shutdown
+    await gps_realtime_hub.stop()
     await engine.dispose()
 
 

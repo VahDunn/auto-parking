@@ -4,7 +4,7 @@
 
 Для проекта добавлена CLI-утилита на Typer:
 
-    auto_parking/minor_utilites/track_generator.py
+    auto_parking/minor_utilities/track_generator.py
 
 Она умеет: - генерировать live-трек для одной машины; - генерировать
 live-треки для всех машин предприятия; - очищать старые точки.
@@ -19,15 +19,15 @@ live-треки для всех машин предприятия; - очища�
 
 Удалить все точки:
 
-    docker-compose exec auto-parking python -m auto_parking.minor_utilites.track_generator track-clear --all
+    docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-clear --all
 
 Удалить точки одной машины:
 
-    docker-compose exec auto-parking python -m auto_parking.minor_utilites.track_generator track-clear --vehicle-id 3214
+    docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-clear --vehicle-id 3214
 
 ## Генерация трека для одной машины
 
-    docker-compose exec auto-parking python -m auto_parking.minor_utilites.track_generator track-generate-live \
+    docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-generate-live \
       --vehicle-id 3214 \
       --radius-km 3 \
       --track-length-km 2 \
@@ -36,7 +36,7 @@ live-треки для всех машин предприятия; - очища�
 
 С бесконечной генерацией:
 
-    docker-compose exec auto-parking python -m auto_parking.minor_utilites.track_generator track-generate-live \
+    docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-generate-live \
       --vehicle-id 3214 \
       --radius-km 3 \
       --track-length-km 2 \
@@ -46,12 +46,25 @@ live-треки для всех машин предприятия; - очища�
 
 ## Генерация для всего предприятия
 
-    docker-compose exec auto-parking python -m auto_parking.minor_utilites.track_generator track-generate-enterprise-live \
+    docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-generate-enterprise-live \
       --enterprise-id 2 \
       --radius-km 3 \
       --track-length-km 2 \
       --interval-sec 5 \
       --clear-before
+
+## Просмотр движения в реальном времени
+
+1. Открыть приложение по адресу `http://localhost`, войти и выбрать предприятие.
+2. Убедиться, что над картой показано `Live: подключено`.
+3. В отдельном терминале запустить генерацию:
+
+       docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-generate-enterprise-live \
+         --enterprise-id 2 \
+         --vehicles-count 10 \
+         --interval-sec 1
+
+Новые GPS-точки публикуются через Redis, проходят через RxPY pipeline и приходят на карту по WebSocket. Для каждой машины на карте создается отдельный движущийся маркер.
 
 ## Проверка через API
 

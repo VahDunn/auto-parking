@@ -104,6 +104,7 @@ async function loadVehiclesForEnterprise(enterprise) {
 }
 
 async function handleEnterpriseSelect(enterprise) {
+    clearLiveVehicleMarkers();
     selectedEnterprise = enterprise;
     selectedVehicle = null;
     selectedVehicleTrips = [];

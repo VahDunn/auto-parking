@@ -40,6 +40,9 @@ const notificationList = document.getElementById("notificationList");
 let accessToken = null;
 let notificationsState = [];
 let notificationSocket = null;
+let liveTrackingSocket = null;
+let liveTrackingReconnectTimer = null;
+let liveTrackingPingTimer = null;
 let selectedReport = null;
 let reportsState = [];
 let selectedImportFile = null;
@@ -58,3 +61,4 @@ const vehiclePageSize = 10;
 
 let leafletMap = null;
 let leafletLayers = [];
+let liveVehicleMarkers = new Map();
