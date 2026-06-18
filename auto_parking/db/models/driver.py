@@ -19,6 +19,7 @@ class Driver(BaseORM):
             ondelete="RESTRICT",
         ),
         nullable=False,
+        index=True,
     )
     enterprise: Mapped["Enterprise"] = relationship(
         back_populates="drivers",

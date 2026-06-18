@@ -25,14 +25,6 @@ def ensure_aware_datetime(value: datetime, field_name: str) -> None:
         )
 
 
-def ensure_enterprise_visible(
-    enterprise_id: int,
-    visible_enterprise_ids: set[int] | None,
-) -> None:
-    if visible_enterprise_ids is not None and enterprise_id not in visible_enterprise_ids:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-
-
 def ensure_valid_date_range(date_from: datetime, date_to: datetime) -> None:
     if date_to < date_from:
         raise HTTPException(

@@ -60,3 +60,16 @@ async def test_report_service_get_trips_uses_trip_filter():
     assert filter_obj.vehicle_id == 1
     assert filter_obj.limit == 1000
     assert filter_obj.sort_by == "started_at_utc"
+    assert filter_obj.load_relations is True
+
+
+async def test_activity_report_does_not_load_trip_relations():
+    service, _, trip_repo, _ = service_with_mocks()
+    trip_repo.get.return_value = []
+    report = payload()
+    report.report_type = ReportType.vehicle_activity
+
+    await service._get_trips(report)
+
+    filter_obj = trip_repo.get.await_args.args[0]
+    assert filter_obj.load_relations is False

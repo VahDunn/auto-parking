@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload
 
-from auto_parking.db.models import Enterprise, User
+from auto_parking.db.models import Enterprise, User, user_enterprise
 
 if TYPE_CHECKING:
     from auto_parking.filter import UserFilter
@@ -36,3 +36,16 @@ class UserRepository:
     async def get_by_id(self, manager_id: int) -> User | None:
         result = await self.db.execute(select(User).where(User.id == manager_id))
         return result.scalar_one_or_none()
+
+    async def get_visible_enterprise_ids(self, user_id: int) -> set[int] | None:
+        stmt = (
+            select(user_enterprise.c.enterprise_id)
+            .select_from(User)
+            .outerjoin(user_enterprise, User.id == user_enterprise.c.user_id)
+            .where(User.id == user_id)
+        )
+        result = await self.db.execute(stmt)
+        enterprise_ids = result.scalars().all()
+        if not enterprise_ids:
+            return None
+        return {enterprise_id for enterprise_id in enterprise_ids if enterprise_id is not None}

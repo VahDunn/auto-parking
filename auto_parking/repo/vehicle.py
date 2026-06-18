@@ -43,7 +43,8 @@ class VehicleRepository:
             stmt = stmt.where(Vehicle.id.in_(filter_obj.id))
 
         if filter_obj.vehicle_number_prefix:
-            stmt = stmt.where(Vehicle.vehicle_number.ilike(f"{filter_obj.vehicle_number_prefix}%"))
+            vehicle_number_prefix = filter_obj.vehicle_number_prefix.strip().upper()
+            stmt = stmt.where(Vehicle.vehicle_number.like(f"{vehicle_number_prefix}%"))
 
         if filter_obj.enterprise_ids:
             stmt = stmt.where(Vehicle.enterprise_id.in_(filter_obj.enterprise_ids))

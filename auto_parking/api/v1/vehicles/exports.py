@@ -7,12 +7,12 @@ from auto_parking.api.v1.vehicles.common import (
     dep_actor_guard,
     dep_visible_ids,
     ensure_aware_datetime,
-    ensure_enterprise_visible,
     ensure_valid_date_range,
     export_response,
 )
 from auto_parking.core.domain.enums.import_export_format import ExportFormat
 from auto_parking.deps.services import dep_export_service, dep_vehicle_service
+from auto_parking.deps.visibility import ensure_enterprise_visible
 from auto_parking.service.vehicle import VehicleService
 
 if TYPE_CHECKING:

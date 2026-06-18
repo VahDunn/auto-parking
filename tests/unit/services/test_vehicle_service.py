@@ -56,7 +56,7 @@ async def test_vehicle_service_create_persists_domain_model():
             id=None,
             price=1000,
             mileage=500,
-            vehicle_number="А123ВС77",
+            vehicle_number=" а123вс77 ",
             owners_count=1,
             accident_number=0,
             manufacture_year=2020,
@@ -68,6 +68,7 @@ async def test_vehicle_service_create_persists_domain_model():
     )
 
     data = repo.create.await_args.args[0]
+    assert data["vehicle_number"] == "А123ВС77"
     assert data["purchased_at_utc"] == datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
 
 

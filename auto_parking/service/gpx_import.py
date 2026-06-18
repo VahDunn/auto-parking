@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from xml.etree import ElementTree
 
 from auto_parking.core.domain.models import TripModel
-from auto_parking.filter import TripFilter
+from auto_parking.filter import TripFilter, VehicleTrackFilter
 
 if TYPE_CHECKING:
     from auto_parking.repo.trip import TripRepository
@@ -60,6 +60,7 @@ class GpxImportService:
                 started_to=ended_at_utc,
                 limit=None,
                 offset=None,
+                load_relations=False,
             )
         )
 
@@ -77,9 +78,12 @@ class GpxImportService:
         if overlapping:
             raise ValueError("GPX не может перекрывать существующие поездки")
 
-        existing_points = await self._track_repo.get_points_by_intervals(
-            vehicle_id=vehicle_id,
-            intervals=[(started_at_utc, ended_at_utc)],
+        existing_points = await self._track_repo.get(
+            VehicleTrackFilter(
+                vehicle_id=vehicle_id,
+                recorded_from=started_at_utc,
+                recorded_to=ended_at_utc,
+            )
         )
 
         point_ids_by_key = {
@@ -102,7 +106,7 @@ class GpxImportService:
             not in point_ids_by_key
         ]
 
-        created_points = await self._track_repo.create_points_bulk(
+        created_points = await self._track_repo.create_many(
             [
                 {
                     "vehicle_id": vehicle_id,

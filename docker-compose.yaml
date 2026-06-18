@@ -61,6 +61,7 @@ services:
       uvicorn auto_parking.main:app
       --host 0.0.0.0
       --port 8000
+      --workers 5
     expose:
       - "8000"
 

@@ -11,6 +11,7 @@ from auto_parking.core.domain.models import (
     VehicleTrackPointModel,
 )
 from auto_parking.core.utils.datetime import to_enterprise_tz, to_utc
+from auto_parking.filter import VehicleTrackFilter
 from auto_parking.observability.performance import log_cache_lookup
 from auto_parking.ports.cache import CacheClient
 
@@ -51,10 +52,12 @@ class VehicleTrackService:
         if cached is not None:
             return cached
 
-        rows = await self._track_repo.get_coordinates(
-            vehicle_id=vehicle_id,
-            date_from_utc=date_from_utc,
-            date_to_utc=date_to_utc,
+        rows = await self._track_repo.get(
+            VehicleTrackFilter(
+                vehicle_id=vehicle_id,
+                recorded_from=date_from_utc,
+                recorded_to=date_to_utc,
+            )
         )
         track = self._build_track(
             rows,
@@ -156,7 +159,7 @@ class VehicleTrackService:
 
         return [
             VehicleTrackPointModel(
-                id=vehicle_id,
+                id=row.id,
                 trip_id=None,
                 recorded_at_utc=row.recorded_at_utc,
                 recorded_at_enterprise=to_enterprise_tz(

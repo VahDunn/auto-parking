@@ -5,6 +5,7 @@ from auto_parking.filter.trip import TripFilter
 from auto_parking.filter.user import UserFilter
 from auto_parking.filter.vehicle import VehicleFilter
 from auto_parking.filter.vehicle_model import VehicleModelFilter
+from auto_parking.filter.vehicle_track import VehicleTrackFilter
 
 __all__ = [
     "BaseFilter",
@@ -14,4 +15,5 @@ __all__ = [
     "UserFilter",
     "VehicleFilter",
     "VehicleModelFilter",
+    "VehicleTrackFilter",
 ]

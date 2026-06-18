@@ -157,6 +157,7 @@ class ReportService:
                 ended_to=date_to_utc,
                 limit=1000,
                 sort_by="started_at_utc",
+                load_relations=report_model.report_type != ReportType.vehicle_activity,
             )
         )
 

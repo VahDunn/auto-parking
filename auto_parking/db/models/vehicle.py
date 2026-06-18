@@ -13,6 +13,14 @@ if TYPE_CHECKING:
 
 class Vehicle(BaseORM):
     __tablename__ = "vehicle"
+    __table_args__ = (
+        sa.Index(
+            "ix_vehicle_vehicle_number_prefix",
+            "vehicle_number",
+            postgresql_ops={"vehicle_number": "text_pattern_ops"},
+        ),
+    )
+
     price: Mapped[int] = mapped_column(sa.BigInteger)
     mileage: Mapped[int] = mapped_column(sa.BigInteger)
     vehicle_number: Mapped[str] = mapped_column(sa.String, unique=True)

@@ -11,6 +11,13 @@ if TYPE_CHECKING:
 
 class VehicleDriverAssignment(Base):
     __tablename__ = "vehicle_driver_assignment"
+    __table_args__ = (
+        sa.Index(
+            "ix_vehicle_driver_assignment_driver_vehicle",
+            "driver_id",
+            "vehicle_id",
+        ),
+    )
 
     vehicle_id: Mapped[int] = mapped_column(
         sa.ForeignKey("vehicle.id", ondelete="CASCADE"),

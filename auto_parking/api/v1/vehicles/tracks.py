@@ -12,7 +12,6 @@ from auto_parking.api.v1.vehicles.common import (
     dep_actor_guard,
     dep_visible_ids,
     ensure_aware_datetime,
-    ensure_enterprise_visible,
     ensure_valid_date_range,
     enterprise_timezones,
     track_response_out,
@@ -24,6 +23,7 @@ from auto_parking.deps.services import (
     dep_vehicle_service,
     dep_vehicle_track_service,
 )
+from auto_parking.deps.visibility import ensure_enterprise_visible
 from auto_parking.filter import EnterpriseFilter
 from auto_parking.service.enterprise import EnterpriseService
 from auto_parking.service.trip_track import TripTrackService
@@ -84,6 +84,7 @@ async def get_vehicle_track_by_trips(
     format: TrackFormat = Query(TrackFormat.json),
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     vehicle_service: VehicleService = dep_vehicle_service,
+    enterprise_service: EnterpriseService = dep_enterprise_service,
     service: TripTrackService = dep_trip_track_service,
 ):
     ensure_aware_datetime(date_from, "date_from")
@@ -95,6 +96,11 @@ async def get_vehicle_track_by_trips(
         raise HTTPException(status_code=404, detail="Vehicle not found")
 
     ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
+    timezone_by_enterprise_id = enterprise_timezones(
+        await enterprise_service.get(
+            EnterpriseFilter(ids=[vehicle.enterprise_id], load_relations=False)
+        )
+    )
 
     return [
         trip_track_group_out(group)
@@ -103,5 +109,6 @@ async def get_vehicle_track_by_trips(
             date_from=date_from,
             date_to=date_to,
             format=format,
+            enterprise_timezone=timezone_by_enterprise_id.get(vehicle.enterprise_id) or "UTC",
         )
     ]

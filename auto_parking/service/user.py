@@ -17,3 +17,6 @@ class UserService:
 
     async def get_by_id(self, id: int) -> "User | None":
         return await self._repo.get_by_id(id)
+
+    async def get_visible_enterprise_ids(self, user_id: int) -> set[int] | None:
+        return await self._repo.get_visible_enterprise_ids(user_id)

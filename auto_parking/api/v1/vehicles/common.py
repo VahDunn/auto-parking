@@ -23,9 +23,12 @@ from auto_parking.core.domain.models import (
     VehicleModel,
     VehicleTrackPointModel,
 )
-from auto_parking.deps.access import require_manager_or_higher
-from auto_parking.deps.visibility import get_visible_enterprise_ids
 from auto_parking.core.utils.datetime import to_enterprise_tz
+from auto_parking.deps.access import require_manager_or_higher
+from auto_parking.deps.visibility import (
+    ensure_enterprise_visible,
+    get_visible_enterprise_ids,
+)
 
 dep_actor_guard = Depends(require_manager_or_higher)
 dep_visible_ids = Depends(get_visible_enterprise_ids)
@@ -108,27 +111,8 @@ def parse_int_list(value: str | None) -> list[int] | None:
     return [int(item.strip()) for item in value.split(",") if item.strip()]
 
 
-def apply_enterprise_visibility(
-    enterprise_ids: list[int] | None,
-    visible_enterprise_ids: set[int] | None,
-) -> list[int] | None:
-    if visible_enterprise_ids is None:
-        return enterprise_ids
-    if enterprise_ids is None:
-        return list(visible_enterprise_ids)
-    return list(set(enterprise_ids) & visible_enterprise_ids)
-
-
 def ensure_vehicle_visible(vehicle: VehicleModel, visible_enterprise_ids: set[int] | None) -> None:
     ensure_enterprise_visible(vehicle.enterprise_id, visible_enterprise_ids)
-
-
-def ensure_enterprise_visible(
-    enterprise_id: int,
-    visible_enterprise_ids: set[int] | None,
-) -> None:
-    if visible_enterprise_ids is not None and enterprise_id not in visible_enterprise_ids:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
 
 def ensure_aware_datetime(value: datetime, field_name: str) -> None:

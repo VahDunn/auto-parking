@@ -1,107 +1,74 @@
 from collections.abc import Sequence
-from datetime import datetime
 from typing import Any
 
 from geoalchemy2.elements import WKTElement
 from sqlalchemy import Row, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auto_parking.db.models import VehicleGpsPoint
+from auto_parking.db.models import Trip, VehicleGpsPoint
+from auto_parking.filter import VehicleTrackFilter
 
 
 class VehicleTrackRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_points(
-        self,
-        vehicle_id: int,
-        date_from_utc: datetime,
-        date_to_utc: datetime,
-    ) -> Sequence[Any]:
-        stmt = (
-            select(
-                VehicleGpsPoint.recorded_at_utc,
-                func.ST_Y(VehicleGpsPoint.position).label("latitude"),
-                func.ST_X(VehicleGpsPoint.position).label("longitude"),
-                func.ST_AsGeoJSON(VehicleGpsPoint.position).label("geojson"),
-            )
-            .where(VehicleGpsPoint.vehicle_id == vehicle_id)
-            .where(VehicleGpsPoint.recorded_at_utc >= date_from_utc)
-            .where(VehicleGpsPoint.recorded_at_utc <= date_to_utc)
-            .order_by(VehicleGpsPoint.recorded_at_utc.asc())
+    async def get(self, filter_obj: VehicleTrackFilter) -> Sequence[Row[Any]]:
+        stmt = select(
+            VehicleGpsPoint.id,
+            VehicleGpsPoint.vehicle_id,
+            VehicleGpsPoint.recorded_at_utc,
+            func.ST_Y(VehicleGpsPoint.position).label("latitude"),
+            func.ST_X(VehicleGpsPoint.position).label("longitude"),
         )
 
-        result = await self.db.execute(stmt)
-        return result.all()
+        if filter_obj.vehicle_id is not None:
+            stmt = stmt.where(VehicleGpsPoint.vehicle_id == filter_obj.vehicle_id)
+        if filter_obj.vehicle_ids:
+            stmt = stmt.where(VehicleGpsPoint.vehicle_id.in_(filter_obj.vehicle_ids))
+        if filter_obj.recorded_from is not None:
+            stmt = stmt.where(VehicleGpsPoint.recorded_at_utc >= filter_obj.recorded_from)
+        if filter_obj.recorded_to is not None:
+            stmt = stmt.where(VehicleGpsPoint.recorded_at_utc <= filter_obj.recorded_to)
+        if filter_obj.intervals is not None:
+            if not filter_obj.intervals:
+                return []
+            stmt = stmt.where(
+                or_(
+                    *(
+                        and_(
+                            VehicleGpsPoint.recorded_at_utc >= started_at_utc,
+                            VehicleGpsPoint.recorded_at_utc <= ended_at_utc,
+                        )
+                        for started_at_utc, ended_at_utc in filter_obj.intervals
+                    )
+                )
+            )
+        if filter_obj.trip_started_from is not None or filter_obj.trip_ended_to is not None:
+            stmt = stmt.join(
+                Trip,
+                and_(
+                    Trip.vehicle_id == VehicleGpsPoint.vehicle_id,
+                    VehicleGpsPoint.recorded_at_utc >= Trip.started_at_utc,
+                    VehicleGpsPoint.recorded_at_utc <= Trip.ended_at_utc,
+                ),
+            ).distinct()
+            if filter_obj.trip_started_from is not None:
+                stmt = stmt.where(Trip.started_at_utc >= filter_obj.trip_started_from)
+            if filter_obj.trip_ended_to is not None:
+                stmt = stmt.where(Trip.ended_at_utc <= filter_obj.trip_ended_to)
 
-    async def get_coordinates(
-        self,
-        vehicle_id: int,
-        date_from_utc: datetime,
-        date_to_utc: datetime,
-    ) -> Sequence[Any]:
-        stmt = (
-            select(
+        result = await self.db.execute(
+            stmt.order_by(
+                VehicleGpsPoint.vehicle_id,
                 VehicleGpsPoint.recorded_at_utc,
-                func.ST_Y(VehicleGpsPoint.position).label("latitude"),
-                func.ST_X(VehicleGpsPoint.position).label("longitude"),
-            )
-            .where(VehicleGpsPoint.vehicle_id == vehicle_id)
-            .where(VehicleGpsPoint.recorded_at_utc >= date_from_utc)
-            .where(VehicleGpsPoint.recorded_at_utc <= date_to_utc)
-            .order_by(VehicleGpsPoint.recorded_at_utc.asc())
-        )
-
-        result = await self.db.execute(stmt)
-        return result.all()
-
-    async def get_points_by_intervals(
-        self,
-        vehicle_id: int,
-        intervals: Sequence[tuple[datetime, datetime]],
-    ) -> Sequence[Row[Any]]:
-        if not intervals:
-            return []
-
-        interval_conditions = [
-            and_(
-                VehicleGpsPoint.recorded_at_utc >= started_at_utc,
-                VehicleGpsPoint.recorded_at_utc <= ended_at_utc,
-            )
-            for started_at_utc, ended_at_utc in intervals
-        ]
-
-        stmt = (
-            select(
                 VehicleGpsPoint.id,
-                VehicleGpsPoint.recorded_at_utc,
-                func.ST_Y(VehicleGpsPoint.position).label("latitude"),
-                func.ST_X(VehicleGpsPoint.position).label("longitude"),
-                func.ST_AsGeoJSON(VehicleGpsPoint.position).label("geojson"),
             )
-            .where(VehicleGpsPoint.vehicle_id == vehicle_id)
-            .where(or_(*interval_conditions))
-            .order_by(VehicleGpsPoint.recorded_at_utc.asc())
         )
-
-        result = await self.db.execute(stmt)
         return result.all()
 
-    async def create_point(
-        self,
-        *,
-        vehicle_id: int,
-        recorded_at_utc: datetime,
-        latitude: float,
-        longitude: float,
-    ) -> VehicleGpsPoint:
-        point = VehicleGpsPoint(
-            vehicle_id=vehicle_id,
-            recorded_at_utc=recorded_at_utc,
-            position=self._point_wkt(longitude, latitude),
-        )
-
+    async def create(self, data: dict[str, Any]) -> VehicleGpsPoint:
+        point = self._make_point(data)
         self.db.add(point)
         await self.db.flush()
 
@@ -114,24 +81,14 @@ class VehicleTrackRepository:
         await self.db.refresh(point)
         return point
 
-    async def create_points_bulk(
+    async def create_many(
         self,
-        points_data: Sequence[dict[str, Any]],
+        items: Sequence[dict[str, Any]],
     ) -> Sequence[VehicleGpsPoint]:
-        if not points_data:
+        if not items:
             return []
-        points = [
-            VehicleGpsPoint(
-                vehicle_id=item["vehicle_id"],
-                recorded_at_utc=item["recorded_at_utc"],
-                position=self._point_wkt(
-                    item["longitude"],
-                    item["latitude"],
-                ),
-            )
-            for item in points_data
-        ]
 
+        points = [self._make_point(item) for item in items]
         self.db.add_all(points)
         await self.db.flush()
 
@@ -141,10 +98,15 @@ class VehicleTrackRepository:
             await self.db.rollback()
             raise
 
-        for point in points:
-            await self.db.refresh(point)
-
         return points
+
+    @classmethod
+    def _make_point(cls, data: dict[str, Any]) -> VehicleGpsPoint:
+        return VehicleGpsPoint(
+            vehicle_id=data["vehicle_id"],
+            recorded_at_utc=data["recorded_at_utc"],
+            position=cls._point_wkt(data["longitude"], data["latitude"]),
+        )
 
     @staticmethod
     def _point_wkt(lon: float, lat: float) -> WKTElement:

@@ -35,6 +35,22 @@ def log_cache_lookup(
     )
 
 
+def log_operation_stage(
+    *,
+    operation: str,
+    stage: str,
+    duration_seconds: float,
+    **fields: object,
+) -> None:
+    _log_event(
+        "operation_stage",
+        operation=operation,
+        stage=stage,
+        duration_ms=_milliseconds(duration_seconds),
+        **fields,
+    )
+
+
 def _log_event(event: str, **fields: object) -> None:
     logger.info(
         json.dumps(

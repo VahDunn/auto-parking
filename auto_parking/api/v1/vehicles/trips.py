@@ -8,7 +8,6 @@ from auto_parking.api.v1.vehicles.common import (
     dep_actor_guard,
     dep_visible_ids,
     ensure_aware_datetime,
-    ensure_enterprise_visible,
     ensure_valid_date_range,
     trip_out,
 )
@@ -17,6 +16,7 @@ from auto_parking.deps.services import (
     dep_trip_service,
     dep_vehicle_service,
 )
+from auto_parking.deps.visibility import ensure_enterprise_visible
 from auto_parking.service.trip import TripService
 from auto_parking.service.vehicle import VehicleService
 

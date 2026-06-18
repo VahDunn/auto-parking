@@ -62,4 +62,17 @@ class Notification(BaseORM):
             "read_at",
             "created_at",
         ),
+        sa.Index(
+            "ix_notification_recipient_created_id",
+            "recipient_user_id",
+            "created_at",
+            "id",
+        ),
+        sa.Index(
+            "ix_notification_unread_recipient_created_id",
+            "recipient_user_id",
+            "created_at",
+            "id",
+            postgresql_where=sa.text("read_at IS NULL"),
+        ),
     )

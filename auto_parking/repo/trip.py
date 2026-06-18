@@ -3,7 +3,7 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import joinedload, noload
 
 from auto_parking.db.models import Enterprise, Trip, Vehicle, VehicleGpsPoint
 from auto_parking.filter import TripFilter
@@ -16,27 +16,21 @@ class TripRepository:
     @staticmethod
     def _base_options():
         return (
-            selectinload(Trip.vehicle).options(
-                load_only(Vehicle.id, Vehicle.enterprise_id, Vehicle.vehicle_number),
-                selectinload(Vehicle.enterprise).options(
-                    load_only(Enterprise.id, Enterprise.timezone)
-                ),
+            joinedload(Trip.vehicle)
+            .load_only(Vehicle.id, Vehicle.enterprise_id, Vehicle.vehicle_number)
+            .joinedload(Vehicle.enterprise)
+            .load_only(Enterprise.id, Enterprise.timezone),
+            joinedload(Trip.start_point).load_only(
+                VehicleGpsPoint.id,
+                VehicleGpsPoint.vehicle_id,
+                VehicleGpsPoint.recorded_at_utc,
+                VehicleGpsPoint.position,
             ),
-            selectinload(Trip.start_point).options(
-                load_only(
-                    VehicleGpsPoint.id,
-                    VehicleGpsPoint.vehicle_id,
-                    VehicleGpsPoint.recorded_at_utc,
-                    VehicleGpsPoint.position,
-                )
-            ),
-            selectinload(Trip.end_point).options(
-                load_only(
-                    VehicleGpsPoint.id,
-                    VehicleGpsPoint.vehicle_id,
-                    VehicleGpsPoint.recorded_at_utc,
-                    VehicleGpsPoint.position,
-                )
+            joinedload(Trip.end_point).load_only(
+                VehicleGpsPoint.id,
+                VehicleGpsPoint.vehicle_id,
+                VehicleGpsPoint.recorded_at_utc,
+                VehicleGpsPoint.position,
             ),
         )
 

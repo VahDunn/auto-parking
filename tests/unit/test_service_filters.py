@@ -6,8 +6,7 @@ import pytest
 from geoalchemy2.elements import WKTElement
 
 from auto_parking.api.schemas.vehicle_track import TrackFormat
-from auto_parking.core.domain.models import TripModel
-from auto_parking.filter import EnterpriseFilter, TripFilter, VehicleFilter
+from auto_parking.filter import EnterpriseFilter, TripFilter, VehicleFilter, VehicleTrackFilter
 from auto_parking.service.export import ExportService
 from auto_parking.service.gpx_import import GpxImportService
 from auto_parking.service.trip import TripService
@@ -45,6 +44,7 @@ async def test_trip_service_uses_trip_filter_for_range_query():
     assert filter_obj.ended_to == date_to
     assert filter_obj.limit is None
     assert filter_obj.offset is None
+    assert filter_obj.load_relations is True
 
 
 async def test_trip_service_can_skip_reverse_geocoding_for_range_query():
@@ -112,7 +112,7 @@ async def test_trip_track_service_uses_trip_filter_for_grouped_track():
 
     assert result == []
     trip_repo.get.assert_awaited_once()
-    track_repo.get_points.assert_not_called()
+    track_repo.get.assert_not_called()
 
     filter_obj = trip_repo.get.await_args.args[0]
     assert isinstance(filter_obj, TripFilter)
@@ -121,6 +121,97 @@ async def test_trip_track_service_uses_trip_filter_for_grouped_track():
     assert filter_obj.ended_to == date_to
     assert filter_obj.limit is None
     assert filter_obj.offset is None
+    assert filter_obj.load_relations is False
+
+
+async def test_trip_track_service_skips_vehicle_lookup_when_timezone_is_provided():
+    vehicle_repo = AsyncMock()
+    trip_repo = AsyncMock()
+    track_repo = AsyncMock()
+    service = TripTrackService(
+        vehicle_repo=vehicle_repo,
+        trip_repo=trip_repo,
+        track_repo=track_repo,
+    )
+    trip_repo.get.return_value = []
+
+    result = await service.get_grouped_track(
+        vehicle_id=3213,
+        date_from=datetime(2026, 4, 21, 11, 35, tzinfo=UTC),
+        date_to=datetime(2026, 4, 21, 11, 41, tzinfo=UTC),
+        format=TrackFormat.json,
+        enterprise_timezone="Europe/Moscow",
+    )
+
+    assert result == []
+    vehicle_repo.get_by_id.assert_not_called()
+    trip_repo.get.assert_awaited_once()
+    track_repo.get.assert_not_called()
+
+
+async def test_trip_track_service_loads_points_for_all_trips_once():
+    vehicle_repo = AsyncMock()
+    trip_repo = AsyncMock()
+    track_repo = AsyncMock()
+    service = TripTrackService(
+        vehicle_repo=vehicle_repo,
+        trip_repo=trip_repo,
+        track_repo=track_repo,
+    )
+    vehicle_repo.get_by_id.return_value = SimpleNamespace(
+        id=3213,
+        enterprise=SimpleNamespace(timezone="UTC"),
+    )
+    trip_repo.get.return_value = [
+        SimpleNamespace(
+            id=1,
+            started_at_utc=datetime(2026, 4, 21, 11, 35, tzinfo=UTC),
+            ended_at_utc=datetime(2026, 4, 21, 11, 36, tzinfo=UTC),
+        ),
+        SimpleNamespace(
+            id=2,
+            started_at_utc=datetime(2026, 4, 21, 11, 40, tzinfo=UTC),
+            ended_at_utc=datetime(2026, 4, 21, 11, 41, tzinfo=UTC),
+        ),
+    ]
+    track_repo.get.return_value = [
+        SimpleNamespace(
+            id=10,
+            recorded_at_utc=datetime(2026, 4, 21, 11, 35, 30, tzinfo=UTC),
+            latitude=55.75,
+            longitude=37.61,
+        ),
+        SimpleNamespace(
+            id=20,
+            recorded_at_utc=datetime(2026, 4, 21, 11, 40, 30, tzinfo=UTC),
+            latitude=55.76,
+            longitude=37.62,
+        ),
+    ]
+
+    result = await service.get_grouped_track(
+        vehicle_id=3213,
+        date_from=datetime(2026, 4, 21, 11, 35, tzinfo=UTC),
+        date_to=datetime(2026, 4, 21, 11, 41, tzinfo=UTC),
+        format=TrackFormat.json,
+    )
+
+    assert [group.points[0].id for group in result] == [10, 20]
+    trip_filter = trip_repo.get.await_args.args[0]
+    assert trip_filter.load_relations is False
+    track_repo.get.assert_awaited_once()
+    filter_obj = track_repo.get.await_args.args[0]
+    assert isinstance(filter_obj, VehicleTrackFilter)
+    assert filter_obj.intervals == [
+        (
+            datetime(2026, 4, 21, 11, 35, tzinfo=UTC),
+            datetime(2026, 4, 21, 11, 36, tzinfo=UTC),
+        ),
+        (
+            datetime(2026, 4, 21, 11, 40, tzinfo=UTC),
+            datetime(2026, 4, 21, 11, 41, tzinfo=UTC),
+        ),
+    ]
 
 
 async def test_export_service_uses_vehicle_filter_for_enterprise_vehicles():
@@ -155,6 +246,7 @@ async def test_export_service_uses_vehicle_filter_for_enterprise_vehicles():
     assert filter_obj.enterprise_ids == [10]
     assert filter_obj.limit is None
     assert filter_obj.offset is None
+    assert filter_obj.load_relations is False
 
 
 async def test_gpx_import_service_uses_standard_trip_filter_for_overlap_candidates():
@@ -172,8 +264,8 @@ async def test_gpx_import_service_uses_standard_trip_filter_for_overlap_candidat
     vehicle_repo.get_by_id.return_value = SimpleNamespace(id=3213)
     trip_repo.get.return_value = []
     trip_service.create.return_value = SimpleNamespace(id=7)
-    track_repo.get_points_by_intervals.return_value = []
-    track_repo.create_points_bulk.return_value = [
+    track_repo.get.return_value = []
+    track_repo.create_many.return_value = [
         SimpleNamespace(id=101),
         SimpleNamespace(id=102),
     ]
@@ -198,6 +290,12 @@ async def test_gpx_import_service_uses_standard_trip_filter_for_overlap_candidat
     assert filter_obj.started_to == datetime(2026, 4, 21, 11, 41, tzinfo=UTC)
     assert filter_obj.limit is None
     assert filter_obj.offset is None
+    assert filter_obj.load_relations is False
+    track_filter = track_repo.get.await_args.args[0]
+    assert isinstance(track_filter, VehicleTrackFilter)
+    assert track_filter.vehicle_id == 3213
+    assert track_filter.recorded_from == datetime(2026, 4, 21, 11, 35, tzinfo=UTC)
+    assert track_filter.recorded_to == datetime(2026, 4, 21, 11, 41, tzinfo=UTC)
     trip_service.create.assert_awaited_once()
     trip_repo.create.assert_not_called()
 

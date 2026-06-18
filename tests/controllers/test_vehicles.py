@@ -3,13 +3,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from auto_parking.core.domain.enums import UserRole
+from auto_parking.core.domain.enums import TrackFormat, UserRole
 from auto_parking.core.domain.models import TripTrackGroupModel, VehicleTrackPointModel
 from auto_parking.filter import EnterpriseFilter, VehicleFilter
 from tests.conftest import (
     set_actor_override,
-    set_export_service_override,
     set_enterprise_service_override,
+    set_export_service_override,
     set_gpx_import_service_override,
     set_trip_service_override,
     set_trip_track_service_override,
@@ -89,7 +89,7 @@ async def test_vehicle_crud_success(
     post_payload = {
         "price": 1000,
         "mileage": 500,
-        "vehicle_number": "А123ВС77",
+        "vehicle_number": " а123вс77 ",
         "owners_count": 1,
         "accident_number": 0,
         "manufacture_year": 2020,
@@ -108,6 +108,8 @@ async def test_vehicle_crud_success(
     assert detail_response.status_code == 200
     assert update_response.status_code == 200
     assert delete_response.status_code == 204
+    created_vehicle = vehicle_service_mock.create.await_args.args[0]
+    assert created_vehicle.vehicle_number == "А123ВС77"
 
 
 async def test_vehicle_create_forbidden_when_enterprise_not_visible(
@@ -217,14 +219,19 @@ async def test_import_vehicle_trip_gpx_rejects_non_gpx(
 async def test_get_vehicle_track_by_trips_success(
     client,
     overrides,
+    enterprise_service_mock,
     vehicle_service_mock,
     trip_track_service_mock,
 ):
     set_actor_override(overrides, UserRole.manager)
     set_visible_ids_override(overrides, {10})
+    set_enterprise_service_override(overrides, enterprise_service_mock)
     set_vehicle_service_override(overrides, vehicle_service_mock)
     set_trip_track_service_override(overrides, trip_track_service_mock)
     vehicle_service_mock.get_by_id.return_value = vehicle_model()
+    enterprise_service_mock.get.return_value = [
+        SimpleNamespace(id=10, timezone="Europe/Moscow")
+    ]
     point = VehicleTrackPointModel(
         id=1,
         recorded_at_utc=datetime(2026, 1, 1, 9, 0, tzinfo=UTC),
@@ -258,3 +265,10 @@ async def test_get_vehicle_track_by_trips_success(
     assert response.status_code == 200
     assert response.json()[0]["trip_id"] == 7
     assert response.json()[0]["points"][0]["latitude"] == 55.75
+    trip_track_service_mock.get_grouped_track.assert_awaited_once_with(
+        vehicle_id=1,
+        date_from=datetime(2026, 1, 1, 0, 0, tzinfo=UTC),
+        date_to=datetime(2026, 1, 2, 0, 0, tzinfo=UTC),
+        format=TrackFormat.json,
+        enterprise_timezone="Europe/Moscow",
+    )

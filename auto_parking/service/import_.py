@@ -64,17 +64,18 @@ class ImportService:
             imported_vehicles += 1
 
             for trip_data in vehicle_data.get("trips", []):
-                created_points = []
-
-                for point_data in trip_data.get("points", []):
-                    point = await self._track_repo.create_point(
-                        vehicle_id=vehicle.id,
-                        recorded_at_utc=self._parse_dt(point_data["recorded_at_utc"]),
-                        latitude=float(point_data["latitude"]),
-                        longitude=float(point_data["longitude"]),
-                    )
-                    created_points.append(point)
-                    imported_points += 1
+                created_points = await self._track_repo.create_many(
+                    [
+                        {
+                            "vehicle_id": vehicle.id,
+                            "recorded_at_utc": self._parse_dt(point_data["recorded_at_utc"]),
+                            "latitude": float(point_data["latitude"]),
+                            "longitude": float(point_data["longitude"]),
+                        }
+                        for point_data in trip_data.get("points", [])
+                    ]
+                )
+                imported_points += len(created_points)
 
                 if not created_points:
                     continue
@@ -153,20 +154,19 @@ class ImportService:
 
         for (source_vehicle_id, _source_trip_id), trip_rows in rows_by_vehicle_trip.items():
             vehicle = vehicles_by_source_id[source_vehicle_id]
-            created_points = []
-
-            for row in trip_rows:
-                if not row.get("point_recorded_at_utc"):
-                    continue
-
-                point = await self._track_repo.create_point(
-                    vehicle_id=vehicle.id,
-                    recorded_at_utc=self._parse_dt(row["point_recorded_at_utc"]),
-                    latitude=float(row["point_latitude"]),
-                    longitude=float(row["point_longitude"]),
-                )
-                created_points.append(point)
-                imported_points += 1
+            created_points = await self._track_repo.create_many(
+                [
+                    {
+                        "vehicle_id": vehicle.id,
+                        "recorded_at_utc": self._parse_dt(row["point_recorded_at_utc"]),
+                        "latitude": float(row["point_latitude"]),
+                        "longitude": float(row["point_longitude"]),
+                    }
+                    for row in trip_rows
+                    if row.get("point_recorded_at_utc")
+                ]
+            )
+            imported_points += len(created_points)
 
             if not created_points:
                 continue

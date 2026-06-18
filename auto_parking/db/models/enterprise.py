@@ -42,4 +42,5 @@ user_enterprise = sa.Table(
         "enterprise_id", sa.ForeignKey("enterprise.id", ondelete="CASCADE"), primary_key=True
     ),
     sa.UniqueConstraint("user_id", "enterprise_id", name="uq_user_enterprise"),
+    sa.Index("ix_user_enterprise_enterprise_user", "enterprise_id", "user_id"),
 )

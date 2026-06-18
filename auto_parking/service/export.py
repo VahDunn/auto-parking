@@ -10,7 +10,7 @@ from auto_parking.core.domain.enums.import_export_format import ExportFormat
 from auto_parking.core.errors import NotFoundError
 from auto_parking.core.utils.datetime import to_utc
 from auto_parking.db.models import Driver, Trip, Vehicle
-from auto_parking.filter import DriverFilter, TripFilter, VehicleFilter
+from auto_parking.filter import DriverFilter, TripFilter, VehicleFilter, VehicleTrackFilter
 from auto_parking.repo.driver import DriverRepository
 from auto_parking.repo.enterprise import EnterpriseRepository
 from auto_parking.repo.trip import TripRepository
@@ -55,7 +55,12 @@ class ExportService:
         enterprise_external_id = self._new_external_id()
 
         vehicles = await self._vehicle_repo.get(
-            VehicleFilter(enterprise_ids=[enterprise_id], limit=None, offset=None)
+            VehicleFilter(
+                enterprise_ids=[enterprise_id],
+                limit=None,
+                offset=None,
+                load_relations=False,
+            )
         )
         drivers = await self._driver_repo.get(
             DriverFilter(id=None, enterprise_ids=[enterprise_id], vehicle_id=None)
@@ -63,6 +68,16 @@ class ExportService:
 
         vehicle_external_ids = {vehicle.id: self._new_external_id() for vehicle in vehicles}
         driver_external_ids = {driver.id: self._new_external_id() for driver in drivers}
+        trips_by_vehicle_id = await self._get_trips_by_vehicle_id(
+            vehicle_ids=[vehicle.id for vehicle in vehicles],
+            date_from_utc=date_from_utc,
+            date_to_utc=date_to_utc,
+        )
+        points_by_vehicle_id = await self._get_trip_points_by_vehicle_id(
+            vehicle_ids=list(trips_by_vehicle_id),
+            date_from_utc=date_from_utc,
+            date_to_utc=date_to_utc,
+        )
 
         result: dict[str, Any] = {
             "dump_format": "auto_parking_guid_export",
@@ -100,23 +115,9 @@ class ExportService:
         }
 
         for vehicle in vehicles:
-            trips = await self._trip_repo.get(
-                TripFilter(
-                    vehicle_id=vehicle.id,
-                    started_from=date_from_utc,
-                    ended_to=date_to_utc,
-                    limit=None,
-                    offset=None,
-                )
-            )
-
+            trips = trips_by_vehicle_id.get(vehicle.id, [])
             trip_external_ids = {trip.id: self._new_external_id() for trip in trips}
-            intervals = [(trip.started_at_utc, trip.ended_at_utc) for trip in trips]
-
-            points = await self._track_repo.get_points_by_intervals(
-                vehicle_id=vehicle.id,
-                intervals=intervals,
-            )
+            points = points_by_vehicle_id.get(vehicle.id, [])
 
             point_rows, trip_edges = self._build_guid_point_rows(
                 trips=trips,
@@ -154,7 +155,12 @@ class ExportService:
             raise NotFoundError("Enterprise not found")
 
         vehicles = await self._vehicle_repo.get(
-            VehicleFilter(enterprise_ids=[enterprise_id], limit=None, offset=None)
+            VehicleFilter(
+                enterprise_ids=[enterprise_id],
+                limit=None,
+                offset=None,
+                load_relations=False,
+            )
         )
 
         result: dict[str, Any] = {
@@ -216,14 +222,14 @@ class ExportService:
                 ended_to=date_to_utc,
                 limit=None,
                 offset=None,
+                load_relations=False,
             )
         )
 
         intervals = [(trip.started_at_utc, trip.ended_at_utc) for trip in trips]
 
-        points = await self._track_repo.get_points_by_intervals(
-            vehicle_id=vehicle.id,
-            intervals=intervals,
+        points = await self._track_repo.get(
+            VehicleTrackFilter(vehicle_id=vehicle.id, intervals=intervals)
         )
 
         result: dict[str, Any] = {
@@ -279,6 +285,16 @@ class ExportService:
         vehicles = await self._vehicle_repo.get(
             VehicleFilter(enterprise_ids=[enterprise_id], limit=None, offset=None)
         )
+        trips_by_vehicle_id = await self._get_trips_by_vehicle_id(
+            vehicle_ids=[vehicle.id for vehicle in vehicles],
+            date_from_utc=date_from_utc,
+            date_to_utc=date_to_utc,
+        )
+        points_by_vehicle_id = await self._get_trip_points_by_vehicle_id(
+            vehicle_ids=list(trips_by_vehicle_id),
+            date_from_utc=date_from_utc,
+            date_to_utc=date_to_utc,
+        )
 
         result: dict[str, Any] = {
             "enterprise": {
@@ -296,22 +312,8 @@ class ExportService:
         }
 
         for vehicle in vehicles:
-            trips = await self._trip_repo.get(
-                TripFilter(
-                    vehicle_id=vehicle.id,
-                    started_from=date_from_utc,
-                    ended_to=date_to_utc,
-                    limit=None,
-                    offset=None,
-                )
-            )
-
-            intervals = [(trip.started_at_utc, trip.ended_at_utc) for trip in trips]
-
-            points = await self._track_repo.get_points_by_intervals(
-                vehicle_id=vehicle.id,
-                intervals=intervals,
-            )
+            trips = trips_by_vehicle_id.get(vehicle.id, [])
+            points = points_by_vehicle_id.get(vehicle.id, [])
 
             result["vehicles"].append(
                 {
@@ -340,6 +342,55 @@ class ExportService:
             return self._enterprise_full_to_csv(result)
 
         raise ValueError("Unsupported export format")
+
+    async def _get_trips_by_vehicle_id(
+        self,
+        *,
+        vehicle_ids: list[int],
+        date_from_utc: datetime,
+        date_to_utc: datetime,
+    ) -> dict[int, list[Trip]]:
+        if not vehicle_ids:
+            return {}
+
+        trips = await self._trip_repo.get(
+            TripFilter(
+                vehicle_ids=vehicle_ids,
+                started_from=date_from_utc,
+                ended_to=date_to_utc,
+                limit=None,
+                offset=None,
+                load_relations=False,
+            )
+        )
+
+        grouped: dict[int, list[Trip]] = {}
+        for trip in trips:
+            grouped.setdefault(trip.vehicle_id, []).append(trip)
+        return grouped
+
+    async def _get_trip_points_by_vehicle_id(
+        self,
+        *,
+        vehicle_ids: list[int],
+        date_from_utc: datetime,
+        date_to_utc: datetime,
+    ) -> dict[int, list[Any]]:
+        if not vehicle_ids:
+            return {}
+
+        points = await self._track_repo.get(
+            VehicleTrackFilter(
+                vehicle_ids=vehicle_ids,
+                trip_started_from=date_from_utc,
+                trip_ended_to=date_to_utc,
+            )
+        )
+
+        grouped: dict[int, list[Any]] = {}
+        for point in points:
+            grouped.setdefault(point.vehicle_id, []).append(point)
+        return grouped
 
     def _build_assignment_rows(
         self,

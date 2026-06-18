@@ -6,10 +6,10 @@ from auto_parking.api.schemas.enterprise import EnterpriseOut
 from auto_parking.api.v1.enterprises.common import (
     dep_actor_guard,
     dep_visible_ids,
-    ensure_enterprise_visible,
     enterprise_out,
 )
 from auto_parking.deps.services import dep_enterprise_service
+from auto_parking.deps.visibility import ensure_enterprise_visible
 from auto_parking.filter import EnterpriseFilter
 
 if TYPE_CHECKING:

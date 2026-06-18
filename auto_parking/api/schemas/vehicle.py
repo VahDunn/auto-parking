@@ -14,6 +14,10 @@ def is_valid_plate(s: str) -> bool:
     return bool(PLATE_RE.fullmatch(s.strip()))
 
 
+def normalize_plate(s: str) -> str:
+    return s.strip().upper()
+
+
 class VehicleOut(ApiSchema):
     id: int
     price: int
@@ -66,6 +70,14 @@ class VehicleCreate(ApiSchema):
             raise ValueError("Datetime must be timezone-aware (with timezone)")
         return v
 
+    @field_validator("vehicle_number")
+    @classmethod
+    def validate_vehicle_number(cls, v: str) -> str:
+        normalized = normalize_plate(v)
+        if not is_valid_plate(normalized):
+            raise ValueError("Invalid vehicle number")
+        return normalized
+
     def to_domain_model(self) -> VehicleModel:
         return VehicleModel(
             id=None,
@@ -103,6 +115,17 @@ class VehicleUpdate(ApiSchema):
         if v.tzinfo is None or v.utcoffset() is None:
             raise ValueError("Datetime must be timezone-aware (with timezone)")
         return v
+
+    @field_validator("vehicle_number")
+    @classmethod
+    def validate_vehicle_number(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+
+        normalized = normalize_plate(v)
+        if not is_valid_plate(normalized):
+            raise ValueError("Invalid vehicle number")
+        return normalized
 
     def apply_to_domain_model(self, vehicle: VehicleModel) -> VehicleModel:
         data = vehicle.to_dict()

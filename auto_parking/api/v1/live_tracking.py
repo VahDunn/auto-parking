@@ -54,7 +54,4 @@ async def _visible_enterprise_ids(*, role: UserRole, user_id: int) -> set[int] |
     if role == UserRole.admin:
         return None
     async with AsyncSessionLocal() as session:
-        user = await UserRepository(session).get_by_id(user_id)
-        if user is None:
-            return None
-        return {enterprise.id for enterprise in user.enterprises}
+        return await UserRepository(session).get_visible_enterprise_ids(user_id)

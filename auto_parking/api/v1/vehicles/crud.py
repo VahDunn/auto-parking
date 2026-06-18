@@ -1,17 +1,20 @@
+from time import perf_counter
+
 from fastapi import APIRouter, HTTPException, Query, status
 
 from auto_parking.api.schemas.vehicle import VehicleCreate, VehicleOut, VehicleUpdate
 from auto_parking.api.v1.vehicles.common import (
-    apply_enterprise_visibility,
     dep_actor_guard,
     dep_visible_ids,
-    enterprise_timezones,
     ensure_vehicle_visible,
+    enterprise_timezones,
     parse_int_list,
     vehicle_out,
 )
 from auto_parking.deps.services import dep_enterprise_service, dep_vehicle_service
+from auto_parking.deps.visibility import apply_enterprise_visibility
 from auto_parking.filter import EnterpriseFilter, VehicleFilter
+from auto_parking.observability.performance import log_operation_stage
 from auto_parking.service.enterprise import EnterpriseService
 from auto_parking.service.vehicle import VehicleService
 
@@ -46,6 +49,8 @@ async def get_vehicles(
     if visible_enterprise_ids is not None and parsed_enterprise_ids == []:
         return []
 
+    operation_started_at = perf_counter()
+    stage_started_at = perf_counter()
     vehicles = await service.get(
         VehicleFilter(
             id=parsed_ids,
@@ -57,6 +62,14 @@ async def get_vehicles(
             sort_by=sort_by,
         )
     )
+    log_operation_stage(
+        operation="vehicles_list",
+        stage="vehicle_service_get",
+        duration_seconds=perf_counter() - stage_started_at,
+        vehicle_count=len(vehicles),
+    )
+
+    stage_started_at = perf_counter()
     timezone_by_enterprise_id = enterprise_timezones(
         await enterprise_service.get(
             EnterpriseFilter(
@@ -65,10 +78,31 @@ async def get_vehicles(
             )
         )
     )
-    return [
+    log_operation_stage(
+        operation="vehicles_list",
+        stage="enterprise_timezones",
+        duration_seconds=perf_counter() - stage_started_at,
+        enterprise_count=len(timezone_by_enterprise_id),
+    )
+
+    stage_started_at = perf_counter()
+    response = [
         vehicle_out(vehicle, timezone_by_enterprise_id.get(vehicle.enterprise_id))
         for vehicle in vehicles
     ]
+    log_operation_stage(
+        operation="vehicles_list",
+        stage="api_mapping",
+        duration_seconds=perf_counter() - stage_started_at,
+        vehicle_count=len(response),
+    )
+    log_operation_stage(
+        operation="vehicles_list",
+        stage="handler_total_without_fastapi_serialization",
+        duration_seconds=perf_counter() - operation_started_at,
+        vehicle_count=len(response),
+    )
+    return response
 
 
 @router.get(

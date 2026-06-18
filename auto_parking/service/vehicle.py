@@ -149,7 +149,7 @@ class VehicleService:
         return {
             "price": vehicle.price,
             "mileage": vehicle.mileage,
-            "vehicle_number": vehicle.vehicle_number,
+            "vehicle_number": vehicle.vehicle_number.strip().upper(),
             "owners_count": vehicle.owners_count,
             "accident_number": vehicle.accident_number,
             "manufacture_year": vehicle.manufacture_year,
