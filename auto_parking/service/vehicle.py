@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Sequence
 from datetime import datetime
 from time import perf_counter
@@ -8,10 +9,13 @@ from auto_parking.core.domain.models import VehicleModel
 from auto_parking.filter import VehicleFilter
 from auto_parking.observability.performance import log_cache_lookup
 from auto_parking.ports.cache import CacheClient
+from auto_parking.ports.events import VEHICLE_EVENTS_TOPIC, EventEnvelope, EventProducer
 
 if TYPE_CHECKING:
     from auto_parking.db.models import Vehicle
     from auto_parking.repo.vehicle import VehicleRepository
+
+logger = logging.getLogger(__name__)
 
 
 class VehicleService:
@@ -20,10 +24,14 @@ class VehicleService:
         repo: "VehicleRepository",
         cache: CacheClient | None = None,
         cache_ttl_seconds: int = 300,
+        event_producer: EventProducer | None = None,
+        event_topic: str = VEHICLE_EVENTS_TOPIC,
     ) -> None:
         self._repo = repo
         self._cache = cache
         self._cache_ttl_seconds = cache_ttl_seconds
+        self._event_producer = event_producer
+        self._event_topic = event_topic
 
     async def get(self, filter_obj: VehicleFilter) -> list[VehicleModel]:
         vehicles: Sequence[Vehicle] = await self._repo.get(filter_obj)
@@ -47,6 +55,7 @@ class VehicleService:
         vehicle: Vehicle = await self._repo.create(data)
         result = self._build_out(vehicle)
         await self._cache_vehicle(result)
+        await self._publish_vehicle_event("vehicle.created", result)
         return result
 
     async def update(self, id: int, vehicle: VehicleModel) -> VehicleModel | None:
@@ -57,12 +66,15 @@ class VehicleService:
 
         result = self._build_out(vehicle)
         await self._cache_vehicle(result)
+        await self._publish_vehicle_event("vehicle.updated", result)
         return result
 
     async def delete(self, id: int) -> bool:
+        current = await self.get_by_id(id)
         deleted = await self._repo.delete(id)
         if deleted:
             await self._delete_cached_vehicle(id)
+            await self._publish_vehicle_event("vehicle.deleted", current, vehicle_id=id)
         return deleted
 
     async def _get_cached_vehicle(self, vehicle_id: int) -> VehicleModel | None:
@@ -127,6 +139,60 @@ class VehicleService:
     def _cache_key(vehicle_id: int) -> str:
         return f"vehicle:id:{vehicle_id}"
 
+    async def _publish_vehicle_event(
+        self,
+        event_type: str,
+        vehicle: VehicleModel | None,
+        *,
+        vehicle_id: int | None = None,
+    ) -> None:
+        if self._event_producer is None:
+            return
+
+        resolved_vehicle_id = vehicle.id if vehicle is not None else vehicle_id
+        if resolved_vehicle_id is None:
+            return
+
+        payload = self._vehicle_event_payload(vehicle, vehicle_id=resolved_vehicle_id)
+        event = EventEnvelope.create(
+            event_type=event_type,
+            producer="auto-parking-api",
+            entity="vehicle",
+            entity_id=resolved_vehicle_id,
+            payload=payload,
+        )
+        try:
+            await self._event_producer.publish(
+                self._event_topic,
+                event,
+                key=str(resolved_vehicle_id),
+            )
+        except Exception:
+            logger.warning(
+                "Failed to publish vehicle event: event_type=%s vehicle_id=%s",
+                event_type,
+                resolved_vehicle_id,
+                exc_info=True,
+            )
+
+    @staticmethod
+    def _vehicle_event_payload(
+        vehicle: VehicleModel | None,
+        *,
+        vehicle_id: int,
+    ) -> dict:
+        if vehicle is None:
+            return {"vehicle_id": vehicle_id}
+        return {
+            "vehicle_id": vehicle_id,
+            "vehicle_number": vehicle.vehicle_number,
+            "enterprise_id": vehicle.enterprise_id,
+            "model_id": vehicle.model_id,
+            "active_driver_id": vehicle.active_driver_id,
+            "driver_ids": list(vehicle.drivers),
+            "color": vehicle.color,
+        }
+
     def _build_out(self, vehicle: "Vehicle") -> VehicleModel:
         return VehicleModel(
             id=vehicle.id,
@@ -142,6 +208,11 @@ class VehicleService:
             drivers=[d.id for d in vehicle.drivers],
             active_driver_id=vehicle.active_driver_id,
             purchased_at_utc=vehicle.purchased_at_utc,
+            enterprise_timezone=(
+                vehicle.enterprise.timezone
+                if vehicle.__dict__.get("enterprise") is not None
+                else None
+            ),
         )
 
     @staticmethod

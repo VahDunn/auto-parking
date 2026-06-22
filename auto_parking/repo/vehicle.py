@@ -2,9 +2,9 @@ from collections.abc import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import joinedload, load_only, noload, selectinload
 
-from auto_parking.db.models import Driver, Vehicle
+from auto_parking.db.models import Driver, Enterprise, Vehicle
 from auto_parking.filter import VehicleFilter
 
 
@@ -23,7 +23,12 @@ class VehicleRepository:
                 noload(Driver.active_vehicle),
                 noload(Driver.vehicles),
             ),
-            noload(Vehicle.enterprise),
+            joinedload(Vehicle.enterprise).options(
+                load_only(Enterprise.id, Enterprise.timezone),
+                noload(Enterprise.vehicles),
+                noload(Enterprise.drivers),
+                noload(Enterprise.users),
+            ),
         )
 
     async def get(self, filter_obj: VehicleFilter) -> Sequence[Vehicle]:

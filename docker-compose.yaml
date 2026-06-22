@@ -34,6 +34,29 @@ services:
       timeout: 3s
       retries: 5
 
+  kafka:
+    image: bitnami/kafka:3.7
+    container_name: auto_parking_kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_ENABLE_KRAFT: "yes"
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    volumes:
+      - kafka_data:/bitnami/kafka
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   auto-parking:
     build: .
     container_name: auto_parking_api
@@ -43,6 +66,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     env_file:
       - .env
     environment:
@@ -50,9 +75,13 @@ services:
       APP_ENV: ${APP_ENV}
       DEBUG: ${DEBUG}
       REDIS_URL: ${REDIS_URL}
+      EVENT_BUS_BACKEND: ${EVENT_BUS_BACKEND:-kafka}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      KAFKA_NOTIFICATION_CONSUMER_GROUP: ${KAFKA_NOTIFICATION_CONSUMER_GROUP:-auto-parking-notification-service}
       ENTITY_CACHE_TTL_SECONDS: ${ENTITY_CACHE_TTL_SECONDS:-300}
       VEHICLE_MODEL_CACHE_TTL_SECONDS: ${VEHICLE_MODEL_CACHE_TTL_SECONDS:-3600}
       VEHICLE_TRACK_CACHE_TTL_SECONDS: ${VEHICLE_TRACK_CACHE_TTL_SECONDS:-300}
+      BOT_LOGIN_REGISTRY_TTL_SECONDS: ${BOT_LOGIN_REGISTRY_TTL_SECONDS:-604800}
       PERFORMANCE_LOG_PATH: /app/logs/performance.jsonl
       APP_ACCESS_LOG_PATH: /app/logs/app-access.log
     volumes:
@@ -93,6 +122,36 @@ services:
       - ./logs:/app/logs
     command: >
       python -m auto_parking.bot.main
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification_service/Dockerfile
+    container_name: auto_parking_notification_service
+    profiles:
+      - notifications
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      APP_ENV: ${APP_ENV}
+      DEBUG: ${DEBUG}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      REDIS_URL: ${REDIS_URL}
+      EVENT_BUS_BACKEND: ${EVENT_BUS_BACKEND:-kafka}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      KAFKA_NOTIFICATION_CONSUMER_GROUP: ${KAFKA_NOTIFICATION_CONSUMER_GROUP:-auto-parking-notification-service}
+      BOT_LOGIN_REGISTRY_TTL_SECONDS: ${BOT_LOGIN_REGISTRY_TTL_SECONDS:-604800}
+    command: >
+      python -m notification_service.main
 
   frontend:
     build: ./frontend
@@ -194,5 +253,6 @@ volumes:
     external: true
     name: auto-parking_db_data
   redis_data:
+  kafka_data:
   prometheus_data:
   grafana_data:

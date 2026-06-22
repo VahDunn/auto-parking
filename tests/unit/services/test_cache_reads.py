@@ -70,6 +70,7 @@ async def test_vehicle_service_get_by_id_uses_cached_domain_model():
 
 async def test_vehicle_service_delete_invalidates_cached_vehicle():
     repo = AsyncMock()
+    repo.get_by_id.return_value = None
     repo.delete.return_value = True
     cache = FakeCacheClient()
     cache.values["vehicle:id:1"] = "{}"

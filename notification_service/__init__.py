@@ -1,0 +1,1 @@
+"""Standalone notification microservice."""

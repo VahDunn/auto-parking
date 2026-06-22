@@ -232,6 +232,10 @@ class TelegramBotHandlers:
             return BotReply("Не удалось авторизоваться как менеджер.", self._main_menu())
 
         self.sessions[chat_id] = session
+        await self.service.bind_telegram_chat(
+            chat_id=chat_id,
+            session=session,
+        )
         return BotReply(f"Готово, вы вошли как {session.username}.", self._main_menu())
 
     async def _handle_notifications(self, chat_id: int) -> BotReply:

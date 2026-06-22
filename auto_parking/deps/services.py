@@ -2,6 +2,7 @@ from fastapi import Depends
 
 from auto_parking.core.config import settings
 from auto_parking.deps.cache import get_cache_client
+from auto_parking.deps.events import get_event_producer
 from auto_parking.deps.integrations import get_reverse_geocoder
 from auto_parking.deps.notifications import notification_publisher
 from auto_parking.deps.repos import (
@@ -55,6 +56,7 @@ def get_vehicle_service(repo: VehicleRepository = dep_vehicle_repo) -> VehicleSe
         repo,
         cache=get_cache_client(),
         cache_ttl_seconds=settings.entity_cache_ttl_seconds,
+        event_producer=get_event_producer(),
     )
 
 

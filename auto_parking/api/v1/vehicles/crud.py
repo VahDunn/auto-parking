@@ -36,7 +36,6 @@ async def get_vehicles(
     sort_by: str | None = Query(None),
     visible_enterprise_ids: set[int] | None = dep_visible_ids,
     service: VehicleService = dep_vehicle_service,
-    enterprise_service: EnterpriseService = dep_enterprise_service,
 ):
     parsed_ids = parse_int_list(id)
     parsed_enterprise_ids = parse_int_list(enterprise_ids)
@@ -70,26 +69,7 @@ async def get_vehicles(
     )
 
     stage_started_at = perf_counter()
-    timezone_by_enterprise_id = enterprise_timezones(
-        await enterprise_service.get(
-            EnterpriseFilter(
-                ids=list({vehicle.enterprise_id for vehicle in vehicles}),
-                load_relations=False,
-            )
-        )
-    )
-    log_operation_stage(
-        operation="vehicles_list",
-        stage="enterprise_timezones",
-        duration_seconds=perf_counter() - stage_started_at,
-        enterprise_count=len(timezone_by_enterprise_id),
-    )
-
-    stage_started_at = perf_counter()
-    response = [
-        vehicle_out(vehicle, timezone_by_enterprise_id.get(vehicle.enterprise_id))
-        for vehicle in vehicles
-    ]
+    response = [vehicle_out(vehicle, vehicle.enterprise_timezone) for vehicle in vehicles]
     log_operation_stage(
         operation="vehicles_list",
         stage="api_mapping",

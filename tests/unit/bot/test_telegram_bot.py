@@ -6,6 +6,7 @@ import pytest
 
 from auto_parking.bot.handlers import TelegramBotHandlers
 from auto_parking.bot.service import BotService, EnterpriseLookup, MileageSummary, VehicleLookup
+from auto_parking.core.security.jwt import create_access_token
 
 pytestmark = pytest.mark.asyncio
 
@@ -110,14 +111,17 @@ async def test_telegram_bot_calls_vehicle_mileage_for_day():
 
 async def test_bot_service_login_uses_api_client():
     api_client = AsyncMock()
-    api_client.login.return_value = "access-token"
+    token = create_access_token(actor_type="manager", actor_id=7)
+    api_client.login.return_value = token
     service = BotService(api_client)
 
     session = await service.login("manager", "password")
 
     assert session is not None
     assert session.username == "manager"
-    assert session.access_token == "access-token"
+    assert session.access_token == token
+    assert session.user_id == 7
+    assert session.role == "manager"
     api_client.login.assert_awaited_once_with(username="manager", password="password")
 
 

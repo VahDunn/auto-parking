@@ -32,6 +32,7 @@ dependencies = [
     "prometheus-client (>=0.21.1,<0.22.0)",
     "reactivex (>=4.1.0,<5.0.0)",
     "websockets (>=16.0,<17.0)",
+    "aiokafka (>=0.14.0,<0.15.0)",
 ]
 
 

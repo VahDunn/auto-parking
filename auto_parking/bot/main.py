@@ -23,6 +23,7 @@ async def main() -> None:
             api_client,
             cache=get_cache_client(),
             cache_ttl_seconds=settings.bot_summary_cache_ttl_seconds,
+            bot_login_registry_ttl_seconds=settings.bot_login_registry_ttl_seconds,
         )
     )
     await TelegramLongPollingClient(settings.telegram_bot_token, handlers).run()

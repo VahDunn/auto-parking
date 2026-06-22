@@ -36,12 +36,17 @@ dep_visible_ids = Depends(get_visible_enterprise_ids)
 
 def vehicle_out(vehicle: VehicleModel, enterprise_timezone: str | None) -> VehicleOut:
     purchased_at_utc = vehicle.purchased_at_utc
+    data = vehicle.to_dict()
+    model_enterprise_timezone = data.pop("enterprise_timezone", None)
+    resolved_enterprise_timezone = enterprise_timezone or model_enterprise_timezone
     return VehicleOut(
-        **vehicle.to_dict(),
+        **data,
         purchased_at_enterprise=(
-            to_enterprise_tz(purchased_at_utc, enterprise_timezone) if purchased_at_utc else None
+            to_enterprise_tz(purchased_at_utc, resolved_enterprise_timezone)
+            if purchased_at_utc
+            else None
         ),
-        enterprise_timezone=enterprise_timezone or "UTC",
+        enterprise_timezone=resolved_enterprise_timezone or "UTC",
     )
 
 

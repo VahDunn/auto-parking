@@ -2,6 +2,8 @@
 
 Бот запускается отдельным процессом и дергает существующее HTTP API проекта.
 
+После успешного `/login` бот сохраняет связь `user_id -> telegram chat_id` в Redis. Эту связь использует отдельный `notification-service`, чтобы отправлять Telegram-уведомления залогиненным менеджерам по событиям из Kafka.
+
 ## Запуск
 
 1. Создать Telegram-бота через BotFather.
@@ -21,6 +23,12 @@ python -m auto_parking.bot.main
 
 ```bash
 docker compose --profile bot up telegram-bot
+```
+
+Для запуска вместе с Kafka notification-service:
+
+```bash
+EVENT_BUS_BACKEND=kafka docker compose --profile bot --profile notifications up -d --build telegram-bot notification-service
 ```
 
 ## Команды

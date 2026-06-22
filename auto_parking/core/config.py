@@ -34,6 +34,19 @@ class Settings(BaseSettings):
     bot_api_base_url: str = Field(default="http://localhost:8000/api", alias="BOT_API_BASE_URL")
     redis_url: str | None = Field(default=None, alias="REDIS_URL")
     bot_summary_cache_ttl_seconds: int = Field(default=300, alias="BOT_SUMMARY_CACHE_TTL_SECONDS")
+    bot_login_registry_ttl_seconds: int = Field(
+        default=7 * 24 * 60 * 60,
+        alias="BOT_LOGIN_REGISTRY_TTL_SECONDS",
+    )
+    event_bus_backend: str = Field(default="redis", alias="EVENT_BUS_BACKEND")
+    kafka_bootstrap_servers: str = Field(
+        default="localhost:9092",
+        alias="KAFKA_BOOTSTRAP_SERVERS",
+    )
+    kafka_notification_consumer_group: str = Field(
+        default="auto-parking-notification-service",
+        alias="KAFKA_NOTIFICATION_CONSUMER_GROUP",
+    )
     entity_cache_ttl_seconds: int = Field(default=300, alias="ENTITY_CACHE_TTL_SECONDS")
     vehicle_model_cache_ttl_seconds: int = Field(
         default=3600,

@@ -7,14 +7,18 @@ from math import atan2, cos, radians, sin, sqrt
 from time import perf_counter
 
 from auto_parking.bot.api_client import AutoParkingApiClient
+from auto_parking.core.security.jwt import decode_access_token
 from auto_parking.observability.performance import log_cache_lookup
 from auto_parking.ports.cache import CacheClient
+from auto_parking.service.bot_session_registry import BotSessionRegistry
 
 
 @dataclass(slots=True)
 class BotSession:
     username: str
     access_token: str
+    user_id: int
+    role: str
 
 
 @dataclass(slots=True)
@@ -44,17 +48,47 @@ class BotService:
         api_client: AutoParkingApiClient,
         cache: CacheClient | None = None,
         cache_ttl_seconds: int = 300,
+        bot_login_registry_ttl_seconds: int = 7 * 24 * 60 * 60,
     ) -> None:
         self._api_client = api_client
         self._cache = cache
         self._cache_ttl_seconds = cache_ttl_seconds
+        self._bot_login_registry_ttl_seconds = bot_login_registry_ttl_seconds
 
     async def login(self, username: str, password: str) -> BotSession | None:
         token = await self._api_client.login(username=username, password=password)
         if token is None:
             return None
 
-        return BotSession(username=username, access_token=token)
+        try:
+            actor = decode_access_token(token)
+        except Exception:
+            return None
+        return BotSession(
+            username=username,
+            access_token=token,
+            user_id=actor["id"],
+            role=actor["role"].value,
+        )
+
+    async def bind_telegram_chat(
+        self,
+        *,
+        chat_id: int,
+        session: BotSession,
+    ) -> None:
+        if self._cache is None:
+            return
+        registry = BotSessionRegistry(
+            self._cache,
+            ttl_seconds=self._bot_login_registry_ttl_seconds,
+        )
+        await registry.bind_telegram_chat(
+            user_id=session.user_id,
+            chat_id=chat_id,
+            username=session.username,
+            role=session.role,
+        )
 
     async def vehicle_mileage(
         self,
