@@ -18,18 +18,23 @@ from auto_parking.ports.events import EventConsumer, EventProducer
 def get_event_producer() -> EventProducer:
     backend = settings.event_bus_backend.lower()
     if backend == "kafka":
-        return KafkaEventProducer(settings.kafka_bootstrap_servers)
+        return KafkaEventProducer(_kafka_bootstrap_servers())
     if backend == "redis" and settings.redis_url:
         return RedisEventProducer(_redis_client())
     return NullEventProducer()
 
 
-def get_event_consumer(group_id: str | None = None) -> EventConsumer:
+def get_event_consumer(
+    group_id: str | None = None,
+    *,
+    auto_offset_reset: str = "earliest",
+) -> EventConsumer:
     backend = settings.event_bus_backend.lower()
     if backend == "kafka":
         return KafkaEventConsumer(
-            bootstrap_servers=settings.kafka_bootstrap_servers,
+            bootstrap_servers=_kafka_bootstrap_servers(),
             group_id=group_id or settings.kafka_notification_consumer_group,
+            auto_offset_reset=auto_offset_reset,
         )
     if backend == "redis" and settings.redis_url:
         return RedisEventConsumer(_redis_client())
@@ -48,3 +53,9 @@ def _redis_client() -> Redis:
         encoding="utf-8",
         decode_responses=True,
     )
+
+
+def _kafka_bootstrap_servers() -> str:
+    if not settings.kafka_bootstrap_servers:
+        raise RuntimeError("KAFKA_BOOTSTRAP_SERVERS is required for Kafka event bus")
+    return settings.kafka_bootstrap_servers

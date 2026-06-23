@@ -39,13 +39,18 @@ class Settings(BaseSettings):
         alias="BOT_LOGIN_REGISTRY_TTL_SECONDS",
     )
     event_bus_backend: str = Field(default="redis", alias="EVENT_BUS_BACKEND")
-    kafka_bootstrap_servers: str = Field(
-        default="localhost:9092",
+    kafka_bootstrap_servers: str | None = Field(
+        default=None,
         alias="KAFKA_BOOTSTRAP_SERVERS",
     )
     kafka_notification_consumer_group: str = Field(
         default="auto-parking-notification-service",
         alias="KAFKA_NOTIFICATION_CONSUMER_GROUP",
+    )
+    audit_consumer_enabled: bool = Field(default=False, alias="AUDIT_CONSUMER_ENABLED")
+    kafka_audit_consumer_group: str = Field(
+        default="auto-parking-api-audit-writer",
+        alias="KAFKA_AUDIT_CONSUMER_GROUP",
     )
     entity_cache_ttl_seconds: int = Field(default=300, alias="ENTITY_CACHE_TTL_SECONDS")
     vehicle_model_cache_ttl_seconds: int = Field(

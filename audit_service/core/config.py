@@ -4,23 +4,21 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
-BASE_DIR = Path(__file__).resolve().parents[1]
+BASE_DIR = Path(__file__).resolve().parents[2]
 ENV_FILE = BASE_DIR / ".env"
 
 
 class Settings(BaseSettings):
     debug: bool = Field(default=False, alias="DEBUG")
-    database_url: str = Field(..., alias="DATABASE_URL")
     redis_url: str | None = Field(default=None, alias="REDIS_URL")
-    telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
     event_bus_backend: str = Field(default="kafka", alias="EVENT_BUS_BACKEND")
-    kafka_bootstrap_servers: str = Field(
-        default="localhost:9092",
+    kafka_bootstrap_servers: str | None = Field(
+        default=None,
         alias="KAFKA_BOOTSTRAP_SERVERS",
     )
-    kafka_notification_consumer_group: str = Field(
-        default="auto-parking-notification-service",
-        alias="KAFKA_NOTIFICATION_CONSUMER_GROUP",
+    kafka_audit_source_consumer_group: str = Field(
+        default="auto-parking-audit-service",
+        alias="KAFKA_AUDIT_SOURCE_CONSUMER_GROUP",
     )
 
     model_config = {

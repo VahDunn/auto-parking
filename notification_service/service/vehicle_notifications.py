@@ -1,25 +1,11 @@
 import logging
-from collections.abc import Sequence
-from typing import Protocol
 
-from notification_service.events import EventEnvelope
+from notification_service.ports.events import EventEnvelope
+from notification_service.ports.manager_lookup import ManagerLookup
+from notification_service.ports.telegram import TelegramSender
+from notification_service.ports.telegram_sessions import TelegramSessionRegistry
 
 logger = logging.getLogger(__name__)
-
-
-class ManagerLookup(Protocol):
-    async def manager_ids_for_enterprise(self, enterprise_id: int) -> Sequence[int]:
-        pass
-
-
-class TelegramSessionRegistry(Protocol):
-    async def get_telegram_chat_id(self, *, user_id: int) -> int | None:
-        pass
-
-
-class TelegramSender(Protocol):
-    async def send_message(self, *, chat_id: int, text: str) -> None:
-        pass
 
 
 class VehicleEventNotificationService:

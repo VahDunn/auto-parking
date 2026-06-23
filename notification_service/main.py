@@ -3,12 +3,16 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from notification_service.db import PostgresManagerLookup, create_engine_and_session_factory
-from notification_service.events import VEHICLE_EVENTS_TOPIC, create_event_consumer
+from notification_service.core.config import get_settings
+from notification_service.integrations.events import create_event_consumer
+from notification_service.integrations.postgres import (
+    PostgresManagerLookup,
+    create_engine_and_session_factory,
+)
+from notification_service.integrations.redis_sessions import RedisTelegramSessionRegistry
+from notification_service.integrations.telegram import TelegramBotSender
+from notification_service.ports.events import VEHICLE_EVENTS_TOPIC
 from notification_service.service import VehicleEventNotificationService
-from notification_service.settings import get_settings
-from notification_service.telegram import TelegramBotSender
-from notification_service.telegram_sessions import RedisTelegramSessionRegistry
 
 logger = logging.getLogger(__name__)
 

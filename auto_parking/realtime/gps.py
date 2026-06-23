@@ -1,20 +1,21 @@
 import asyncio
-import json
 import logging
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
+from uuid import uuid4
 
 import reactivex.operators as ops
 from fastapi import WebSocket
 from reactivex.subject import Subject
-from redis.asyncio import Redis
-from redis.exceptions import RedisError
 
-from auto_parking.core.config import settings
+from auto_parking.deps.events import get_event_consumer, get_event_producer
+from auto_parking.ports.events import GPS_EVENTS_TOPIC, EventConsumer, EventEnvelope, EventProducer
 
 logger = logging.getLogger(__name__)
 
-GPS_CHANNEL = "auto-parking:vehicle-gps"
+GPS_EVENT_TYPE = "vehicle.gps"
+GPS_EVENT_PRODUCER = "auto-parking-track-generator"
 
 
 @dataclass(frozen=True)
@@ -63,7 +64,7 @@ def _valid_payload(payload: object) -> bool:
 
 
 async def publish_gps_point(
-    redis: Redis | None,
+    producer: EventProducer | None,
     *,
     vehicle_id: int,
     vehicle_number: str,
@@ -72,7 +73,7 @@ async def publish_gps_point(
     latitude: float,
     longitude: float,
 ) -> None:
-    if redis is None:
+    if producer is None:
         return
     payload = GpsPointEvent(
         vehicle_id=vehicle_id,
@@ -82,16 +83,26 @@ async def publish_gps_point(
         latitude=latitude,
         longitude=longitude,
     )
+    event = EventEnvelope.create(
+        event_type=GPS_EVENT_TYPE,
+        producer=GPS_EVENT_PRODUCER,
+        entity="vehicle",
+        entity_id=vehicle_id,
+        payload=asdict(payload),
+    )
     try:
-        await redis.publish(GPS_CHANNEL, json.dumps(asdict(payload)))
-    except RedisError:
+        await producer.publish(GPS_EVENTS_TOPIC, event, key=str(vehicle_id))
+    except Exception:
         logger.warning("Failed to publish GPS event", exc_info=True)
 
 
-def create_gps_redis() -> Redis | None:
-    if not settings.redis_url:
-        return None
-    return Redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+def create_gps_event_producer() -> EventProducer:
+    return get_event_producer()
+
+
+async def close_gps_event_producer(producer: EventProducer | None) -> None:
+    if producer is not None:
+        await producer.close()
 
 
 class GpsRealtimeHub:
@@ -110,11 +121,12 @@ class GpsRealtimeHub:
                 )
             ),
         ).subscribe(on_next=self._schedule_broadcast, on_error=self._log_pipeline_error)
+        self._consumer: EventConsumer | None = None
         self._listener_task: asyncio.Task | None = None
         self._stopping = False
 
     async def start(self) -> None:
-        if self._listener_task is None and settings.redis_url:
+        if self._listener_task is None:
             self._stopping = False
             self._listener_task = asyncio.create_task(self._listen())
 
@@ -127,6 +139,9 @@ class GpsRealtimeHub:
             except asyncio.CancelledError:
                 pass
             self._listener_task = None
+        if self._consumer is not None:
+            await self._consumer.stop()
+            self._consumer = None
 
     async def connect(self, websocket: WebSocket, enterprise_ids: set[int] | None) -> None:
         await websocket.accept()
@@ -137,6 +152,11 @@ class GpsRealtimeHub:
 
     def emit(self, payload: dict) -> None:
         self._subject.on_next(payload)
+
+    async def handle_event(self, event: EventEnvelope) -> None:
+        if event.event_type != GPS_EVENT_TYPE or event.entity != "vehicle":
+            return
+        self.emit(event.payload)
 
     def _schedule_broadcast(self, event: GpsPointEvent) -> None:
         asyncio.get_running_loop().create_task(self._broadcast(event))
@@ -153,28 +173,21 @@ class GpsRealtimeHub:
 
     async def _listen(self) -> None:
         while not self._stopping:
-            redis = create_gps_redis()
-            if redis is None:
-                return
-            pubsub = redis.pubsub()
+            self._consumer = get_event_consumer(
+                group_id=f"auto-parking-gps-live-{os.getpid()}-{uuid4()}",
+                auto_offset_reset="latest",
+            )
             try:
-                await pubsub.subscribe(GPS_CHANNEL)
-                async for message in pubsub.listen():
-                    if message["type"] != "message":
-                        continue
-                    try:
-                        payload = json.loads(message["data"])
-                    except (TypeError, json.JSONDecodeError):
-                        continue
-                    self.emit(payload)
+                await self._consumer.subscribe([GPS_EVENTS_TOPIC], self.handle_event)
             except asyncio.CancelledError:
                 raise
-            except RedisError:
-                logger.warning("GPS Redis listener disconnected", exc_info=True)
+            except Exception:
+                logger.warning("GPS event listener disconnected", exc_info=True)
                 await asyncio.sleep(1)
             finally:
-                await pubsub.aclose()
-                await redis.aclose()
+                if self._consumer is not None:
+                    await self._consumer.stop()
+                    self._consumer = None
 
     @staticmethod
     def _log_pipeline_error(error: Exception) -> None:

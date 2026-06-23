@@ -13,7 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auto_parking.db.engine import AsyncSessionLocal
 from auto_parking.db.models import Enterprise, Trip, Vehicle, VehicleGpsPoint
-from auto_parking.realtime.gps import create_gps_redis, publish_gps_point
+from auto_parking.realtime.gps import (
+    close_gps_event_producer,
+    create_gps_event_producer,
+    publish_gps_point,
+)
 
 app = typer.Typer(help="Утилита генерации GPS-треков и поездок для существующих машин")
 
@@ -602,8 +606,6 @@ async def generate_live_track(
     if seed is not None:
         random.seed(seed)
 
-    gps_redis = create_gps_redis()
-
     async with AsyncSessionLocal() as db:
         vehicle = await _get_vehicle_with_enterprise(db, vehicle_id)
         enterprise = vehicle.enterprise
@@ -631,6 +633,7 @@ async def generate_live_track(
 
         route_number = 0
         completed_routes = 0
+        gps_producer = create_gps_event_producer()
 
         while True:
             if _is_route_limit_reached(completed_routes, routes_count):
@@ -674,7 +677,7 @@ async def generate_live_track(
                 )
                 inserted_points.append(point)
                 await publish_gps_point(
-                    gps_redis,
+                    gps_producer,
                     vehicle_id=vehicle_id,
                     vehicle_number=vehicle.vehicle_number,
                     enterprise_id=enterprise.id,
@@ -719,8 +722,7 @@ async def generate_live_track(
             if not loop and routes_count is not None:
                 continue
 
-    if gps_redis is not None:
-        await gps_redis.aclose()
+    await close_gps_event_producer(gps_producer)
     typer.echo("Генерация live-трека и поездок завершена")
 
 
@@ -776,8 +778,6 @@ async def generate_enterprise_live_tracks(
             )
             await db.commit()
 
-    gps_redis = create_gps_redis()
-
     typer.echo(
         f"Запуск live-генерации для enterprise_id={enterprise_id}. "
         f"Машин найдено: {len(vehicle_ids)}"
@@ -808,6 +808,7 @@ async def generate_enterprise_live_tracks(
         return
 
     typer.echo(f"Активных машин для генерации: {len(active_states)}")
+    gps_producer = create_gps_event_producer()
 
     try:
         while True:
@@ -903,7 +904,7 @@ async def generate_enterprise_live_tracks(
 
             for state, point, lon, lat in pending_insertions:
                 await publish_gps_point(
-                    gps_redis,
+                    gps_producer,
                     vehicle_id=state.vehicle_id,
                     vehicle_number=vehicle_numbers[state.vehicle_id],
                     enterprise_id=enterprise_id,
@@ -935,8 +936,7 @@ async def generate_enterprise_live_tracks(
     except KeyboardInterrupt:
         typer.echo("Остановка генерации enterprise...")
 
-    if gps_redis is not None:
-        await gps_redis.aclose()
+    await close_gps_event_producer(gps_producer)
     typer.echo("Генерация enterprise-треков и поездок завершена")
 
 
