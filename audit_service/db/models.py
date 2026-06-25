@@ -3,9 +3,11 @@ from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from auto_parking.db.models.base import Base
+
+class Base(DeclarativeBase):
+    pass
 
 
 class AuditEvent(Base):

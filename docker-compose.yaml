@@ -34,6 +34,22 @@ services:
       timeout: 3s
       retries: 5
 
+  audit-db:
+    image: postgres:16-alpine
+    container_name: auto_parking_audit_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${AUDIT_POSTGRES_DB:-audit_db}
+      POSTGRES_USER: ${AUDIT_POSTGRES_USER:-audit_user}
+      POSTGRES_PASSWORD: ${AUDIT_POSTGRES_PASSWORD:-audit_password}
+    volumes:
+      - audit_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   kafka:
     image: apache/kafka:3.9.1
     container_name: auto_parking_kafka
@@ -46,7 +62,7 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
@@ -59,6 +75,18 @@ services:
       timeout: 5s
       retries: 10
 
+  kafka-init:
+    build: .
+    container_name: auto_parking_kafka_init
+    restart: "no"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+    command: >
+      python -m event_bus.init_topics
+
   auto-parking:
     build: .
     container_name: auto_parking_api
@@ -68,8 +96,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
@@ -77,11 +105,9 @@ services:
       APP_ENV: ${APP_ENV}
       DEBUG: ${DEBUG}
       REDIS_URL: ${REDIS_URL}
-      EVENT_BUS_BACKEND: ${EVENT_BUS_BACKEND:-kafka}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       KAFKA_NOTIFICATION_CONSUMER_GROUP: ${KAFKA_NOTIFICATION_CONSUMER_GROUP:-auto-parking-notification-service}
-      AUDIT_CONSUMER_ENABLED: ${AUDIT_CONSUMER_ENABLED:-true}
-      KAFKA_AUDIT_CONSUMER_GROUP: ${KAFKA_AUDIT_CONSUMER_GROUP:-auto-parking-api-audit-writer}
+      GPS_CONSUMER_ENABLED: ${GPS_CONSUMER_ENABLED:-true}
       ENTITY_CACHE_TTL_SECONDS: ${ENTITY_CACHE_TTL_SECONDS:-300}
       VEHICLE_MODEL_CACHE_TTL_SECONDS: ${VEHICLE_MODEL_CACHE_TTL_SECONDS:-3600}
       VEHICLE_TRACK_CACHE_TTL_SECONDS: ${VEHICLE_TRACK_CACHE_TTL_SECONDS:-300}
@@ -109,8 +135,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
       auto-parking:
         condition: service_started
     env_file:
@@ -138,21 +164,17 @@ services:
       - notifications
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
       APP_ENV: ${APP_ENV}
       DEBUG: ${DEBUG}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       REDIS_URL: ${REDIS_URL}
-      EVENT_BUS_BACKEND: ${EVENT_BUS_BACKEND:-kafka}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       KAFKA_NOTIFICATION_CONSUMER_GROUP: ${KAFKA_NOTIFICATION_CONSUMER_GROUP:-auto-parking-notification-service}
       BOT_LOGIN_REGISTRY_TTL_SECONDS: ${BOT_LOGIN_REGISTRY_TTL_SECONDS:-604800}
@@ -168,16 +190,15 @@ services:
       - audit
     restart: unless-stopped
     depends_on:
-      redis:
+      audit-db:
         condition: service_healthy
-      kafka:
-        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
       DEBUG: ${DEBUG}
-      REDIS_URL: ${REDIS_URL}
-      EVENT_BUS_BACKEND: ${EVENT_BUS_BACKEND:-kafka}
+      AUDIT_DATABASE_URL: postgresql+asyncpg://${AUDIT_POSTGRES_USER:-audit_user}:${AUDIT_POSTGRES_PASSWORD:-audit_password}@audit-db:5432/${AUDIT_POSTGRES_DB:-audit_db}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       KAFKA_AUDIT_SOURCE_CONSUMER_GROUP: ${KAFKA_AUDIT_SOURCE_CONSUMER_GROUP:-auto-parking-audit-service}
     command: >
@@ -283,6 +304,7 @@ volumes:
     external: true
     name: auto-parking_db_data
   redis_data:
+  audit_db_data:
   kafka_data:
   prometheus_data:
   grafana_data:

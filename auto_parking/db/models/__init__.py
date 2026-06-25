@@ -1,4 +1,3 @@
-from auto_parking.db.models.audit_event import AuditEvent as AuditEvent
 from auto_parking.db.models.base import Base as Base
 from auto_parking.db.models.base import BaseORM as BaseORM
 from auto_parking.db.models.driver import Driver as Driver
@@ -22,5 +21,4 @@ ADMIN_MODELS = (
     VehicleModel,
     VehicleDriverAssignment,
     Notification,
-    AuditEvent,
 )

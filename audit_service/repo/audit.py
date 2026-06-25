@@ -1,8 +1,8 @@
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auto_parking.db.models import AuditEvent
-from auto_parking.ports.events import EventEnvelope
+from audit_service.db.models import AuditEvent
+from audit_service.ports.events import EventEnvelope
 
 
 class AuditEventRepository:

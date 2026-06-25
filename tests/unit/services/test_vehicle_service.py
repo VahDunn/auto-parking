@@ -6,7 +6,7 @@ import pytest
 
 from auto_parking.core.domain.models import VehicleModel
 from auto_parking.filter import VehicleFilter
-from auto_parking.ports.events import VEHICLE_EVENTS_TOPIC
+from auto_parking.ports.events import AUDIT_EVENTS_TOPIC, VEHICLE_EVENTS_TOPIC
 from auto_parking.service.vehicle import VehicleService
 
 pytestmark = pytest.mark.asyncio
@@ -77,6 +77,7 @@ async def test_vehicle_service_create_persists_domain_model():
 async def test_vehicle_service_create_publishes_vehicle_event():
     repo = AsyncMock()
     repo.create.return_value = vehicle_orm()
+    repo.manager_ids_for_enterprise.return_value = [21, 22]
     producer = AsyncMock()
     service = VehicleService(repo, event_producer=producer)
 
@@ -95,14 +96,19 @@ async def test_vehicle_service_create_publishes_vehicle_event():
         )
     )
 
-    producer.publish.assert_awaited_once()
-    topic, event = producer.publish.await_args.args
+    assert producer.publish.await_count == 2
+    topic, event = producer.publish.await_args_list[0].args
     assert topic == VEHICLE_EVENTS_TOPIC
     assert event.event_type == "vehicle.created"
     assert event.payload["vehicle_id"] == 1
     assert event.payload["vehicle_number"] == "А123ВС77"
     assert event.payload["enterprise_id"] == 10
-    assert producer.publish.await_args.kwargs == {"key": "1"}
+    assert event.payload["manager_user_ids"] == [21, 22]
+    assert producer.publish.await_args_list[0].kwargs == {"key": "1"}
+    audit_topic, audit_event = producer.publish.await_args_list[1].args
+    assert audit_topic == AUDIT_EVENTS_TOPIC
+    assert audit_event == event
+    assert producer.publish.await_args_list[1].kwargs == {"key": "1"}
 
 
 async def test_vehicle_service_update_persists_domain_model():

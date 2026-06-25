@@ -4,12 +4,12 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from auto_parking.api.router import api_router
+from auto_parking.core.config import settings
 from auto_parking.core.handlers import register_exception_handlers
 from auto_parking.core.logger import setup_logging
 from auto_parking.db.admin import setup_admin
 from auto_parking.db.engine import engine
 from auto_parking.db.events import register_listeners
-from auto_parking.deps.audit import audit_event_consumer
 from auto_parking.deps.events import close_event_producer
 from auto_parking.integrations.monitoring import setup_metrics
 from auto_parking.realtime.gps import gps_realtime_hub
@@ -18,11 +18,11 @@ from auto_parking.realtime.gps import gps_realtime_hub
 @asynccontextmanager
 async def lifespan(app_main: FastAPI):
     register_listeners()
-    await audit_event_consumer.start()
-    await gps_realtime_hub.start()
+    if settings.gps_consumer_enabled:
+        await gps_realtime_hub.start()
     yield
-    await gps_realtime_hub.stop()
-    await audit_event_consumer.stop()
+    if settings.gps_consumer_enabled:
+        await gps_realtime_hub.stop()
     await close_event_producer()
     await engine.dispose()
 

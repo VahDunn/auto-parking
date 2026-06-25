@@ -10,10 +10,8 @@ ENV_FILE = BASE_DIR / ".env"
 
 class Settings(BaseSettings):
     debug: bool = Field(default=False, alias="DEBUG")
-    database_url: str = Field(..., alias="DATABASE_URL")
     redis_url: str | None = Field(default=None, alias="REDIS_URL")
     telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
-    event_bus_backend: str = Field(default="kafka", alias="EVENT_BUS_BACKEND")
     kafka_bootstrap_servers: str | None = Field(
         default=None,
         alias="KAFKA_BOOTSTRAP_SERVERS",

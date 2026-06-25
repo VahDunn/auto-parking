@@ -4,7 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, noload, selectinload
 
-from auto_parking.db.models import Driver, Enterprise, Vehicle
+from auto_parking.core.domain.enums.user_role import UserRole
+from auto_parking.db.models import Driver, Enterprise, User, Vehicle, user_enterprise
 from auto_parking.filter import VehicleFilter
 
 
@@ -98,6 +99,18 @@ class VehicleRepository:
             select(Vehicle).where(Vehicle.id == vehicle_id).options(*self._base_options())
         )
         return result.scalar_one_or_none()
+
+    async def manager_ids_for_enterprise(self, enterprise_id: int) -> list[int]:
+        result = await self.db.execute(
+            select(User.id)
+            .join(user_enterprise, user_enterprise.c.user_id == User.id)
+            .where(
+                user_enterprise.c.enterprise_id == enterprise_id,
+                User.role == UserRole.manager,
+            )
+            .order_by(User.id)
+        )
+        return [int(user_id) for user_id in result.scalars().all()]
 
     async def create(self, data: dict) -> Vehicle:
         vehicle = Vehicle(**data)

@@ -9,7 +9,12 @@ from auto_parking.core.domain.models import VehicleModel
 from auto_parking.filter import VehicleFilter
 from auto_parking.observability.performance import log_cache_lookup
 from auto_parking.ports.cache import CacheClient
-from auto_parking.ports.events import VEHICLE_EVENTS_TOPIC, EventEnvelope, EventProducer
+from auto_parking.ports.events import (
+    AUDIT_EVENTS_TOPIC,
+    VEHICLE_EVENTS_TOPIC,
+    EventEnvelope,
+    EventProducer,
+)
 
 if TYPE_CHECKING:
     from auto_parking.db.models import Vehicle
@@ -26,12 +31,14 @@ class VehicleService:
         cache_ttl_seconds: int = 300,
         event_producer: EventProducer | None = None,
         event_topic: str = VEHICLE_EVENTS_TOPIC,
+        audit_event_topic: str = AUDIT_EVENTS_TOPIC,
     ) -> None:
         self._repo = repo
         self._cache = cache
         self._cache_ttl_seconds = cache_ttl_seconds
         self._event_producer = event_producer
         self._event_topic = event_topic
+        self._audit_event_topic = audit_event_topic
 
     async def get(self, filter_obj: VehicleFilter) -> list[VehicleModel]:
         vehicles: Sequence[Vehicle] = await self._repo.get(filter_obj)
@@ -153,7 +160,7 @@ class VehicleService:
         if resolved_vehicle_id is None:
             return
 
-        payload = self._vehicle_event_payload(vehicle, vehicle_id=resolved_vehicle_id)
+        payload = await self._vehicle_event_payload(vehicle, vehicle_id=resolved_vehicle_id)
         event = EventEnvelope.create(
             event_type=event_type,
             producer="auto-parking-api",
@@ -161,32 +168,56 @@ class VehicleService:
             entity_id=resolved_vehicle_id,
             payload=payload,
         )
+        await self._publish_event(
+            topic=self._event_topic,
+            event=event,
+            key=str(resolved_vehicle_id),
+            log_name="vehicle",
+        )
+        await self._publish_event(
+            topic=self._audit_event_topic,
+            event=event,
+            key=str(resolved_vehicle_id),
+            log_name="audit",
+        )
+
+    async def _publish_event(
+        self,
+        *,
+        topic: str,
+        event: EventEnvelope,
+        key: str,
+        log_name: str,
+    ) -> None:
+        if self._event_producer is None:
+            return
+
         try:
-            await self._event_producer.publish(
-                self._event_topic,
-                event,
-                key=str(resolved_vehicle_id),
-            )
+            await self._event_producer.publish(topic, event, key=key)
         except Exception:
             logger.warning(
-                "Failed to publish vehicle event: event_type=%s vehicle_id=%s",
-                event_type,
-                resolved_vehicle_id,
+                "Failed to publish %s event: topic=%s event_type=%s entity_id=%s",
+                log_name,
+                topic,
+                event.event_type,
+                event.entity_id,
                 exc_info=True,
             )
 
-    @staticmethod
-    def _vehicle_event_payload(
+    async def _vehicle_event_payload(
+        self,
         vehicle: VehicleModel | None,
         *,
         vehicle_id: int,
     ) -> dict:
         if vehicle is None:
-            return {"vehicle_id": vehicle_id}
+            return {"vehicle_id": vehicle_id, "manager_user_ids": []}
+        manager_ids = await self._repo.manager_ids_for_enterprise(vehicle.enterprise_id)
         return {
             "vehicle_id": vehicle_id,
             "vehicle_number": vehicle.vehicle_number,
             "enterprise_id": vehicle.enterprise_id,
+            "manager_user_ids": manager_ids,
             "model_id": vehicle.model_id,
             "active_driver_id": vehicle.active_driver_id,
             "driver_ids": list(vehicle.drivers),
