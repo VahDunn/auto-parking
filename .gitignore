@@ -1,4 +1,8 @@
 .*
+!.github/
+!.github/**
+!.gitignore
+!deploy/.env.prod.example
 *.egg-info/
 env/
 venv/

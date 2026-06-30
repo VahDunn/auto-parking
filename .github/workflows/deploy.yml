@@ -1,0 +1,95 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Docker image tag to deploy
+        required: true
+        default: latest
+      deploy_path:
+        description: Directory on the server with production compose and .env
+        required: true
+        default: /opt/auto-parking
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy over SSH
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare image namespace
+        id: images
+        shell: bash
+        run: |
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "namespace=${owner}/auto-parking" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_SSH_KEY"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload compose files
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ inputs.deploy_path }}
+        run: |
+          test -n "$DEPLOY_USER"
+          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p '$DEPLOY_PATH' '$DEPLOY_PATH/logs'"
+          scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" \
+            deploy/docker-compose.prod.yaml \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/docker-compose.yaml"
+          scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" \
+            nginx/nginx.conf \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/nginx.conf"
+
+      - name: Deploy stack
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ inputs.deploy_path }}
+          IMAGE_NAMESPACE: ${{ secrets.IMAGE_NAMESPACE }}
+          DEFAULT_IMAGE_NAMESPACE: ${{ steps.images.outputs.namespace }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          namespace="${IMAGE_NAMESPACE:-$DEFAULT_IMAGE_NAMESPACE}"
+          test -n "$namespace"
+          test -n "$GHCR_USERNAME"
+          test -n "$GHCR_TOKEN"
+
+          printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd '$DEPLOY_PATH' && \
+             docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin && \
+             IMAGE_REGISTRY='ghcr.io' IMAGE_NAMESPACE='$namespace' IMAGE_TAG='$IMAGE_TAG' \
+               docker compose --profile bot --profile notifications --profile audit pull && \
+             IMAGE_REGISTRY='ghcr.io' IMAGE_NAMESPACE='$namespace' IMAGE_TAG='$IMAGE_TAG' \
+               docker compose run --rm kafka-init && \
+             IMAGE_REGISTRY='ghcr.io' IMAGE_NAMESPACE='$namespace' IMAGE_TAG='$IMAGE_TAG' \
+               docker compose --profile migrate run --rm migrate && \
+             IMAGE_REGISTRY='ghcr.io' IMAGE_NAMESPACE='$namespace' IMAGE_TAG='$IMAGE_TAG' \
+               docker compose --profile bot --profile notifications --profile audit up -d && \
+             docker compose ps && \
+             curl -fsS http://localhost/api/health"

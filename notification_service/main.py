@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     settings = get_settings()
 
     if not settings.telegram_bot_token:
