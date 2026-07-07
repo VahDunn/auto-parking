@@ -8,6 +8,9 @@ env/
 venv/
 build/
 dist/
+node_modules/
+playwright-report/
+test-results/
 __pycache__/
 temp/
 tmp/
@@ -19,4 +22,6 @@ logs/
 *.key
 *.service
 *.json
+!package.json
+!package-lock.json
 .env

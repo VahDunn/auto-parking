@@ -14,8 +14,25 @@ jobs:
     runs-on: ubuntu-latest
     env:
       APP_ENV: test
-      DATABASE_URL: postgresql+asyncpg://auto_parking:change-me@localhost:5432/auto_parking
+      DATABASE_URL: postgresql+asyncpg://auto_parking:change-me@localhost:5432/auto_parking_test
+      AUDIT_DATABASE_URL: postgresql+asyncpg://auto_parking:change-me@localhost:5432/auto_parking_test
       JWT_SECRET_KEY: test-secret
+      RUN_INTEGRATION: "1"
+      TEST_DATABASE_URL: postgresql+asyncpg://auto_parking:change-me@localhost:5432/auto_parking_test
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: auto_parking_test
+          POSTGRES_USER: auto_parking
+          POSTGRES_PASSWORD: change-me
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U auto_parking -d auto_parking_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout

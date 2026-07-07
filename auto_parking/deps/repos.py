@@ -5,6 +5,7 @@ from auto_parking.deps.commons import depends_db
 from auto_parking.repo.driver import DriverRepository
 from auto_parking.repo.enterprise import EnterpriseRepository
 from auto_parking.repo.notification import NotificationRepository
+from auto_parking.repo.outbox import OutboxRepository
 from auto_parking.repo.report import ReportRepository
 from auto_parking.repo.trip import TripRepository
 from auto_parking.repo.user import UserRepository
@@ -67,6 +68,12 @@ def get_notification_repo(
     return NotificationRepository(db)
 
 
+def get_outbox_repo(
+    db: AsyncSession = depends_db,
+) -> OutboxRepository:
+    return OutboxRepository(db)
+
+
 dep_enterprise_repo = Depends(get_enterprise_repo)
 dep_vehicle_repo = Depends(get_vehicle_repo)
 dep_vehicle_model_repo = Depends(get_vehicle_model_repo)
@@ -76,3 +83,4 @@ dep_track_repo = Depends(get_vehicle_track_repo)
 dep_trip_repo = Depends(get_trip_repo)
 dep_report_repo = Depends(get_report_repo)
 dep_notification_repo = Depends(get_notification_repo)
+dep_outbox_repo = Depends(get_outbox_repo)

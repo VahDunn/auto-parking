@@ -8,21 +8,35 @@ from auto_parking.core.config import settings
 from auto_parking.core.handlers import register_exception_handlers
 from auto_parking.core.logger import setup_logging
 from auto_parking.db.admin import setup_admin
-from auto_parking.db.engine import engine
+from auto_parking.db.engine import AsyncSessionLocal, engine
 from auto_parking.db.events import register_listeners
-from auto_parking.deps.events import close_event_producer
+from auto_parking.deps.events import close_event_producer, get_event_producer
 from auto_parking.integrations.monitoring import setup_metrics
 from auto_parking.realtime.gps import gps_realtime_hub
+from auto_parking.service.outbox import OutboxDispatcher
+
+outbox_dispatcher = OutboxDispatcher(
+    sessionmaker=AsyncSessionLocal,
+    producer_factory=get_event_producer,
+    batch_size=settings.outbox_dispatcher_batch_size,
+    poll_interval_seconds=settings.outbox_dispatcher_poll_interval_seconds,
+    retry_delay_seconds=settings.outbox_dispatcher_retry_delay_seconds,
+    max_attempts=settings.outbox_dispatcher_max_attempts,
+)
 
 
 @asynccontextmanager
 async def lifespan(app_main: FastAPI):
     register_listeners()
+    if settings.outbox_dispatcher_enabled and settings.kafka_bootstrap_servers:
+        await outbox_dispatcher.start()
     if settings.gps_consumer_enabled:
         await gps_realtime_hub.start()
     yield
     if settings.gps_consumer_enabled:
         await gps_realtime_hub.stop()
+    if settings.outbox_dispatcher_enabled and settings.kafka_bootstrap_servers:
+        await outbox_dispatcher.stop()
     await close_event_producer()
     await engine.dispose()
 

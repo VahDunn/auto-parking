@@ -18,6 +18,7 @@ from auto_parking.ports.events import (
 
 if TYPE_CHECKING:
     from auto_parking.db.models import Vehicle
+    from auto_parking.repo.outbox import OutboxRepository
     from auto_parking.repo.vehicle import VehicleRepository
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ class VehicleService:
         cache: CacheClient | None = None,
         cache_ttl_seconds: int = 300,
         event_producer: EventProducer | None = None,
+        outbox_repo: "OutboxRepository | None" = None,
         event_topic: str = VEHICLE_EVENTS_TOPIC,
         audit_event_topic: str = AUDIT_EVENTS_TOPIC,
     ) -> None:
@@ -37,6 +39,7 @@ class VehicleService:
         self._cache = cache
         self._cache_ttl_seconds = cache_ttl_seconds
         self._event_producer = event_producer
+        self._outbox_repo = outbox_repo
         self._event_topic = event_topic
         self._audit_event_topic = audit_event_topic
 
@@ -59,29 +62,73 @@ class VehicleService:
 
     async def create(self, vehicle: VehicleModel) -> VehicleModel:
         data = self._persistence_data(vehicle)
+        if self._outbox_repo is not None:
+            try:
+                vehicle = await self._repo.create_uncommitted(data)
+                result = self._build_out(vehicle)
+                await self._emit_vehicle_event("vehicle.created", result)
+                await self._repo.db.commit()
+            except Exception:
+                await self._repo.db.rollback()
+                raise
+
+            await self._cache_vehicle(result)
+            return result
+
         vehicle: Vehicle = await self._repo.create(data)
         result = self._build_out(vehicle)
         await self._cache_vehicle(result)
-        await self._publish_vehicle_event("vehicle.created", result)
+        await self._emit_vehicle_event("vehicle.created", result)
         return result
 
     async def update(self, id: int, vehicle: VehicleModel) -> VehicleModel | None:
         data = self._persistence_data(vehicle)
+        if self._outbox_repo is not None:
+            try:
+                vehicle = await self._repo.update_uncommitted(id, data)
+                if vehicle is None:
+                    await self._repo.db.rollback()
+                    return None
+
+                result = self._build_out(vehicle)
+                await self._emit_vehicle_event("vehicle.updated", result)
+                await self._repo.db.commit()
+            except Exception:
+                await self._repo.db.rollback()
+                raise
+
+            await self._cache_vehicle(result)
+            return result
+
         vehicle = await self._repo.update(id, data)
         if vehicle is None:
             return None
 
         result = self._build_out(vehicle)
         await self._cache_vehicle(result)
-        await self._publish_vehicle_event("vehicle.updated", result)
+        await self._emit_vehicle_event("vehicle.updated", result)
         return result
 
     async def delete(self, id: int) -> bool:
         current = await self.get_by_id(id)
+        if self._outbox_repo is not None:
+            try:
+                deleted = await self._repo.delete_uncommitted(id)
+                if deleted:
+                    await self._emit_vehicle_event("vehicle.deleted", current, vehicle_id=id)
+                await self._repo.db.commit()
+            except Exception:
+                await self._repo.db.rollback()
+                raise
+
+            if deleted:
+                await self._delete_cached_vehicle(id)
+            return deleted
+
         deleted = await self._repo.delete(id)
         if deleted:
             await self._delete_cached_vehicle(id)
-            await self._publish_vehicle_event("vehicle.deleted", current, vehicle_id=id)
+            await self._emit_vehicle_event("vehicle.deleted", current, vehicle_id=id)
         return deleted
 
     async def _get_cached_vehicle(self, vehicle_id: int) -> VehicleModel | None:
@@ -146,14 +193,14 @@ class VehicleService:
     def _cache_key(vehicle_id: int) -> str:
         return f"vehicle:id:{vehicle_id}"
 
-    async def _publish_vehicle_event(
+    async def _emit_vehicle_event(
         self,
         event_type: str,
         vehicle: VehicleModel | None,
         *,
         vehicle_id: int | None = None,
     ) -> None:
-        if self._event_producer is None:
+        if self._event_producer is None and self._outbox_repo is None:
             return
 
         resolved_vehicle_id = vehicle.id if vehicle is not None else vehicle_id
@@ -168,20 +215,20 @@ class VehicleService:
             entity_id=resolved_vehicle_id,
             payload=payload,
         )
-        await self._publish_event(
+        await self._send_or_queue_event(
             topic=self._event_topic,
             event=event,
             key=str(resolved_vehicle_id),
             log_name="vehicle",
         )
-        await self._publish_event(
+        await self._send_or_queue_event(
             topic=self._audit_event_topic,
             event=event,
             key=str(resolved_vehicle_id),
             log_name="audit",
         )
 
-    async def _publish_event(
+    async def _send_or_queue_event(
         self,
         *,
         topic: str,
@@ -189,6 +236,10 @@ class VehicleService:
         key: str,
         log_name: str,
     ) -> None:
+        if self._outbox_repo is not None:
+            await self._outbox_repo.add_event(topic=topic, event=event, key=key)
+            return
+
         if self._event_producer is None:
             return
 

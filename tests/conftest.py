@@ -1,4 +1,10 @@
+import os
 from unittest.mock import AsyncMock, Mock
+
+os.environ.setdefault(
+    "AUDIT_DATABASE_URL",
+    "postgresql+asyncpg://auto_parking:change-me@localhost:5432/auto_parking_test",
+)
 
 import httpx
 import pytest
@@ -25,6 +31,16 @@ from auto_parking.deps.services import (
 )
 from auto_parking.deps.visibility import get_visible_enterprise_ids
 from auto_parking.main import app as fastapi_app
+
+
+def pytest_collection_modifyitems(config, items):
+    if os.getenv("RUN_INTEGRATION") == "1":
+        return
+
+    skip_integration = pytest.mark.skip(reason="set RUN_INTEGRATION=1 to run integration tests")
+    for item in items:
+        if "integration" in item.keywords:
+            item.add_marker(skip_integration)
 
 
 class FakeActor:

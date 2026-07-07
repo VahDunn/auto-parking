@@ -2,7 +2,6 @@ from fastapi import Depends
 
 from auto_parking.core.config import settings
 from auto_parking.deps.cache import get_cache_client
-from auto_parking.deps.events import get_event_producer
 from auto_parking.deps.integrations import get_reverse_geocoder
 from auto_parking.deps.notifications import notification_publisher
 from auto_parking.deps.repos import (
@@ -10,6 +9,7 @@ from auto_parking.deps.repos import (
     dep_enterprise_repo,
     dep_manager_repo,
     dep_notification_repo,
+    dep_outbox_repo,
     dep_report_repo,
     dep_track_repo,
     dep_trip_repo,
@@ -19,6 +19,7 @@ from auto_parking.deps.repos import (
 from auto_parking.repo.driver import DriverRepository
 from auto_parking.repo.enterprise import EnterpriseRepository
 from auto_parking.repo.notification import NotificationRepository
+from auto_parking.repo.outbox import OutboxRepository
 from auto_parking.repo.report import ReportRepository
 from auto_parking.repo.trip import TripRepository
 from auto_parking.repo.user import UserRepository
@@ -51,12 +52,15 @@ def get_driver_service(repo: DriverRepository = dep_driver_repo) -> DriverServic
     return DriverService(repo)
 
 
-def get_vehicle_service(repo: VehicleRepository = dep_vehicle_repo) -> VehicleService:
+def get_vehicle_service(
+    repo: VehicleRepository = dep_vehicle_repo,
+    outbox_repo: OutboxRepository = dep_outbox_repo,
+) -> VehicleService:
     return VehicleService(
         repo,
         cache=get_cache_client(),
         cache_ttl_seconds=settings.entity_cache_ttl_seconds,
-        event_producer=get_event_producer(),
+        outbox_repo=outbox_repo,
     )
 
 

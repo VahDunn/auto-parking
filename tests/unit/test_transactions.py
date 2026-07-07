@@ -78,6 +78,7 @@ async def test_repository_rolls_back_failed_write():
     db.rollback = AsyncMock()
     db.refresh = AsyncMock()
     repo = VehicleRepository(db)
+    repo.get_by_id = AsyncMock(return_value=vehicle_orm())
 
     with pytest.raises(RuntimeError, match="boom"):
         await repo.create(vehicle_data())

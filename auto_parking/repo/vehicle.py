@@ -113,20 +113,35 @@ class VehicleRepository:
         return [int(user_id) for user_id in result.scalars().all()]
 
     async def create(self, data: dict) -> Vehicle:
-        vehicle = Vehicle(**data)
-
-        self.db.add(vehicle)
-        await self.db.flush()
+        vehicle = await self.create_uncommitted(data)
         try:
             await self.db.commit()
         except Exception:
             await self.db.rollback()
             raise
 
-        await self.db.refresh(vehicle)
+        return await self.get_by_id(vehicle.id)  # pyright: ignore[reportReturnType]
+
+    async def create_uncommitted(self, data: dict) -> Vehicle:
+        vehicle = Vehicle(**data)
+        self.db.add(vehicle)
+        await self.db.flush()
         return await self.get_by_id(vehicle.id)  # pyright: ignore[reportReturnType]
 
     async def update(self, vehicle_id: int, data: dict) -> Vehicle | None:  # pyright: ignore[reportMissingTypeArgument]
+        vehicle = await self.update_uncommitted(vehicle_id, data)
+        if vehicle is None:
+            return None
+
+        try:
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        return await self.get_by_id(vehicle.id)
+
+    async def update_uncommitted(self, vehicle_id: int, data: dict) -> Vehicle | None:  # pyright: ignore[reportMissingTypeArgument]
         vehicle = await self.get_by_id(vehicle_id)
         if not vehicle:
             return None
@@ -134,25 +149,28 @@ class VehicleRepository:
         for k, v in data.items():
             setattr(vehicle, k, v)
 
+        await self.db.flush()
+        return await self.get_by_id(vehicle.id)
+
+    async def delete(self, vehicle_id: int) -> bool:
+        deleted = await self.delete_uncommitted(vehicle_id)
+        if not deleted:
+            return False
+
         try:
             await self.db.commit()
         except Exception:
             await self.db.rollback()
             raise
 
-        await self.db.refresh(vehicle)
-        return vehicle
+        return True
 
-    async def delete(self, vehicle_id: int) -> bool:
+    async def delete_uncommitted(self, vehicle_id: int) -> bool:
         vehicle = await self.get_by_id(vehicle_id)
         if not vehicle:
             return False
 
         await self.db.delete(vehicle)
-        try:
-            await self.db.commit()
-        except Exception:
-            await self.db.rollback()
-            raise
+        await self.db.flush()
 
         return True

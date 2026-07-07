@@ -4,6 +4,7 @@ from auto_parking.db.models.driver import Driver as Driver
 from auto_parking.db.models.enterprise import Enterprise as Enterprise
 from auto_parking.db.models.enterprise import user_enterprise as user_enterprise
 from auto_parking.db.models.notification import Notification as Notification
+from auto_parking.db.models.outbox_event import OutboxEvent as OutboxEvent
 from auto_parking.db.models.report import Report as Report
 from auto_parking.db.models.trip import Trip as Trip
 from auto_parking.db.models.user import User as User

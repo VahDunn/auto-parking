@@ -56,6 +56,20 @@ class Settings(BaseSettings):
         default=300,
         alias="VEHICLE_TRACK_CACHE_TTL_SECONDS",
     )
+    outbox_dispatcher_enabled: bool = Field(default=True, alias="OUTBOX_DISPATCHER_ENABLED")
+    outbox_dispatcher_batch_size: int = Field(default=100, alias="OUTBOX_DISPATCHER_BATCH_SIZE")
+    outbox_dispatcher_poll_interval_seconds: float = Field(
+        default=1.0,
+        alias="OUTBOX_DISPATCHER_POLL_INTERVAL_SECONDS",
+    )
+    outbox_dispatcher_retry_delay_seconds: int = Field(
+        default=5,
+        alias="OUTBOX_DISPATCHER_RETRY_DELAY_SECONDS",
+    )
+    outbox_dispatcher_max_attempts: int = Field(
+        default=10,
+        alias="OUTBOX_DISPATCHER_MAX_ATTEMPTS",
+    )
     model_config = {
         "env_file": str(ENV_FILE),
         "env_file_encoding": "utf-8",
