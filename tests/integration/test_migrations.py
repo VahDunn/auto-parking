@@ -3,6 +3,8 @@ import subprocess
 import sys
 
 import pytest
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -16,6 +18,7 @@ async def test_alembic_upgrade_head_builds_schema_from_scratch(
     integration_sessionmaker: async_sessionmaker[AsyncSession],
 ):
     database_url = os.environ["TEST_DATABASE_URL"]
+    expected_head = ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
 
     async with integration_sessionmaker() as session:
         conn = await session.connection()
@@ -56,5 +59,5 @@ async def test_alembic_upgrade_head_builds_schema_from_scratch(
             )
         ).scalars().all()
 
-    assert version == "8d42b0e9f1c3"
+    assert version == expected_head
     assert vehicle_indexes == ["ix_vehicle_vehicle_number_prefix"]
