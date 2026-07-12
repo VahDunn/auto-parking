@@ -1,7 +1,16 @@
+import os
 from time import perf_counter, time
 
 from fastapi import FastAPI, Request, Response
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    REGISTRY,
+    CollectorRegistry,
+    Counter,
+    Histogram,
+    generate_latest,
+    multiprocess,
+)
 
 from auto_parking.observability.access_log import log_access_request
 from auto_parking.observability.performance import log_http_request
@@ -60,7 +69,15 @@ def setup_metrics(app: FastAPI) -> None:
 
     @app.get("/metrics", include_in_schema=False)
     async def metrics() -> Response:
-        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+        return Response(generate_latest(_metrics_registry()), media_type=CONTENT_TYPE_LATEST)
+
+
+def _metrics_registry() -> CollectorRegistry:
+    if os.getenv("PROMETHEUS_MULTIPROC_DIR"):
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return registry
+    return REGISTRY
 
 
 def _route_path(request: Request) -> str:

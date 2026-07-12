@@ -11,7 +11,7 @@ from auto_parking.db.admin import setup_admin
 from auto_parking.db.engine import AsyncSessionLocal, engine
 from auto_parking.db.events import register_listeners
 from auto_parking.deps.events import close_event_producer, get_event_producer
-from auto_parking.integrations.monitoring import setup_metrics
+from auto_parking.integrations.monitoring import setup_metrics, setup_tracing, shutdown_tracing
 from auto_parking.realtime.gps import gps_realtime_hub
 from auto_parking.service.outbox import OutboxDispatcher
 
@@ -39,6 +39,7 @@ async def lifespan(app_main: FastAPI):
         await outbox_dispatcher.stop()
     await close_event_producer()
     await engine.dispose()
+    shutdown_tracing(app_main)
 
 
 def create_app() -> FastAPI:
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     setup_metrics(main_app)
+    setup_tracing(main_app, engine)
     register_exception_handlers(main_app)
     setup_admin(main_app)
     main_app.include_router(api_router, prefix="/api")

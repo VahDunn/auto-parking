@@ -1,0 +1,163 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: auto_parking_e2e_db
+    restart: "no"
+    environment:
+      POSTGRES_DB: auto_parking_e2e
+      POSTGRES_USER: auto_parking_e2e
+      POSTGRES_PASSWORD: auto_parking_e2e
+    volumes:
+      - e2e_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auto_parking_e2e -d auto_parking_e2e"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: auto_parking_e2e_redis
+    restart: "no"
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - e2e_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:3.9.1
+    container_name: auto_parking_e2e_kafka
+    restart: "no"
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+    volumes:
+      - e2e_kafka_data:/tmp/kraft-combined-logs
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  kafka-init:
+    build: .
+    container_name: auto_parking_e2e_kafka_init
+    restart: "no"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    command: >
+      python -m event_bus.init_topics
+
+  e2e-migrate:
+    build: .
+    container_name: auto_parking_e2e_migrate
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: test
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://auto_parking_e2e:auto_parking_e2e@db:5432/auto_parking_e2e
+      JWT_SECRET_KEY: test-secret
+    command: >
+      alembic upgrade head
+
+  e2e-seed:
+    build: .
+    container_name: auto_parking_e2e_seed
+    restart: "no"
+    depends_on:
+      e2e-migrate:
+        condition: service_completed_successfully
+    environment:
+      APP_ENV: test
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://auto_parking_e2e:auto_parking_e2e@db:5432/auto_parking_e2e
+      JWT_SECRET_KEY: test-secret
+    command: >
+      python -m auto_parking.minor_utilities.seed_e2e_data
+
+  auto-parking:
+    build: .
+    container_name: auto_parking_e2e_api
+    restart: "no"
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      e2e-seed:
+        condition: service_completed_successfully
+    environment:
+      APP_ENV: test
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://auto_parking_e2e:auto_parking_e2e@db:5432/auto_parking_e2e
+      JWT_SECRET_KEY: test-secret
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TTL_MINUTES: 60
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      GPS_CONSUMER_ENABLED: "false"
+      PERFORMANCE_LOG_PATH: /app/logs/e2e-performance.jsonl
+      APP_ACCESS_LOG_PATH: /app/logs/e2e-app-access.log
+    volumes:
+      - ./logs:/app/logs
+    command: >
+      uvicorn auto_parking.main:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 1
+    expose:
+      - "8000"
+
+  frontend:
+    build: ./frontend
+    container_name: auto_parking_e2e_frontend
+    restart: "no"
+    depends_on:
+      - auto-parking
+    expose:
+      - "80"
+
+  nginx:
+    image: nginx:alpine
+    container_name: auto_parking_e2e_nginx
+    restart: "no"
+    depends_on:
+      - frontend
+      - auto-parking
+    ports:
+      - "8081:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+volumes:
+  e2e_db_data:
+  e2e_redis_data:
+  e2e_kafka_data:

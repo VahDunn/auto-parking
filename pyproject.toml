@@ -33,6 +33,13 @@ dependencies = [
     "reactivex (>=4.1.0,<5.0.0)",
     "websockets (>=16.0,<17.0)",
     "aiokafka (>=0.14.0,<0.15.0)",
+    "opentelemetry-sdk (>=1.41.0,<2.0.0)",
+    "opentelemetry-exporter-otlp-proto-http (>=1.41.0,<2.0.0)",
+    "opentelemetry-instrumentation-fastapi (>=0.62b0,<0.63)",
+    "opentelemetry-instrumentation-sqlalchemy (>=0.62b0,<0.63)",
+    "opentelemetry-instrumentation-httpx (>=0.62b0,<0.63)",
+    "opentelemetry-instrumentation-redis (>=0.62b0,<0.63)",
+    "opentelemetry-instrumentation-aiokafka (>=0.62b0,<0.63)",
 ]
 
 

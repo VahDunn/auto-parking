@@ -24,4 +24,5 @@ logs/
 *.json
 !package.json
 !package-lock.json
+!monitoring/grafana/dashboards/*.json
 .env

@@ -25,6 +25,23 @@ class Settings(BaseSettings):
         default="logs/app-access.log",
         alias="APP_ACCESS_LOG_PATH",
     )
+    otel_tracing_enabled: bool = Field(default=False, alias="OTEL_TRACING_ENABLED")
+    otel_service_name: str = Field(default="auto-parking-api", alias="OTEL_SERVICE_NAME")
+    otel_service_version: str = Field(default="1.0.0", alias="OTEL_SERVICE_VERSION")
+    otel_exporter_otlp_traces_endpoint: str = Field(
+        default="http://localhost:4318/v1/traces",
+        alias="OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    )
+    otel_trace_sample_ratio: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        alias="OTEL_TRACE_SAMPLE_RATIO",
+    )
+    otel_fastapi_excluded_urls: str = Field(
+        default=".*/metrics$,.*/api/health$",
+        alias="OTEL_PYTHON_FASTAPI_EXCLUDED_URLS",
+    )
     performance_log_max_bytes: int = Field(
         default=10 * 1024 * 1024,
         alias="PERFORMANCE_LOG_MAX_BYTES",
