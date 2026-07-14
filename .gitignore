@@ -2,6 +2,7 @@
 !.github/
 !.github/**
 !.gitignore
+!.env.example
 !deploy/.env.prod.example
 *.egg-info/
 env/

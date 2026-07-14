@@ -1,19 +1,104 @@
 # Нагрузочное тестирование
 
-В проекте используется Locust. Сценарии лежат в `load_tests/locustfile.py`.
+Locust-сценарии из `load_tests/locustfile.py` измеряют latency, RPS и ошибки
+работающего HTTP-стенда. Это ручные performance-прогоны, а не функциональный
+pass/fail gate. Они не входят в GitHub Actions.
 
-## Запуск API
+Исторические цифры отделены от методики и находятся в
+[отчёте о масштабируемости](../reports/scalability.md). Общие Python-проверки
+описаны в [обзоре тестирования](README.md).
+
+## Безопасность
+
+> Locust не проверяет hostname и не защищает production от запуска мутационных
+> профилей. `WriteUser` и `ReadWriteUser` создают, изменяют и удаляют автомобили.
+> Используйте отдельный стенд и отдельную БД.
+
+Write-профили удаляют созданные записи после каждого успешного CRUD-цикла и
+пытаются очистить оставшиеся записи при остановке user. Это best-effort cleanup:
+аварийное завершение процесса или нештатный ответ API может оставить данные.
+
+Перед прогоном проверьте target в `--host`, выбранные enterprise/model IDs и
+учётную запись. Для воспроизводимого замера не запускайте Locust одновременно с
+E2E, seed или другими нагрузочными процессами.
+
+## Подготовка стенда
+
+Установить dev-зависимости и создать каталог для CSV:
 
 ```bash
-docker-compose up -d db redis auto-parking nginx
-docker-compose exec -T auto-parking alembic upgrade head
+poetry install --with dev --no-interaction
+mkdir -p logs
 ```
 
-Тесты бьют в nginx на `http://localhost`.
+Поднять локальное приложение за Nginx:
 
-## Baseline health
+```bash
+docker compose up -d --build nginx
+curl -fsS http://localhost/api/health
+```
 
-Показывает верхнюю границу для легкого endpoint-а без БД и auth.
+Compose-сервис `migrate` применяет Alembic migrations как зависимость backend.
+Authenticated-профилям нужны пользователь и подходящие тестовые данные:
+
+- существующие vehicle IDs для detail/track запросов;
+- существующие enterprise IDs для фильтров;
+- существующие enterprise и vehicle model для write-профилей.
+
+По умолчанию каждый виртуальный пользователь входит как `superman` / `superman`.
+Можно передать другой login/password или готовый access token.
+
+## Профили
+
+| Класс | Нагрузка | Мутации |
+| --- | --- | --- |
+| `HealthUser` | непрерывный `GET /api/health`, без auth | нет |
+| `HotApiUser` | взвешенная смесь частых list/detail GET-запросов | нет |
+| `ReadOnlyUser` | alias `HotApiUser` с тем же набором задач | нет |
+| `TrackApiUser` | задачи `HotApiUser` плюс track и trips GET-запросы | нет |
+| `WriteUser` | цикл `POST` → `PATCH` → `DELETE` автомобиля | да |
+| `ReadWriteUser` | задачи `HotApiUser` плюс CRUD-цикл с меньшим весом | да |
+
+`TrackApiUser` не является изолированным track benchmark: из-за наследования он
+одновременно выполняет обычные hot API requests.
+
+У всех профилей `wait_time = 0`, поэтому они создают максимально плотный поток
+запросов в пределах доступной конкурентности.
+
+## Переменные окружения
+
+| Переменная | Default | Использование |
+| --- | --- | --- |
+| `LOCUST_USERNAME` | `superman` | login при старте виртуального пользователя |
+| `LOCUST_PASSWORD` | `superman` | password при login |
+| `LOCUST_TOKEN` | не задан | готовый bearer token; если задан, login не выполняется |
+| `LOCUST_VEHICLE_IDS` | `1,2,3,4,5` | detail, track и trips requests |
+| `LOCUST_ENTERPRISE_IDS` | `2` | enterprise filter в read-профилях |
+| `LOCUST_WRITE_ENTERPRISE_ID` | `2` | enterprise для создаваемых автомобилей |
+| `LOCUST_WRITE_MODEL_ID` | `1` | vehicle model для создаваемых автомобилей |
+| `LOCUST_TRACK_DATE_FROM` | `2024-01-01T00:00:00+00:00` | начало track interval |
+| `LOCUST_TRACK_DATE_TO` | `2026-01-01T00:00:00+00:00` | конец track interval |
+
+Готовый `LOCUST_TOKEN` полезен, если login не должен влиять на подготовительную
+фазу прогона. Сам login не входит в повторяющиеся tasks.
+
+## Headless-запуск
+
+Общий шаблон:
+
+```bash
+poetry run locust \
+  -f load_tests/locustfile.py PROFILE \
+  --host http://localhost \
+  --headless \
+  -u USERS \
+  -r SPAWN_RATE \
+  -t DURATION \
+  --csv logs/RESULT_PREFIX
+```
+
+Замените uppercase placeholders реальными значениями. Например, health
+baseline без auth:
 
 ```bash
 poetry run locust \
@@ -26,73 +111,24 @@ poetry run locust \
   --csv logs/locust-health
 ```
 
-## Частые authenticated ручки
+Authenticated read mix с явно выбранными данными:
 
 ```bash
-export LOCUST_TOKEN="$(poetry run python - <<'PY'
-import httpx
-
-response = httpx.post(
-    "http://localhost/api/auth/login",
-    json={"username": "superman", "password": "superman"},
-    timeout=20,
-)
-response.raise_for_status()
-print(response.json()["access_token"])
-PY
-)"
-
-LOCUST_TOKEN="$LOCUST_TOKEN" \
 LOCUST_VEHICLE_IDS=1,2,3,4,5 \
 LOCUST_ENTERPRISE_IDS=2 \
 poetry run locust \
   -f load_tests/locustfile.py HotApiUser \
   --host http://localhost \
   --headless \
-  -u 50 \
-  -r 10 \
+  -u 20 \
+  -r 5 \
   -t 60s \
   --csv logs/locust-hot-api
 ```
 
-## Треки
-
-Этот профиль тяжелее, потому что добавляет точки и поездки.
+Мутационный профиль на отдельном стенде:
 
 ```bash
-LOCUST_TOKEN="$LOCUST_TOKEN" \
-LOCUST_VEHICLE_IDS=1,2,3,4,5 \
-LOCUST_TRACK_DATE_FROM=2024-01-01T00:00:00+00:00 \
-LOCUST_TRACK_DATE_TO=2026-01-01T00:00:00+00:00 \
-poetry run locust \
-  -f load_tests/locustfile.py TrackApiUser \
-  --host http://localhost \
-  --headless \
-  -u 20 \
-  -r 5 \
-  -t 60s \
-  --csv logs/locust-track-api
-```
-
-## Read/write профили
-
-Read-only профиль дергает только `GET`-ручки. Write-only профиль делает цикл
-`POST /api/vehicles` -> `PATCH /api/vehicles/{id}` -> `DELETE /api/vehicles/{id}`.
-
-```bash
-LOCUST_TOKEN="$LOCUST_TOKEN" \
-poetry run locust \
-  -f load_tests/locustfile.py ReadOnlyUser \
-  --host http://localhost \
-  --headless \
-  -u 20 \
-  -r 5 \
-  -t 30s \
-  --csv logs/locust-read-only
-```
-
-```bash
-LOCUST_TOKEN="$LOCUST_TOKEN" \
 LOCUST_WRITE_ENTERPRISE_ID=2 \
 LOCUST_WRITE_MODEL_ID=1 \
 poetry run locust \
@@ -102,68 +138,22 @@ poetry run locust \
   -u 5 \
   -r 1 \
   -t 30s \
-  --csv logs/locust-write-only
+  --csv logs/locust-write
 ```
 
-```bash
-LOCUST_TOKEN="$LOCUST_TOKEN" \
-LOCUST_WRITE_ENTERPRISE_ID=2 \
-LOCUST_WRITE_MODEL_ID=1 \
-poetry run locust \
-  -f load_tests/locustfile.py ReadWriteUser \
-  --host http://localhost \
-  --headless \
-  -u 20 \
-  -r 5 \
-  -t 30s \
-  --csv logs/locust-read-write
-```
+Чтобы запустить другой профиль, достаточно заменить имя класса и подобрать
+нагрузку. Для `TrackApiUser` дополнительно задайте корректный временной interval;
+для `ReadWriteUser` действуют одновременно read и write variables.
 
-## Что смотреть
+## Как читать результат
 
-- `Requests/s` - фактический RPS.
-- `Failures/s` и failure count - ошибки под нагрузкой.
-- `50%`, `95%`, `99%` - latency percentiles.
-- Если RPS перестал расти при увеличении `-u`, значит уперлись в приложение, БД, nginx или машину.
+- `Requests/s` — фактическая интенсивность завершённых запросов;
+- failure count и `Failures/s` — ошибки API и проверки ответов в сценарии;
+- p50, p95 и p99 — распределение latency, а не среднее значение;
+- plateau RPS при росте `-u` — признак насыщения приложения, БД, Nginx или host;
+- write RPS считает отдельные HTTP requests: один полный CRUD-цикл состоит из
+  трёх запросов.
 
-## Текущие результаты
-
-Локальные замеры через nginx, Docker Desktop, один `uvicorn` worker:
-
-| Профиль | Users | RPS | Failures | p50 | p95 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `HealthUser` | `50` | `1733` | `0` | `24 ms` | `71 ms` |
-| `HealthUser` | `100` | `1615` | `0` | `51 ms` | `110 ms` |
-| `HotApiUser` | `5` | `80` | `0` | `48 ms` | `140 ms` |
-| `HotApiUser` | `10` | `72` | `0` | `110 ms` | `320 ms` |
-| `HotApiUser` | `20` | `77` | `0` | `240 ms` | `560 ms` |
-| `TrackApiUser` | `3` | `54` | `0` | `42 ms` | `140 ms` |
-
-Итог: health-only baseline держит около `1.6-1.7 kRPS`, а реальная смесь частых authenticated API - около `0.08 kRPS` при p95 около `140 ms`.
-
-## Повтор с 5 workers
-
-После добавления `--workers 5` в backend command:
-
-| Профиль | Workers | Users | RPS | Failures | p50 | p95 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `HealthUser` | `1` | `100` | `1615` | `0` | `51 ms` | `110 ms` |
-| `HealthUser` | `5` | `100` | `2149` | `0` | `45 ms` | `53 ms` |
-| `HotApiUser` | `1` | `5` | `80` | `0` | `48 ms` | `140 ms` |
-| `HotApiUser` | `5` | `5` | `96` | `0` | `46 ms` | `140 ms` |
-| `HotApiUser` | `1` | `10` | `72` | `0` | `110 ms` | `320 ms` |
-| `HotApiUser` | `5` | `10` | `144` | `0` | `50 ms` | `180 ms` |
-| `HotApiUser` | `1` | `20` | `77` | `0` | `240 ms` | `560 ms` |
-| `HotApiUser` | `5` | `20` | `190` | `0` | `79 ms` | `260 ms` |
-
-Итог: 5 workers подняли реальную смесь API примерно до `0.19 kRPS`. Дальше надо отдельно проверять websocket/live-сценарии, потому что in-memory состояния существуют отдельно в каждом worker process.
-
-## Read/write замер с 5 workers
-
-| Профиль | Users | RPS | Failures | p50 | p95 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `ReadOnlyUser` | `20` | `188` | `0` | `73 ms` | `260 ms` |
-| `WriteUser` | `5` | `114` | `0` | `52 ms` | `61 ms` |
-| `ReadWriteUser` | `20` | `155` | `0` | `86 ms` | `330 ms` |
-
-`WriteUser` считает RPS по отдельным write-запросам. Один полный цикл записи состоит из трех запросов: `POST`, `PATCH`, `DELETE`. Поэтому `114 RPS` - это примерно `38` CRUD-циклов в секунду.
+Фиксируйте вместе с результатом commit, dataset, число Uvicorn workers, ресурсы
+Docker/host, профиль, `-u`, `-r`, duration и все `LOCUST_*` overrides. Без этого
+сравнение двух прогонов ненадёжно.

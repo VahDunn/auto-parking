@@ -1,97 +1,95 @@
-# GPS Track Generator
+# Генератор GPS-треков
 
-## Генерация GPS-треков
-
-Для проекта добавлена CLI-утилита на Typer:
-
-    auto_parking/minor_utilities/track_generator.py
-
-Она умеет: - генерировать live-трек для одной машины; - генерировать
-live-треки для всех машин предприятия; - очищать старые точки.
+CLI `auto_parking.minor_utilities.track_generator` создаёт точки и поездки в
+основной БД, публикует live GPS events в Kafka и тем самым обновляет карту через
+WebSocket. Команды изменяют данные; используйте development/test окружение.
 
 ## Подготовка
 
-Убедиться, что контейнеры подняты:
+Запустите локальный стенд и убедитесь, что нужные `vehicle_id`/`enterprise_id`
+существуют. Общая инструкция находится в
+[локальной разработке](../development/local-setup.md).
 
-    docker-compose up -d --build
+Посмотреть все параметры:
 
-## Очистка точек
+```bash
+docker compose exec auto-parking \
+  python -m auto_parking.minor_utilities.track_generator --help
+```
 
-Удалить все точки:
+## Одна машина
 
-    docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-clear --all
+```bash
+docker compose exec auto-parking \
+  python -m auto_parking.minor_utilities.track_generator \
+  track-generate-live \
+  --vehicle-id 3214 \
+  --radius-km 3 \
+  --track-length-km 2 \
+  --interval-sec 5 \
+  --clear-before \
+  --loop
+```
 
-Удалить точки одной машины:
+Без `--loop` генератор завершится после одного маршрута. Для воспроизводимого
+маршрута используйте `--seed`; `--no-osrm` отключает внешний OSRM.
 
-    docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-clear --vehicle-id 3214
+## Предприятие
 
-## Генерация трека для одной машины
+```bash
+docker compose exec auto-parking \
+  python -m auto_parking.minor_utilities.track_generator \
+  track-generate-enterprise-live \
+  --enterprise-id 2 \
+  --vehicles-count 10 \
+  --radius-km 3 \
+  --track-length-km 2 \
+  --interval-sec 1 \
+  --clear-before
+```
 
-    docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-generate-live \
-      --vehicle-id 3214 \
-      --radius-km 3 \
-      --track-length-km 2 \
-      --interval-sec 5 \
-      --clear-before
+Остановите непрерывную генерацию через `Ctrl+C`.
 
-С бесконечной генерацией:
+## Очистка
 
-    docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-generate-live \
-      --vehicle-id 3214 \
-      --radius-km 3 \
-      --track-length-km 2 \
-      --interval-sec 5 \
-      --clear-before \
-      --loop
+Удалить поездки и точки одной машины:
 
-## Генерация для всего предприятия
+```bash
+docker compose exec auto-parking \
+  python -m auto_parking.minor_utilities.track_generator \
+  track-clear --vehicle-id 3214
+```
 
-    docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-generate-enterprise-live \
-      --enterprise-id 2 \
-      --radius-km 3 \
-      --track-length-km 2 \
-      --interval-sec 5 \
-      --clear-before
+Удаление данных всех машин требует явного флага:
 
-## Просмотр движения в реальном времени
+```bash
+docker compose exec auto-parking \
+  python -m auto_parking.minor_utilities.track_generator \
+  track-clear --all
+```
 
-1. Открыть приложение по адресу `http://localhost`, войти и выбрать предприятие.
-2. Убедиться, что над картой показано `Live: подключено`.
-3. В отдельном терминале запустить генерацию:
+## Проверка
 
-       docker-compose exec auto-parking python -m auto_parking.minor_utilities.track_generator track-generate-enterprise-live \
-         --enterprise-id 2 \
-         --vehicles-count 10 \
-         --interval-sec 1
+После авторизации откройте приложение и убедитесь, что карта показывает
+`Live: подключено`. Исторические точки можно запросить через Nginx:
 
-Новые GPS-точки публикуются в Kafka topic `auto-parking.gps.events`, затем проходят через RxPY pipeline и приходят на карту по WebSocket. Для каждой машины на карте создается отдельный движущийся маркер.
+```bash
+curl --get 'http://localhost/api/vehicles/3214/track' \
+  -H 'Authorization: Bearer <TOKEN>' \
+  --data-urlencode 'date_from=2026-04-01T00:00:00Z' \
+  --data-urlencode 'date_to=2026-04-30T23:59:59Z' \
+  --data-urlencode 'format=json'
+```
 
-## Проверка через API
+Последние строки БД:
 
-JSON:
-
-    curl "http://localhost:8001/api/vehicles/3214/track?date_from=2026-04-01T00:00:00Z&date_to=2026-04-30T23:59:59Z&format=json" \
-      -H "Authorization: Bearer <TOKEN>"
-
-GeoJSON:
-
-    curl "http://localhost:8001/api/vehicles/3214/track?date_from=2026-04-01T00:00:00Z&date_to=2026-04-30T23:59:59Z&format=geojson" \
-      -H "Authorization: Bearer <TOKEN>"
-
-## Проверка через БД
-
-    docker-compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
-    SELECT
-        vehicle_id,
-        recorded_at_utc,
-        ST_X(position) AS lon,
-        ST_Y(position) AS lat
+```bash
+docker compose exec db sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+    SELECT vehicle_id, recorded_at_utc,
+           ST_X(position) AS lon, ST_Y(position) AS lat
     FROM vehicle_gps_point
-    WHERE vehicle_id = 3214
     ORDER BY recorded_at_utc DESC
     LIMIT 10;
-    "
-
-## Остановка
-
-    Ctrl+C
+  "'
+```

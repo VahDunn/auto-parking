@@ -1,13 +1,14 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from auto_parking.core.domain.enums import NotificationType, UserRole
 from auto_parking.core.security.passwords import hash_password
 from auto_parking.db.models import Enterprise, Notification, Trip, User, Vehicle
 from auto_parking.db.models.vehicle_model import VehicleModel as VehicleModelOrm
+from auto_parking.repo.notification import NotificationRepository
 from auto_parking.repo.vehicle_track import VehicleTrackRepository
 
 pytestmark = [
@@ -219,3 +220,39 @@ async def test_notification_api_lists_marks_one_and_marks_all_for_logged_in_mana
         persisted_notifications = result.scalars().all()
 
     assert all(notification.read_at is not None for notification in persisted_notifications)
+
+
+async def test_notification_repository_does_not_load_unused_relationship_graph(
+    integration_sessionmaker,
+):
+    manager, own_notifications, _ = await seed_notification_flow(integration_sessionmaker)
+    statements: list[str] = []
+
+    async with integration_sessionmaker() as session:
+        sync_engine = session.bind.sync_engine
+
+        def capture_statement(
+            connection,
+            cursor,
+            statement,
+            parameters,
+            context,
+            executemany,
+        ):
+            del connection, cursor, parameters, context, executemany
+            statements.append(statement)
+
+        event.listen(sync_engine, "before_cursor_execute", capture_statement)
+        try:
+            notifications = await NotificationRepository(session).get_for_user(
+                user_id=manager.id,
+                unread_only=True,
+            )
+        finally:
+            event.remove(sync_engine, "before_cursor_execute", capture_statement)
+
+    assert {notification.id for notification in notifications} == {
+        notification.id for notification in own_notifications
+    }
+    assert len(statements) == 1
+    assert "FROM notification" in statements[0]

@@ -1,17 +1,12 @@
-# GoAccess
+# GoAccess и access logs
 
-## Application access log
+GoAccess строит локальные HTML-отчёты из двух независимых источников. Он не
+входит в Docker Compose и устанавливается отдельно.
 
-Приложение пишет встроенный access log в `logs/app-access.log`.
-Формат совместим с GoAccess и не зависит от локали:
+## Лог приложения
 
-```text
-127.0.0.1 - - [1780738445] "GET /api/health HTTP/1.1" 200 15 "-" "curl/8.7.1" 12.345
-```
-
-Последнее поле - длительность запроса в миллисекундах.
-
-Собрать отчет:
+FastAPI пишет `logs/app-access.log` в формате с Unix timestamp и дополнительной
+длительностью запроса в миллисекундах.
 
 ```bash
 goaccess logs/app-access.log \
@@ -20,21 +15,16 @@ goaccess logs/app-access.log \
   -o logs/goaccess-app-report.html
 ```
 
-## Nginx access log
+Путь задаётся `APP_ACCESS_LOG_PATH`; локальный Compose монтирует каталог `logs`
+в API container.
 
-Nginx пишет access log в формате `goaccess_combined` с unix timestamp:
+## Лог Nginx
 
-```text
-127.0.0.1 - - [1780738445] "GET /api/health HTTP/1.1" 200 15 "-" "curl/8.7.1"
-```
-
-Такой формат не зависит от локали терминала и не ломается на датах вида
-`22/May/2026`.
-
-Собрать отчет из docker logs:
+Nginx пишет access log в stdout в формате `goaccess_combined`. Сначала сохраните
+его без Compose prefix, затем постройте отчёт:
 
 ```bash
-docker-compose logs --no-color nginx \
+docker compose logs --no-color nginx \
   | sed -E 's/^auto_parking_nginx[[:space:]]+\\| //' \
   > logs/nginx-access.log
 
@@ -44,5 +34,5 @@ goaccess logs/nginx-access.log \
   -o logs/goaccess-nginx-report.html
 ```
 
-Для старых логов nginx в дефолтном формате `22/May/2026` нужен старый
-combined-конфиг или запуск с `LC_ALL=C`.
+Форматы хранятся в `monitoring/goaccess`. Отчёты и исходные логи находятся в
+gitignored-каталоге `logs` и не являются постоянным monitoring storage.

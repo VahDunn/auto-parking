@@ -1,160 +1,77 @@
-# Prometheus and Grafana
+# Prometheus и Grafana
 
-> Подробное руководство с теорией metrics, PromQL, добавлением custom metrics,
-> Grafana-as-code и связью с OpenTelemetry находится в
-> [`observability-guide.md`](observability-guide.md).
+Документ описывает метрики, dashboards и диагностику. Запуск всего локального
+стека находится в [локальной разработке](../development/local-setup.md), alerts
+и доставка — в отдельном [runbook](alerting.md).
 
-## What is wired together
+## Поток данных
 
-The monitoring stack is part of `docker-compose.yaml`.
+```text
+FastAPI /metrics --------------------> Prometheus -> Grafana
+Nginx /api/health <- Blackbox Exporter -> Prometheus -> Grafana
+Collector /metrics ------------------> Prometheus
+Tempo /metrics ----------------------> Prometheus
+```
 
-| Component | Compose service | Local URL | Purpose |
+Prometheus обращается к API по Docker DNS `auto-parking:8000`. Synthetic probe
+проходит через Nginx и тем самым проверяет не только процесс FastAPI, но и
+пользовательский маршрут до `/api/health`.
+
+## Метрики приложения
+
+| Метрика | Тип | Labels | Назначение |
 | --- | --- | --- | --- |
-| API metrics endpoint | `auto-parking` | `http://localhost/metrics` | Exposes application metrics through Nginx. |
-| Blackbox Exporter | `blackbox-exporter` | internal only | Probes the real `/api/health` route through Nginx. |
-| Prometheus | `prometheus` | `http://localhost:9090` | Scrapes API, synthetic health, exporter, and self-metrics. |
-| Grafana | `grafana` | `http://localhost:3000` | Shows the provisioned API dashboards. |
+| `auto_parking_http_requests_total` | counter | `method`, `path`, `status` | HTTP-запросы, кроме `/metrics` |
+| `auto_parking_http_request_duration_seconds` | histogram | `method`, `path` | latency HTTP |
+| `auto_parking_http_error_responses_total` | counter | `audience`, `caller`, `error_type` | стабильный сигнал 4xx/5xx для rules |
+| `auto_parking_interservice_http_requests_total` | counter | `caller`, `method`, `path`, `status` | внутренний HTTP-трафик |
+| `auto_parking_sql_events_by_severity_total` | counter | `severity` | SQL-события для rules |
+| `auto_parking_sql_events_total` | counter | `severity`, `operation`, `category` | детализация SQL errors/messages |
+| `auto_parking_sql_query_duration_seconds` | histogram | `operation` | latency SQL |
 
-Inside the Docker network Prometheus scrapes the API directly:
+HTTP paths нормализуются по шаблону FastAPI route, чтобы ID сущностей не
+создавали неограниченную cardinality. SQL statements и тексты ошибок не
+помещаются в labels.
 
-```yaml
-scrape_configs:
-  - job_name: auto-parking-api
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - auto-parking:8000
-```
+Локальный API работает с несколькими Uvicorn workers, поэтому включён режим
+`PROMETHEUS_MULTIPROC_DIR`. Startup-команда очищает этот каталог перед запуском;
+при ручном изменении workers контейнер нужно пересоздать.
 
-Grafana is provisioned with a Prometheus datasource:
+## Synthetic health
 
-```yaml
-url: http://prometheus:9090
-uid: prometheus
-```
+Blackbox Exporter публикует:
 
-The default home dashboard path is:
+- `probe_success` — `1`, если Nginx вернул ожидаемый HTTP status;
+- `probe_duration_seconds` — полная длительность проверки;
+- `probe_http_status_code` — фактический status.
 
-```text
-/var/lib/grafana/dashboards/auto-parking-api.json
-```
+Health requests исключены из пользовательских RPS/latency panels и traces.
 
-That file is mounted from:
+## Provisioned dashboards
 
-```text
-monitoring/grafana/dashboards/auto-parking-api.json
-```
-
-Grafana also provisions two focused dashboards from the same directory:
-
-| Dashboard | UID | What it shows |
+| Dashboard | UID | Назначение |
 | --- | --- | --- |
-| Auto Parking Request Mix | `auto-parking-request-mix` | Request rate and volume split by route, method, and status code. |
-| Auto Parking Response Time | `auto-parking-response-time` | Exact average latency plus p50, p95, and p99 by request type. |
+| Auto Parking API | `auto-parking-api` | общий health, RPS, errors и latency |
+| Auto Parking Request Mix | `auto-parking-request-mix` | методы, routes и statuses |
+| Auto Parking Response Time | `auto-parking-response-time` | average, p50, p95 и p99 |
+| Auto Parking Alerts | `auto-parking-alerts` | firing alerts, SQL/HTTP signals и baseline |
 
-Both focused dashboards exclude the synthetic `/api/health` probe so it does
-not hide real API traffic.
+JSON хранится в `monitoring/grafana/dashboards`, provisioning — в
+`monitoring/grafana/provisioning`. Provisioned dashboard следует менять в JSON;
+изменение только через UI не является постоянным.
 
-## Application metrics
-
-The FastAPI app registers metrics in `auto_parking/integrations/monitoring/prometheus.py`.
-
-Current custom metrics:
-
-| Metric | Type | Labels | Meaning |
-| --- | --- | --- | --- |
-| `auto_parking_http_requests_total` | counter | `method`, `path`, `status` | Total non-`/metrics` HTTP requests. |
-| `auto_parking_http_request_duration_seconds` | histogram | `method`, `path` | Request duration distribution. |
-
-The API runs with several Uvicorn workers in local compose. For that reason
-`PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc` is set for the API container,
-and the startup command clears and recreates that directory before Uvicorn starts.
-
-## Synthetic health monitoring
-
-Prometheus uses Blackbox Exporter to request the application through the same
-Nginx route that local users access:
-
-```text
-Prometheus -> blackbox-exporter:9115 -> http://nginx/api/health
-```
-
-The probe runs every five seconds even when there is no user traffic. It exports:
-
-| Metric | Meaning |
-| --- | --- |
-| `probe_success` | `1` when the route returns HTTP 200, otherwise `0`. |
-| `probe_duration_seconds` | End-to-end health request duration. |
-| `probe_http_status_code` | HTTP status returned by Nginx. |
-
-The Grafana dashboard shows the current probe state, latency, and one-hour
-availability. Synthetic `/api/health` requests are filtered out of the regular
-request rate, latency, error-rate, and total-request panels.
-
-## Run locally
-
-```bash
-docker compose up -d --build nginx prometheus grafana
-```
-
-This starts the dependency chain required by `nginx`, then starts Prometheus and
-Grafana.
-
-Open:
-
-- application: `http://localhost`;
-- Prometheus: `http://localhost:9090`;
-- Grafana: `http://localhost:3000`;
-- Grafana login: `admin` / `admin`.
-
-To populate the API dashboards with a short read-only sample:
-
-```bash
-poetry run locust \
-  -f load_tests/locustfile.py ReadOnlyUser \
-  --host http://localhost \
-  --headless \
-  -u 1 \
-  -r 1 \
-  -t 15s \
-  --only-summary \
-  --exit-code-on-error 1
-```
-
-The scenario performs only authenticated `GET` requests. Even one user is
-visible because the load-test client sends the next request without an
-artificial wait.
-
-## Verify
-
-Check API metrics through Nginx:
+## Проверка
 
 ```bash
 curl -fsS http://localhost/metrics | head -50
+curl -fsS http://localhost:9090/-/ready
+curl -fsS 'http://localhost:9090/api/v1/query?query=up'
+curl -fsS -u admin:admin http://localhost:3000/api/datasources/uid/prometheus
+curl -fsS -u admin:admin \
+  http://localhost:3000/api/dashboards/uid/auto-parking-api
 ```
 
-Check API metrics from Prometheus container:
-
-```bash
-docker compose exec -T prometheus wget -qO- http://auto-parking:8000/metrics | head -50
-```
-
-Check Prometheus targets:
-
-```bash
-curl -fsS http://localhost:9090/api/v1/targets
-```
-
-Expected result: targets `auto-parking-api`, `auto-parking-health`,
-`blackbox-exporter`, `otel-collector`, `tempo`, and `prometheus` have `health: up`.
-
-Check that Prometheus receives API samples:
-
-```bash
-curl -fsS 'http://localhost:9090/api/v1/query?query=auto_parking_http_requests_total'
-```
-
-Check the synthetic HTTP probe:
+Проверка synthetic route:
 
 ```bash
 curl -fsS --get \
@@ -162,51 +79,55 @@ curl -fsS --get \
   http://localhost:9090/api/v1/query
 ```
 
-Check Grafana datasource provisioning:
+## Полезные PromQL-запросы
 
-```bash
-curl -fsS -u admin:admin http://localhost:3000/api/datasources/name/Prometheus
+RPS по route:
+
+```promql
+sum by (method, path) (rate(auto_parking_http_requests_total[5m]))
 ```
 
-Check Grafana dashboard provisioning:
+HTTP p95:
 
-```bash
-curl -fsS -u admin:admin http://localhost:3000/api/search?query=Auto%20Parking%20API
-curl -fsS -u admin:admin \
-  http://localhost:3000/api/dashboards/uid/auto-parking-request-mix
-curl -fsS -u admin:admin \
-  http://localhost:3000/api/dashboards/uid/auto-parking-response-time
+```promql
+histogram_quantile(
+  0.95,
+  sum by (le, method, path) (
+    rate(auto_parking_http_request_duration_seconds_bucket[5m])
+  )
+)
 ```
 
-## Troubleshooting
+Доля 5xx:
 
-If Prometheus shows `auto-parking-api` as down, check that the API container is
-running and that `/metrics` works inside the Docker network:
+```promql
+sum(rate(auto_parking_http_requests_total{status=~"5.."}[5m]))
+/
+sum(rate(auto_parking_http_requests_total[5m]))
+```
+
+## Диагностика
+
+Если target down:
 
 ```bash
 docker compose ps
-docker compose logs --no-color --tail=120 auto-parking prometheus
-docker compose exec -T prometheus wget -qO- http://auto-parking:8000/metrics
+docker compose logs --tail=120 auto-parking nginx blackbox-exporter prometheus
+docker compose exec -T prometheus \
+  wget -qO- http://auto-parking:8000/metrics
 ```
 
-If `auto-parking-health` is down, inspect the exporter and probe the target
-directly from its container:
+Если Grafana не видит dashboard или datasource:
 
 ```bash
-docker compose logs --no-color --tail=120 blackbox-exporter prometheus nginx
-docker compose exec -T blackbox-exporter wget -qO- \
-  'http://localhost:9115/probe?module=auto_parking_health&target=http://nginx/api/health'
+docker compose logs --tail=120 grafana
 ```
 
-If Grafana opens but the dashboard is missing, check provisioning logs:
-
-```bash
-docker compose logs --no-color --tail=120 grafana
-```
-
-If metrics are empty after changing worker count, recreate the API container so
-the multiprocess metrics directory is cleaned:
+Если series пропали после изменения числа workers:
 
 ```bash
 docker compose up -d --force-recreate auto-parking
 ```
+
+Пороговые условия не дублируются здесь: источником истины остаётся
+`monitoring/alerts.yml`, а порядок расследования описан в [Alerting](alerting.md).

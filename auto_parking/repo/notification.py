@@ -4,8 +4,15 @@ from typing import Any
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload
 
 from auto_parking.db.models import Notification
+
+_NOTIFICATION_NOLOAD_OPTIONS = (
+    noload(Notification.recipient),
+    noload(Notification.enterprise),
+    noload(Notification.trip),
+)
 
 
 class NotificationRepository:
@@ -22,6 +29,7 @@ class NotificationRepository:
     ) -> Sequence[Notification]:
         stmt = (
             select(Notification)
+            .options(*_NOTIFICATION_NOLOAD_OPTIONS)
             .where(Notification.recipient_user_id == user_id)
             .order_by(Notification.created_at.desc(), Notification.id.desc())
             .offset(offset)
@@ -50,6 +58,7 @@ class NotificationRepository:
         ids = [notification.id for notification in notifications]
         result = await self.db.execute(
             select(Notification)
+            .options(*_NOTIFICATION_NOLOAD_OPTIONS)
             .where(Notification.id.in_(ids))
             .order_by(Notification.created_at.desc(), Notification.id.desc())
         )
@@ -106,7 +115,9 @@ class NotificationRepository:
         notification_id: int,
     ) -> Notification | None:
         result = await self.db.execute(
-            select(Notification).where(
+            select(Notification)
+            .options(*_NOTIFICATION_NOLOAD_OPTIONS)
+            .where(
                 Notification.id == notification_id,
                 Notification.recipient_user_id == user_id,
             )

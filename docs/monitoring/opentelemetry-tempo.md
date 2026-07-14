@@ -1,119 +1,107 @@
-# OpenTelemetry and Tempo
+# OpenTelemetry и Tempo
 
-> Полное введение со схемами, TraceQL, manual spans, Kafka propagation,
-> sampling и конфигурацией находится в
-> [`observability-guide.md`](observability-guide.md).
-
-## Data flow
-
-The local tracing path is:
+## Поток traces
 
 ```text
 FastAPI -> OTLP/HTTP -> OpenTelemetry Collector -> OTLP/gRPC -> Tempo -> Grafana
 ```
 
-| Component | Compose service | Local URL or port | Purpose |
-| --- | --- | --- | --- |
-| Instrumented API | `auto-parking` | internal `8000` | Creates request and dependency spans. |
-| OpenTelemetry Collector | `otel-collector` | `4317` gRPC, `4318` HTTP | Receives, batches, and forwards traces. |
-| Tempo | `tempo` | `http://localhost:3200` | Stores and queries traces. |
-| Grafana | `grafana` | `http://localhost:3000` | Searches and displays traces through the `tempo` datasource. |
+| Компонент | Роль |
+| --- | --- |
+| `auto-parking` | создаёт server и dependency spans |
+| `otel-collector` | принимает OTLP, ограничивает память, группирует и отправляет batches |
+| `tempo` | хранит и индексирует локальные traces |
+| `grafana` | ищет и показывает traces через datasource `tempo` |
 
-The API instruments:
+Сейчас instrumented только основной API process. Подключены FastAPI,
+SQLAlchemy, Redis, HTTPX и AIOKafka instrumentors. Notification- и audit-service
+не отправляют traces в Collector.
 
-- FastAPI server requests;
-- SQLAlchemy database calls;
-- Redis commands;
-- outgoing HTTPX requests;
-- AIOKafka producers and consumers.
+`/metrics` и `/api/health` исключены. Root sampling применяется к входящему HTTP
+или Kafka consumer; фоновые SQL/Redis/HTTPX/Kafka producer операции сами по себе
+не создают поток разрозненных root traces.
 
-`/metrics` and `/api/health` are excluded from tracing. The sampler starts new
-traces only for inbound HTTP and Kafka consumer operations. SQL, Redis, HTTPX,
-and Kafka producer spans are retained as children, but background polling does
-not create a stream of disconnected root traces.
+Transactional outbox отделяет HTTP transaction от поздней публикации Kafka.
+Без явного сохранения trace context в outbox payload сквозной parent-child trace
+через эту границу не гарантируется.
 
-## Configuration
+## Конфигурация
 
-The main files are:
-
-- `auto_parking/integrations/monitoring/tracing.py` - SDK and instrumentation setup;
-- `monitoring/otel-collector.yml` - OTLP receiver, batching, and Tempo exporter;
-- `monitoring/tempo.yml` - local single-binary Tempo storage;
-- `monitoring/grafana/provisioning/datasources/tempo.yml` - Grafana datasource.
-
-Environment variables:
-
-| Variable | Local default | Meaning |
+| Переменная | Значение в локальном Compose | Назначение |
 | --- | --- | --- |
-| `OTEL_TRACING_ENABLED` | `true` in Compose | Enables API tracing. |
-| `OTEL_SERVICE_NAME` | `auto-parking-api` | Tempo service name. |
-| `OTEL_SERVICE_VERSION` | `1.0.0` | Resource service version. |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | `http://otel-collector:4318/v1/traces` | OTLP/HTTP trace endpoint. |
-| `OTEL_TRACE_SAMPLE_RATIO` | `1.0` | Fraction of new entry-point traces to retain. |
-| `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS` | metrics and health regexes | Comma-separated URL exclusion patterns. |
+| `OTEL_TRACING_ENABLED` | `true` | включает tracing API |
+| `OTEL_SERVICE_NAME` | `auto-parking-api` | имя сервиса |
+| `OTEL_SERVICE_VERSION` | `1.0.0` | версия resource |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | `http://otel-collector:4318/v1/traces` | OTLP/HTTP endpoint |
+| `OTEL_TRACE_SAMPLE_RATIO` | `1.0` | доля новых entry-point traces |
+| `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS` | metrics/health regex | исключённые URL |
 
-Set `OTEL_TRACING_ENABLED=false` to run the API without tracing. For a
-non-local deployment, lower the sampling ratio and configure authenticated TLS
-between the application, Collector, and backend.
+Код SDK находится в
+`auto_parking/integrations/monitoring/tracing.py`, Collector — в
+`monitoring/otel-collector.yml`, Tempo — в `monitoring/tempo.yml`.
 
-## Run and explore
+## Поиск в Grafana
 
-```bash
-docker compose up -d --build nginx prometheus tempo otel-collector grafana
-```
+Откройте <http://localhost:3000/explore>, выберите datasource `Tempo` и режим
+TraceQL.
 
-Open Grafana, choose **Explore**, select the **Tempo** datasource, and use:
+Все traces API:
 
 ```traceql
 { resource.service.name = "auto-parking-api" }
 ```
 
-To focus on one route:
+Конкретный route:
 
 ```traceql
-{ span.http.route = "/api/vehicles" }
+{ resource.service.name = "auto-parking-api" && span.http.route = "/api/vehicles" }
 ```
 
-## Verify
+Ошибочные или медленные SQL spans:
 
-Check service health:
+```traceql
+{ span.db.system = "postgresql" && status = error }
+```
+
+```traceql
+{ span.db.system = "postgresql" && duration > 100ms }
+```
+
+## Проверка pipeline
 
 ```bash
-docker compose ps tempo otel-collector auto-parking grafana
+docker compose ps auto-parking otel-collector tempo grafana
 curl -fsS http://localhost:3200/ready
-docker compose exec -T prometheus wget -qO- http://otel-collector:13133/
-```
-
-Check Grafana provisioning:
-
-```bash
 curl -fsS -u admin:admin http://localhost:3000/api/datasources/uid/tempo
 ```
 
-Generate a deterministic trace and retrieve it by ID:
+Создать trace с предсказуемым ID и получить его из Tempo:
 
 ```bash
 curl -fsS -o /dev/null \
-  -H "traceparent: 00-0123456789abcdef0123456789abcdef-0123456789abcdef-01" \
+  -H 'traceparent: 00-0123456789abcdef0123456789abcdef-0123456789abcdef-01' \
   http://localhost/openapi.json
 
 curl -fsS \
   http://localhost:3200/api/traces/0123456789abcdef0123456789abcdef
 ```
 
-Prometheus also scrapes the `otel-collector` and `tempo` jobs. Useful Collector
-pipeline metrics include `otelcol_receiver_accepted_spans`,
-`otelcol_exporter_sent_spans`, and `otelcol_exporter_send_failed_spans`.
+Prometheus собирает внутренние метрики Collector и Tempo. Для pipeline особенно
+полезны `otelcol_receiver_accepted_spans`, `otelcol_exporter_sent_spans` и
+`otelcol_exporter_send_failed_spans`.
 
-## Troubleshooting
-
-If traces do not arrive, inspect the complete path:
+## Диагностика
 
 ```bash
-docker compose logs --no-color --tail=120 auto-parking otel-collector tempo
-docker compose exec -T prometheus wget -qO- http://otel-collector:8888/metrics
+docker compose logs --tail=120 auto-parking otel-collector tempo
+docker compose exec -T prometheus \
+  wget -qO- http://otel-collector:8888/metrics
 ```
 
-An unavailable Collector does not prevent the API from serving requests. The
-batch exporter retries transient delivery failures, while its queue and failure
-metrics show whether spans are backing up or being dropped.
+Если accepted растёт, а sent нет, проверяйте exporter и доступность Tempo. Если
+оба счётчика не растут, проверяйте endpoint приложения, sampling и excluded URL.
+Недоступный Collector не должен останавливать HTTP API, но очередь exporter
+ограничена и при долгом сбое traces могут быть потеряны.
+
+Локальная конфигурация не включает TLS/auth, объектное хранилище, явный
+retention или HA и не должна переноситься в production без доработки.

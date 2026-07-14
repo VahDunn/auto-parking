@@ -1,0 +1,211 @@
+rule_files:
+  - ../alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  - name: HTTP p95 is critical after a sustained threefold spike
+    interval: 15s
+    input_series:
+      - series: 'auto_parking:http_request_duration_seconds:p95_5m{method="GET",path="/api/test"}'
+        values: '0.8x20'
+      - series: 'auto_parking:http_request_duration_seconds:p95_baseline_1h{method="GET",path="/api/test"}'
+        values: '0.2x20'
+      - series: 'auto_parking:http_requests:rate5m{method="GET",path="/api/test"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 2m15s
+        alertname: AutoParkingHTTPP95LatencySpike
+        exp_alerts:
+          - exp_labels:
+              alert_category: latency
+              method: GET
+              path: /api/test
+              service: auto-parking-api
+              severity: critical
+              team: backend
+            exp_annotations:
+              summary: p95 HTTP вырос более чем втрое
+              description: >-
+                GET /api/test: текущий p95 выше трёхкратного часового baseline и
+                абсолютного порога 250 мс.
+              runbook: docs/monitoring/alerting.md#high-latency
+
+  - name: SQL p95 is critical after a sustained threefold spike
+    interval: 15s
+    input_series:
+      - series: 'auto_parking:sql_query_duration_seconds:p95_5m{operation="SELECT"}'
+        values: '0.3x20'
+      - series: 'auto_parking:sql_query_duration_seconds:p95_baseline_1h{operation="SELECT"}'
+        values: '0.05x20'
+      - series: 'auto_parking:sql_queries:rate5m{operation="SELECT"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 2m15s
+        alertname: AutoParkingSQLP95LatencySpike
+        exp_alerts:
+          - exp_labels:
+              alert_category: latency
+              operation: SELECT
+              service: auto-parking-api
+              severity: critical
+              team: backend
+            exp_annotations:
+              summary: p95 SQL вырос более чем втрое
+              description: >-
+                SELECT: текущий p95 выше трёхкратного часового baseline и абсолютного
+                порога 100 мс.
+              runbook: docs/monitoring/alerting.md#high-latency
+
+  - name: A single SQL FATAL event is critical
+    interval: 15s
+    input_series:
+      - series: 'auto_parking_sql_events_by_severity_total{severity="FATAL"}'
+        values: '0 1x8'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: AutoParkingSQLFatalOrPanic
+        exp_alerts:
+          - exp_labels:
+              alert_category: sql
+              service: auto-parking-api
+              severity: critical
+              team: backend
+            exp_annotations:
+              summary: PostgreSQL FATAL/PANIC в приложении
+              description: >-
+                За последнюю минуту обнаружено хотя бы одно критическое SQL-событие.
+                Подробности по operation/category смотрите на alert dashboard и в traces.
+              runbook: docs/monitoring/alerting.md#sql-errors
+
+  - name: Three SQL ERROR events become a warning
+    interval: 15s
+    input_series:
+      - series: 'auto_parking_sql_events_by_severity_total{severity="ERROR"}'
+        values: '0 3x12'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: AutoParkingSQLErrorBurst
+        exp_alerts:
+          - exp_labels:
+              alert_category: sql
+              service: auto-parking-api
+              severity: warning
+              team: backend
+            exp_annotations:
+              summary: Серия SQL ERROR
+              description: >-
+                Не менее трёх SQL-ошибок за 10 минут. Подробности по operation/category
+                смотрите на alert dashboard и в traces.
+              runbook: docs/monitoring/alerting.md#sql-errors
+
+  - name: Ten PostgreSQL WARNING events become a warning
+    interval: 15s
+    input_series:
+      - series: 'auto_parking_sql_events_by_severity_total{severity="WARNING"}'
+        values: '0 10x16'
+    alert_rule_test:
+      - eval_time: 2m30s
+        alertname: AutoParkingSQLWarningBurst
+        exp_alerts:
+          - exp_labels:
+              alert_category: sql
+              service: auto-parking-api
+              severity: warning
+              team: backend
+            exp_annotations:
+              summary: Серия PostgreSQL WARNING
+              description: >-
+                Не менее десяти предупреждений за 10 минут. Подробности по
+                operation/category смотрите на alert dashboard.
+              runbook: docs/monitoring/alerting.md#sql-errors
+
+  - name: A single interservice 400 becomes a warning
+    interval: 15s
+    input_series:
+      - series: 'auto_parking_http_error_responses_total{audience="interservice",caller="telegram-bot",error_type="400"}'
+        values: '0 1x8'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: AutoParkingInterservice4xx
+        exp_alerts:
+          - exp_labels:
+              alert_category: http_errors
+              caller: telegram-bot
+              error_type: "400"
+              service: auto-parking-api
+              severity: warning
+              team: backend
+            exp_annotations:
+              summary: "Межсервисные 4xx: telegram-bot"
+              description: >-
+                Получен хотя бы один ответ типа 400 за 5 минут. Для контролируемых
+                клиентов любой 4xx считается дефектом контракта; route/status найдите
+                на alert dashboard.
+              runbook: docs/monitoring/alerting.md#http-errors
+
+  - name: A single interservice 5xx is critical
+    interval: 15s
+    input_series:
+      - series: 'auto_parking_http_error_responses_total{audience="interservice",caller="notification-service",error_type="5xx"}'
+        values: '0 1x8'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: AutoParkingInterservice5xx
+        exp_alerts:
+          - exp_labels:
+              alert_category: http_errors
+              caller: notification-service
+              service: auto-parking-api
+              severity: critical
+              team: backend
+            exp_annotations:
+              summary: "Межсервисный 5xx: notification-service"
+              description: >-
+                API вернул 5xx внутреннему клиенту. Точный route/status найдите на
+                alert dashboard и затем откройте trace за тот же интервал.
+              runbook: docs/monitoring/alerting.md#http-errors
+
+  - name: Twenty public other 4xx responses become a warning
+    interval: 15s
+    input_series:
+      - series: 'auto_parking_http_error_responses_total{audience="external",caller="external",error_type="other_4xx"}'
+        values: '0 20x16'
+    alert_rule_test:
+      - eval_time: 2m30s
+        alertname: AutoParkingPublic4xxBurst
+        exp_alerts:
+          - exp_labels:
+              alert_category: http_errors
+              error_type: other_4xx
+              service: auto-parking-api
+              severity: warning
+              team: backend
+            exp_annotations:
+              summary: Всплеск публичных HTTP other_4xx
+              description: >-
+                Не менее двадцати ответов other_4xx за 10 минут. Проверьте ошибку
+                клиента, сломанный frontend и активность ботов.
+              runbook: docs/monitoring/alerting.md#http-errors
+
+  - name: Three external 5xx responses are critical
+    interval: 15s
+    input_series:
+      - series: 'auto_parking_http_error_responses_total{audience="external",caller="external",error_type="5xx"}'
+        values: '0 3x12'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: AutoParkingExternal5xxBurst
+        exp_alerts:
+          - exp_labels:
+              alert_category: http_errors
+              caller: external
+              service: auto-parking-api
+              severity: critical
+              team: backend
+            exp_annotations:
+              summary: Серия внешних API 5xx
+              description: >-
+                Не менее трёх внешних ответов 5xx за пять минут; caller=external.
+                Точный route/status смотрите на dashboard.
+              runbook: docs/monitoring/alerting.md#http-errors

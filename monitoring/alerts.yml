@@ -1,0 +1,285 @@
+groups:
+  - name: auto-parking-recording-rules
+    interval: 15s
+    rules:
+      - record: auto_parking:http_request_duration_seconds:p95_5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, method, path) (
+              rate(auto_parking_http_request_duration_seconds_bucket[5m])
+            )
+          )
+
+      - record: auto_parking:http_request_duration_seconds:p95_baseline_1h
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, method, path) (
+              rate(auto_parking_http_request_duration_seconds_bucket[1h] offset 5m)
+            )
+          )
+
+      - record: auto_parking:http_requests:rate5m
+        expr: |
+          sum by (method, path) (
+            rate(auto_parking_http_requests_total[5m])
+          )
+
+      - record: auto_parking:sql_query_duration_seconds:p95_5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, operation) (
+              rate(auto_parking_sql_query_duration_seconds_bucket[5m])
+            )
+          )
+
+      - record: auto_parking:sql_query_duration_seconds:p95_baseline_1h
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, operation) (
+              rate(auto_parking_sql_query_duration_seconds_bucket[1h] offset 5m)
+            )
+          )
+
+      - record: auto_parking:sql_queries:rate5m
+        expr: |
+          sum by (operation) (
+            rate(auto_parking_sql_query_duration_seconds_count[5m])
+          )
+
+  - name: auto-parking-sql-alerts
+    interval: 15s
+    rules:
+      - alert: AutoParkingSQLFatalOrPanic
+        expr: |
+          sum (
+            increase(auto_parking_sql_events_by_severity_total{severity=~"FATAL|PANIC"}[1m])
+          ) > 0
+        keep_firing_for: 5m
+        labels:
+          severity: critical
+          service: auto-parking-api
+          team: backend
+          alert_category: sql
+        annotations:
+          summary: "PostgreSQL FATAL/PANIC в приложении"
+          description: >-
+            За последнюю минуту обнаружено хотя бы одно критическое SQL-событие.
+            Подробности по operation/category смотрите на alert dashboard и в traces.
+          runbook: "docs/monitoring/alerting.md#sql-errors"
+
+      - alert: AutoParkingSQLErrorBurst
+        expr: |
+          sum (
+            increase(auto_parking_sql_events_by_severity_total{severity="ERROR"}[10m])
+          ) >= 3
+        for: 1m
+        keep_firing_for: 5m
+        labels:
+          severity: warning
+          service: auto-parking-api
+          team: backend
+          alert_category: sql
+        annotations:
+          summary: "Серия SQL ERROR"
+          description: >-
+            Не менее трёх SQL-ошибок за 10 минут. Подробности по operation/category
+            смотрите на alert dashboard и в traces.
+          runbook: "docs/monitoring/alerting.md#sql-errors"
+
+      - alert: AutoParkingSQLWarningBurst
+        expr: |
+          sum (
+            increase(auto_parking_sql_events_by_severity_total{severity="WARNING"}[10m])
+          ) >= 10
+        for: 2m
+        keep_firing_for: 5m
+        labels:
+          severity: warning
+          service: auto-parking-api
+          team: backend
+          alert_category: sql
+        annotations:
+          summary: "Серия PostgreSQL WARNING"
+          description: >-
+            Не менее десяти предупреждений за 10 минут. Подробности по
+            operation/category смотрите на alert dashboard.
+          runbook: "docs/monitoring/alerting.md#sql-errors"
+
+  - name: auto-parking-latency-alerts
+    interval: 15s
+    rules:
+      - alert: AutoParkingHTTPP95LatencyHigh
+        expr: |
+          auto_parking:http_request_duration_seconds:p95_5m > 0.5
+          and on (method, path)
+          auto_parking:http_requests:rate5m >= 0.2
+        for: 5m
+        keep_firing_for: 5m
+        labels:
+          severity: warning
+          service: auto-parking-api
+          team: backend
+          alert_category: latency
+        annotations:
+          summary: "Высокий p95 HTTP для {{ $labels.method }} {{ $labels.path }}"
+          description: >-
+            p95 дольше 500 мс в течение пяти минут при достаточном трафике;
+            сейчас {{ $value | humanizeDuration }}.
+          runbook: "docs/monitoring/alerting.md#high-latency"
+
+      - alert: AutoParkingHTTPP95LatencySpike
+        expr: |
+          (
+            auto_parking:http_request_duration_seconds:p95_5m
+              > 3 * auto_parking:http_request_duration_seconds:p95_baseline_1h
+          )
+          and on (method, path)
+          auto_parking:http_request_duration_seconds:p95_5m > 0.25
+          and on (method, path)
+          auto_parking:http_requests:rate5m >= 0.2
+        for: 2m
+        keep_firing_for: 10m
+        labels:
+          severity: critical
+          service: auto-parking-api
+          team: backend
+          alert_category: latency
+        annotations:
+          summary: "p95 HTTP вырос более чем втрое"
+          description: >-
+            {{ $labels.method }} {{ $labels.path }}: текущий p95 выше трёхкратного
+            часового baseline и абсолютного порога 250 мс.
+          runbook: "docs/monitoring/alerting.md#high-latency"
+
+      - alert: AutoParkingSQLP95LatencyHigh
+        expr: |
+          auto_parking:sql_query_duration_seconds:p95_5m > 0.25
+          and on (operation)
+          auto_parking:sql_queries:rate5m >= 0.2
+        for: 5m
+        keep_firing_for: 5m
+        labels:
+          severity: warning
+          service: auto-parking-api
+          team: backend
+          alert_category: latency
+        annotations:
+          summary: "Высокий p95 SQL для {{ $labels.operation }}"
+          description: >-
+            p95 SQL дольше 250 мс в течение пяти минут при достаточном числе запросов;
+            сейчас {{ $value | humanizeDuration }}.
+          runbook: "docs/monitoring/alerting.md#high-latency"
+
+      - alert: AutoParkingSQLP95LatencySpike
+        expr: |
+          (
+            auto_parking:sql_query_duration_seconds:p95_5m
+              > 3 * auto_parking:sql_query_duration_seconds:p95_baseline_1h
+          )
+          and on (operation)
+          auto_parking:sql_query_duration_seconds:p95_5m > 0.1
+          and on (operation)
+          auto_parking:sql_queries:rate5m >= 0.2
+        for: 2m
+        keep_firing_for: 10m
+        labels:
+          severity: critical
+          service: auto-parking-api
+          team: backend
+          alert_category: latency
+        annotations:
+          summary: "p95 SQL вырос более чем втрое"
+          description: >-
+            {{ $labels.operation }}: текущий p95 выше трёхкратного часового baseline
+            и абсолютного порога 100 мс.
+          runbook: "docs/monitoring/alerting.md#high-latency"
+
+  - name: auto-parking-http-error-alerts
+    interval: 15s
+    rules:
+      - alert: AutoParkingInterservice4xx
+        expr: |
+          sum by (caller, error_type) (
+            increase(auto_parking_http_error_responses_total{
+              audience="interservice", error_type=~"400|404|other_4xx"
+            }[5m])
+          ) >= 1
+        keep_firing_for: 5m
+        labels:
+          severity: warning
+          service: auto-parking-api
+          team: backend
+          alert_category: http_errors
+        annotations:
+          summary: "Межсервисные 4xx: {{ $labels.caller }}"
+          description: >-
+            Получен хотя бы один ответ типа {{ $labels.error_type }} за 5 минут.
+            Для контролируемых клиентов любой 4xx считается дефектом контракта;
+            route/status найдите на alert dashboard.
+          runbook: "docs/monitoring/alerting.md#http-errors"
+
+      - alert: AutoParkingInterservice5xx
+        expr: |
+          sum by (caller) (
+            increase(auto_parking_http_error_responses_total{
+              audience="interservice", error_type="5xx"
+            }[5m])
+          ) >= 1
+        keep_firing_for: 10m
+        labels:
+          severity: critical
+          service: auto-parking-api
+          team: backend
+          alert_category: http_errors
+        annotations:
+          summary: "Межсервисный 5xx: {{ $labels.caller }}"
+          description: >-
+            API вернул 5xx внутреннему клиенту. Точный route/status найдите на
+            alert dashboard и затем откройте trace за тот же интервал.
+          runbook: "docs/monitoring/alerting.md#http-errors"
+
+      - alert: AutoParkingPublic4xxBurst
+        expr: |
+          sum by (error_type) (
+            increase(auto_parking_http_error_responses_total{
+              audience="external", error_type=~"400|404|other_4xx"
+            }[10m])
+          ) >= 20
+        for: 2m
+        keep_firing_for: 5m
+        labels:
+          severity: warning
+          service: auto-parking-api
+          team: backend
+          alert_category: http_errors
+        annotations:
+          summary: "Всплеск публичных HTTP {{ $labels.error_type }}"
+          description: >-
+            Не менее двадцати ответов {{ $labels.error_type }} за 10 минут. Проверьте
+            ошибку клиента, сломанный frontend и активность ботов.
+          runbook: "docs/monitoring/alerting.md#http-errors"
+
+      - alert: AutoParkingExternal5xxBurst
+        expr: |
+          sum by (caller) (
+            increase(auto_parking_http_error_responses_total{
+              audience="external", error_type="5xx"
+            }[5m])
+          ) >= 3
+        for: 1m
+        keep_firing_for: 10m
+        labels:
+          severity: critical
+          service: auto-parking-api
+          team: backend
+          alert_category: http_errors
+        annotations:
+          summary: "Серия внешних API 5xx"
+          description: >-
+            Не менее трёх внешних ответов 5xx за пять минут; caller={{ $labels.caller }}.
+            Точный route/status смотрите на dashboard.
+          runbook: "docs/monitoring/alerting.md#http-errors"

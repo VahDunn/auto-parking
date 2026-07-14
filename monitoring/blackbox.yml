@@ -1,0 +1,14 @@
+modules:
+  auto_parking_health:
+    prober: http
+    timeout: 3s
+    http:
+      method: GET
+      valid_status_codes:
+        - 200
+      valid_http_versions:
+        - HTTP/1.1
+      follow_redirects: false
+      preferred_ip_protocol: ip4
+      fail_if_body_not_matches_regexp:
+        - '"status"\s*:\s*"ok"'

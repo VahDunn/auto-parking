@@ -277,9 +277,47 @@ services:
       - blackbox-exporter
     ports:
       - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.external-url=http://localhost:9090
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
+
+  alertmanager:
+    image: prom/alertmanager:v0.32.1
+    container_name: auto_parking_alertmanager
+    profiles:
+      - alerts
+    restart: unless-stopped
+    depends_on:
+      - mailpit
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.external-url=http://localhost:9093
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alertmanager/templates:/etc/alertmanager/templates:ro
+      - alertmanager_data:/alertmanager
+    secrets:
+      - alert_telegram_bot_token
+      - alert_telegram_chat_id
+
+  mailpit:
+    image: axllent/mailpit:v1.30.0
+    container_name: auto_parking_mailpit
+    profiles:
+      - alerts
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+    expose:
+      - "1025"
 
   tempo:
     image: grafana/tempo:3.0.2
@@ -396,3 +434,10 @@ volumes:
   prometheus_data:
   grafana_data:
   tempo_data:
+  alertmanager_data:
+
+secrets:
+  alert_telegram_bot_token:
+    environment: TELEGRAM_BOT_TOKEN
+  alert_telegram_chat_id:
+    environment: ALERT_TELEGRAM_CHAT_ID

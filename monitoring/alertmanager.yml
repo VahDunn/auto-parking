@@ -1,0 +1,83 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: mailpit:1025
+  smtp_from: alertmanager@auto-parking.local
+  smtp_require_tls: false
+
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+route:
+  receiver: oncall-warning
+  group_by:
+    - alertname
+    - service
+    - audience
+    - caller
+    - error_type
+    - method
+    - path
+    - operation
+  group_wait: 1m
+  group_interval: 10m
+  repeat_interval: 6h
+  routes:
+    - receiver: oncall-critical
+      matchers:
+        - severity="critical"
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 30m
+    - receiver: oncall-warning
+      matchers:
+        - severity="warning"
+      mute_time_intervals:
+        - moscow-night
+
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal:
+      - service
+      - alert_category
+
+receivers:
+  - name: oncall-critical
+    telegram_configs:
+      - bot_token_file: /run/secrets/alert_telegram_bot_token
+        chat_id_file: /run/secrets/alert_telegram_chat_id
+        send_resolved: true
+        parse_mode: ""
+        message: '{{ template "auto_parking.telegram.message" . }}'
+    email_configs:
+      - to: oncall@auto-parking.local
+        send_resolved: true
+        headers:
+          Subject: '[auto-parking][{{ .Status }}][{{ .CommonLabels.severity }}] {{ .CommonLabels.alertname }}'
+        html: '{{ template "auto_parking.email.html" . }}'
+
+  - name: oncall-warning
+    telegram_configs:
+      - bot_token_file: /run/secrets/alert_telegram_bot_token
+        chat_id_file: /run/secrets/alert_telegram_chat_id
+        send_resolved: true
+        parse_mode: ""
+        message: '{{ template "auto_parking.telegram.message" . }}'
+    email_configs:
+      - to: oncall@auto-parking.local
+        send_resolved: true
+        headers:
+          Subject: '[auto-parking][{{ .Status }}][{{ .CommonLabels.severity }}] {{ .CommonLabels.alertname }}'
+        html: '{{ template "auto_parking.email.html" . }}'
+
+time_intervals:
+  - name: moscow-night
+    time_intervals:
+      - times:
+          - start_time: "00:00"
+            end_time: "08:00"
+          - start_time: "23:00"
+            end_time: "24:00"
+        location: Europe/Moscow

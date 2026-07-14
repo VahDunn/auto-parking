@@ -1,98 +1,119 @@
-# E2E-тесты
+# Браузерные E2E-тесты
 
-Сквозные тесты работают через настоящий браузер Playwright против поднятого стенда.
-Мутационные сценарии, например CRUD машин, нельзя гонять по рабочей базе.
+Playwright запускает настоящий Chromium против frontend и API за Nginx. Общая
+классификация проверок и фактический состав CI описаны в
+[обзоре тестирования](README.md).
 
-## Как не трогать рабочую базу
+## Сценарии
 
-Есть три нормальных варианта:
+| Файл | Сценарий | Поведение по умолчанию |
+| --- | --- | --- |
+| `tests/e2e/auth.spec.js` | вход manager и загрузка основных экранов | запускается |
+| `tests/e2e/vehicle-crud.spec.js` | создание, изменение и удаление автомобиля через UI | пропускается без двух защитных flags |
 
-1. Поднимать отдельный тестовый стенд с отдельной БД.
-   Это самый прямой вариант для E2E: браузер ходит в настоящее приложение, но приложение
-   подключено не к рабочей базе, а к временной базе для тестов.
+Обычный `npm run e2e` поэтому выполняет auth smoke, а CRUD показывает как
+skipped. Чтобы выполнить оба сценария, CRUD нужно явно разрешить.
 
-2. Создавать тестовые данные с уникальным префиксом и чистить их после теста.
-   Это проще, но хуже защищает от падений посередине теста: мусорные записи могут остаться.
+## Установка Playwright
 
-3. Откатывать БД после прогона из snapshot/backup.
-   Например, перед E2E делать dump или использовать временный volume, а после тестов
-   полностью удалять его. Это удобно для стабильного тестового стенда.
-
-В проекте реализован первый вариант: отдельный compose-файл
-`docker-compose.e2e.yaml`. Он поднимает отдельные контейнеры и отдельные volume:
-
-- Postgres/PostGIS для e2e;
-- Redis для e2e;
-- Kafka для e2e;
-- backend;
-- frontend;
-- nginx на `http://localhost:8081`.
-
-## Запуск безопасного E2E-стенда
+Node-зависимости зафиксированы в `package-lock.json`:
 
 ```bash
-npm install
+npm ci
 npx playwright install chromium
-docker compose -p auto-parking-e2e -f docker-compose.e2e.yaml up -d --build nginx
+```
+
+Конфигурация находится в `playwright.config.js`. Тестируется только desktop
+Chromium; базовый URL по умолчанию — `http://localhost`.
+
+## Изолированный стенд
+
+`docker-compose.e2e.yaml` поднимает отдельные PostGIS, Redis и Kafka, выполняет
+миграции и seed, затем запускает backend, frontend и Nginx на
+`http://localhost:8081`.
+
+```bash
+docker compose \
+  -p auto-parking-e2e \
+  -f docker-compose.e2e.yaml \
+  up -d --build nginx
+
+until curl -fsS http://localhost:8081/api/health >/dev/null; do
+  sleep 1
+done
+```
+
+Стенд использует отдельные named volumes, но они сохраняются между запусками,
+пока не выполнен cleanup с `-v`.
+
+## Запуск
+
+Только безопасный auth smoke:
+
+```bash
 E2E_BASE_URL=http://localhost:8081 npm run e2e
 ```
 
-Остановить и удалить тестовые данные:
+Auth smoke и полный CRUD в одном прогоне:
 
 ```bash
-docker compose -p auto-parking-e2e -f docker-compose.e2e.yaml down -v
-```
-
-## Обычный smoke-запуск
-
-Если стенд уже поднят:
-
-```bash
+E2E_BASE_URL=http://localhost:8081 \
+E2E_RUN_CRUD=1 \
+E2E_ALLOW_MUTATIONS=1 \
 npm run e2e
 ```
 
-По умолчанию тесты ходят на `http://localhost`. Для e2e-стенда нужно указать:
-
-```bash
-E2E_BASE_URL=http://localhost:8081 npm run e2e
-```
-
-Дефолтный пользователь после миграций:
-
-```text
-login: superman
-password: superman
-```
-
-## CRUD-сценарий машины
-
-Полный сценарий создания, редактирования и удаления машины требует, чтобы в БД были:
-
-- хотя бы одно предприятие, доступное пользователю;
-- хотя бы одна модель машины.
-
-Для e2e-стенда эти данные создает команда:
-
-```bash
-python -m auto_parking.minor_utilities.seed_e2e_data
-```
-
-В `docker-compose.e2e.yaml` она запускается автоматически через сервис `e2e-seed`.
-
-CRUD-сценарий отключен по умолчанию. Чтобы включить, нужны два явных флага:
-
-```bash
-E2E_BASE_URL=http://localhost:8081 E2E_RUN_CRUD=1 E2E_ALLOW_MUTATIONS=1 npm run e2e
-```
-
-Или коротко:
+Только CRUD-сценарий; npm script сам устанавливает оба разрешающих flag:
 
 ```bash
 E2E_BASE_URL=http://localhost:8081 npm run e2e:crud
 ```
 
-`E2E_ALLOW_MUTATIONS=1` нужен как предохранитель. Без него тест не будет создавать,
-редактировать и удалять данные. Дополнительно тест откажется запускаться против
-нелокального host.
+Для отладки доступны headed и UI mode:
 
-Если данных нет, тест будет пропущен с понятным сообщением.
+```bash
+E2E_BASE_URL=http://localhost:8081 npm run e2e:headed
+E2E_BASE_URL=http://localhost:8081 npm run e2e:ui
+```
+
+## Переменные окружения
+
+| Переменная | Значение по умолчанию | Назначение |
+| --- | --- | --- |
+| `E2E_BASE_URL` | `http://localhost` | адрес проверяемого Nginx/frontend |
+| `E2E_USERNAME` | `superman` | login тестового manager |
+| `E2E_PASSWORD` | `superman` | password тестового manager |
+| `E2E_RUN_CRUD` | не задана | включает сбор и запуск CRUD-теста при значении `1` |
+| `E2E_ALLOW_MUTATIONS` | не задана | подтверждает разрешение менять данные при значении `1` |
+
+Пользователь `superman` создаётся миграциями, а необходимые enterprise и vehicle
+model — сервисом `e2e-seed`.
+
+## Защита данных
+
+CRUD-тест начинает работу только при одновременном выполнении условий:
+
+- `E2E_RUN_CRUD=1`;
+- `E2E_ALLOW_MUTATIONS=1`;
+- hostname в `E2E_BASE_URL` — `localhost`, `127.0.0.1` или loopback IPv6;
+- в API доступны хотя бы один enterprise и одна vehicle model.
+
+Эта защита не заменяет отдельную БД. Рекомендуемый target — только compose-стенд
+из этого документа.
+
+## Cleanup
+
+Остановить стенд и удалить все его тестовые данные:
+
+```bash
+docker compose \
+  -p auto-parking-e2e \
+  -f docker-compose.e2e.yaml \
+  down -v
+```
+
+Playwright сохраняет HTML report и диагностические artifacts согласно
+`playwright.config.js`; каталоги `playwright-report/` и `test-results/` исключены
+из Git.
+
+Browser E2E не входит в текущий GitHub Actions workflow и запускается вручную.

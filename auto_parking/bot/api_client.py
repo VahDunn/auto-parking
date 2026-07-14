@@ -167,5 +167,7 @@ class AutoParkingApiClient:
         return True
 
     def _client(self, token: str | None = None) -> httpx.AsyncClient:
-        headers = {"Authorization": f"Bearer {token}"} if token else None
+        headers = {"X-Auto-Parking-Service": "telegram-bot"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         return httpx.AsyncClient(base_url=self._base_url, headers=headers, timeout=20)

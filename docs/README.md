@@ -1,26 +1,49 @@
-# Documentation
+# Документация Auto Parking
 
-## Monitoring
+Это каноническая карта документации проекта. Корневой
+[`README.md`](../README.md) даёт только краткий обзор; команды, настройки и
+эксплуатационные процедуры должны жить в тематических разделах ниже.
 
-- [`monitoring/observability-guide.md`](monitoring/observability-guide.md) - подробный учебник по OpenTelemetry, Prometheus, Tempo, Grafana, Kafka tracing и добавлению instrumentation.
-- [`monitoring/prometheus-grafana.md`](monitoring/prometheus-grafana.md) - Prometheus, Grafana, metrics, dashboard provisioning, checks.
-- [`monitoring/opentelemetry-tempo.md`](monitoring/opentelemetry-tempo.md) - OpenTelemetry tracing, Collector, Tempo, and Grafana Explore.
-- [`monitoring/goaccess.md`](monitoring/goaccess.md) - GoAccess reports for application and Nginx access logs.
+## Начало работы
 
-## Architecture
+| Задача | Документ |
+| --- | --- |
+| Поднять проект локально | [Локальная разработка](development/local-setup.md) |
+| Настроить окружение | [Конфигурация](configuration.md) |
+| Понять состав системы | [Архитектурный обзор](architecture/project-structure.md) |
+| Разобраться с событиями | [Kafka и transactional outbox](architecture/kafka.md) |
 
-- [`architecture/project-structure.md`](architecture/project-structure.md) - repository structure.
-- [`architecture/kafka.md`](architecture/kafka.md) - Kafka topics, outbox, producers, consumers.
+## Разработка и качество
 
-## Testing
+| Раздел | Что в нём находится |
+| --- | --- |
+| [Тестирование](testing/README.md) | Стратегия, unit/integration tests, E2E и нагрузочные проверки |
+| [CI](ci-cd.md) | Проверки pull request и сборка Docker images |
+| [Конфигурация](configuration.md) | Переменные окружения, профили и секреты |
 
-- [`testing/e2e.md`](testing/e2e.md) - Playwright E2E stand.
-- [`testing/load-testing.md`](testing/load-testing.md) - Locust load tests.
-- [`testing/scalability-report.md`](testing/scalability-report.md) - scalability notes and measurements.
+## Эксплуатация
 
-## Operations
+| Раздел | Что в нём находится |
+| --- | --- |
+| [Деплой](deployment.md) | Подготовка сервера, выкладка, миграции и откат |
+| [Monitoring](monitoring/README.md) | Метрики, трассировки, логи, алерты и диагностика |
+| [Operations](operations/README.md) | Миграции и прикладные runbooks |
+| [Отчёты](reports/README.md) | Датированные результаты проверок и измерений |
 
-- [`operations/ci-cd.md`](operations/ci-cd.md) - GitHub Actions and deployment.
-- [`operations/telegram-bot.md`](operations/telegram-bot.md) - Telegram bot notes.
-- [`operations/track-generator.md`](operations/track-generator.md) - demo track generator.
-- [`operations/alembic.md`](operations/alembic.md) - Alembic environment notes.
+## Архитектура
+
+- [Обзор системы и границы компонентов](architecture/project-structure.md)
+- [Kafka, контракты событий и outbox](architecture/kafka.md)
+
+## Как поддерживать документацию
+
+- Текущее поведение описывается в архитектуре, руководствах и runbooks.
+- Результаты конкретного прогона с датой, commit и окружением хранятся в
+  [отчётах](reports/README.md), а не выдаются за текущее состояние.
+- Команда или настройка должна иметь один канонический источник; в других
+  документах на неё ставится ссылка.
+- Используются относительные ссылки внутри репозитория и команда
+  `docker compose` для Compose v2.
+- При перемещении alert runbook нужно одновременно обновлять ссылки в
+  `monitoring/alerts.yml` и ожидаемые значения в
+  `monitoring/tests/alerts.test.yml`.

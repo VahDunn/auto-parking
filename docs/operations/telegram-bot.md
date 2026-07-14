@@ -1,34 +1,32 @@
-# Telegram bot
+# Telegram-бот и уведомления
 
-Бот запускается отдельным процессом и дергает существующее HTTP API проекта.
-
-После успешного `/login` бот сохраняет связь `user_id -> telegram chat_id` в Redis. Эту связь использует отдельный `notification-service`, чтобы отправлять Telegram-уведомления залогиненным менеджерам по событиям из общего event bus.
+`telegram-bot` — отдельный процесс из основного image. Он обращается к FastAPI
+по HTTP и после `/login` сохраняет связь `user_id -> chat_id` в Redis.
+`notification-service` читает события машин из Kafka и использует эту связь для
+отправки уведомлений.
 
 ## Запуск
 
-1. Создать Telegram-бота через BotFather.
-2. Положить токен в `.env`:
+Создайте бота через BotFather и задайте в `.env`:
 
-```env
-TELEGRAM_BOT_TOKEN=123456:telegram-token
+```dotenv
+TELEGRAM_BOT_TOKEN=<telegram-token>
 ```
 
-3. Запустить:
+Запустите bot и consumer:
 
 ```bash
-python -m auto_parking.bot.main
+docker compose \
+  --profile bot \
+  --profile notifications \
+  up -d telegram-bot notification-service
 ```
 
-Или через Docker Compose:
+Для запуска процесса вне Docker нужны доступные с host `BOT_API_BASE_URL` и
+`REDIS_URL`:
 
 ```bash
-docker compose --profile bot up telegram-bot
-```
-
-Для запуска вместе с notification-service через Kafka:
-
-```bash
-docker compose --profile bot --profile notifications up -d --build kafka telegram-bot notification-service
+poetry run python -m auto_parking.bot.main
 ```
 
 ## Команды
@@ -42,3 +40,20 @@ docker compose --profile bot --profile notifications up -d --build kafka telegra
 ```
 
 Обычный текст бот возвращает эхом.
+
+## Диагностика
+
+```bash
+docker compose logs --tail=120 telegram-bot notification-service
+docker compose exec redis \
+  redis-cli --scan --pattern 'bot:telegram:user:*'
+```
+
+Если сообщения после vehicle event не приходят, проверьте, что пользователь
+выполнил `/login`, consumer подключился к Kafka и у него совпадает
+`KAFKA_NOTIFICATION_CONSUMER_GROUP`.
+
+Тот же `TELEGRAM_BOT_TOKEN` локально может использовать Alertmanager. Для
+получения `chat_id` через `getUpdates` временно остановите long polling бота или
+используйте отдельный bot token. Alert routing описан в
+[Alerting](../monitoring/alerting.md).

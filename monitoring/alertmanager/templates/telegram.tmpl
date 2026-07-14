@@ -1,0 +1,14 @@
+{{ define "auto_parking.telegram.message" -}}
+{{ if eq .Status "firing" }}ALERT FIRING{{ else }}ALERT RESOLVED{{ end }}
+Severity: {{ .CommonLabels.severity }}
+Service: {{ .CommonLabels.service }}
+Alerts: {{ len .Alerts }}
+{{ range .Alerts }}
+---
+{{ .Annotations.summary }}
+{{ .Annotations.description }}
+{{ if .Labels.caller }}caller={{ .Labels.caller }}{{ end }}{{ if .Labels.method }} method={{ .Labels.method }}{{ end }}{{ if .Labels.path }} path={{ .Labels.path }}{{ end }}{{ if .Labels.status }} status={{ .Labels.status }}{{ end }}
+Runbook: {{ .Annotations.runbook }}
+{{ if .GeneratorURL }}Prometheus: {{ .GeneratorURL }}{{ end }}
+{{ end -}}
+{{ end }}

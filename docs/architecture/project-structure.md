@@ -1,320 +1,231 @@
-# Структура проекта Auto Parking
+# Архитектура Auto Parking
 
-Документ фиксирует текущую архитектуру проекта простыми слоями: runtime-процессы, общая библиотека событий, инфраструктура и основные потоки данных.
+Документ описывает текущее устройство системы: runtime-компоненты, владение
+данными, основные потоки и границы кода. Команды запуска находятся в
+[руководстве по локальной разработке](../development/local-setup.md), а
+production-процедуры — в [руководстве по деплою](../deployment.md).
 
-## Коротко
+## Система в одном абзаце
 
-```text
-auto_parking/          основной FastAPI-монолит
-notification_service/ отдельный микросервис Telegram-уведомлений
-audit_service/        отдельный микросервис аудита со своей БД
-event_bus/            общая Python-библиотека для Kafka-событий, не микросервис
-frontend/             статический frontend
-nginx/                reverse proxy
-```
+Auto Parking состоит из основного FastAPI-приложения, статического frontend,
+Telegram-бота и двух Kafka consumers: сервиса уведомлений и сервиса аудита.
+Основные бизнес-данные хранятся в PostgreSQL/PostGIS, быстрые чтения и
+Telegram-привязки — в Redis, межпроцессные события — в Kafka. Audit service
+владеет отдельной PostgreSQL базой. Nginx является единой HTTP/WebSocket точкой
+входа.
 
-Главное разделение:
-
-```text
-Сервисы приложения:
-  auto-parking API
-  telegram-bot
-  notification-service
-  audit-service
-
-Общая библиотека:
-  event_bus
-
-Инфраструктура:
-  PostgreSQL/PostGIS
-  Redis
-  Kafka
-  Audit PostgreSQL
-  nginx
-  Prometheus/Grafana/GoAccess
-```
-
-## Runtime-Схема
+## Runtime-топология
 
 ```mermaid
 flowchart TB
     Browser["Browser"] --> Nginx["nginx"]
-    Nginx --> Frontend["frontend"]
+    Nginx --> Frontend["static frontend"]
     Nginx --> API["auto-parking API"]
-    API --> Postgres["PostgreSQL/PostGIS"]
-    API --> Redis["Redis<br/>cache"]
-    API --> Kafka["Kafka"]
 
-    TelegramUser["Telegram user"] --> TelegramBot["telegram-bot"]
-    TelegramBot --> API
-    TelegramBot --> Redis
+    API --> MainDB["PostgreSQL/PostGIS<br/>business data + outbox"]
+    API --> Redis["Redis<br/>cache + bot registry"]
+    TelegramUser["Telegram user"] --> Bot["telegram-bot"]
+    Bot --> API
+    Bot --> Redis
 
-    API -->|"vehicle.*"| Kafka
-    API -->|"audit.*"| Kafka
-    Kafka -->|"vehicle.*"| Notification["notification-service"]
-    Notification -->|"audit.*"| Kafka
-    Kafka -->|"audit.*"| Audit["audit-service"]
-    Audit --> AuditDB["audit-db<br/>PostgreSQL"]
+    MainDB --> Dispatcher["OutboxDispatcher"]
+    Dispatcher --> Kafka
 
+    Kafka -->|"vehicle events"| Notification["notification-service"]
     Notification --> Redis
-    Notification --> TelegramAPI["Telegram API"]
+    Notification --> TelegramAPI["Telegram Bot API"]
     TelegramAPI --> TelegramUser
+    Notification -->|"audit events"| Kafka
 
-    TrackGen["track_generator"] --> Postgres
-    TrackGen -->|"vehicle.gps"| Kafka
-    Kafka -->|"vehicle.gps"| API
+    Kafka -->|"audit events"| Audit["audit-service"]
+    Audit --> AuditDB["audit-db"]
+
+    TrackGenerator["track generator"] --> MainDB
+    TrackGenerator -->|"GPS events"| Kafka
+    Kafka -->|"GPS events"| API
     API -->|"WebSocket"| Browser
 ```
 
-Что важно:
+`event_bus/` на схеме не показан как процесс: это общая Python-библиотека с
+контрактами и Kafka adapters, которую импортируют приложение и workers.
 
-1. `Kafka` это отдельный брокер сообщений.
-2. `event_bus/` это не сервис, а общая Python-библиотека, которую импортируют сервисы.
-3. `Redis` не используется как брокер сообщений. Он нужен для cache и Telegram login registry.
-4. `notification-service` не подключается к PostgreSQL основного приложения.
-5. `audit-service` владеет своей БД `audit-db`; основной API в audit DB не пишет.
+## Компоненты и ответственность
 
-## Общая Библиотека Event Bus
+| Компонент | Ответственность | Что ему не принадлежит |
+| --- | --- | --- |
+| `nginx` | HTTP/WebSocket ingress, маршрутизация к frontend и API | Бизнес-логика и данные |
+| `frontend` | Статический браузерный интерфейс | Прямой доступ к БД |
+| `auto-parking` | REST/WebSocket API, авторизация, бизнес-сценарии, outbox dispatcher, live GPS consumer | Audit DB |
+| `telegram-bot` | Long polling, диалоги, вызовы основного HTTP API, привязка Telegram chat | Прямые SQL-запросы к бизнес-БД |
+| `notification-service` | Обработка vehicle events и отправка Telegram-уведомлений | Основная PostgreSQL и audit DB |
+| `audit-service` | Идемпотентное сохранение audit events | Основная PostgreSQL |
+| `event_bus` | Event envelope, topic catalog, producer/consumer adapters, topic init | Собственный runtime и хранилище |
+| Monitoring stack | Метрики, traces, dashboards, alerts | Бизнес-данные |
 
-`event_bus/` нужен, чтобы все сервисы одинаково понимали события и Kafka.
+## Владение данными
 
-```text
-event_bus/
-  contracts.py     EventEnvelope, EventProducer, EventConsumer
-  kafka.py         KafkaEventProducer, KafkaEventConsumer
-  topics.py        единственное место описания Kafka topics
-  init_topics.py   создание topics при старте docker-compose
-```
+| Хранилище | Владелец | Данные |
+| --- | --- | --- |
+| Main PostgreSQL/PostGIS | `auto-parking` | Пользователи, предприятия, машины, водители, поездки, GPS-точки, отчёты, уведомления и `outbox_event` |
+| Audit PostgreSQL | `audit-service` | Неизменяемая проекция Kafka audit events с уникальным `event_id` |
+| Redis | Основное приложение, bot и notification service | Кэш сущностей/отчётов и registry `user_id -> telegram_chat_id` |
+| Kafka | Общий transport | Vehicle, audit и live GPS event streams |
 
-Ее используют:
+Redis не является брокером сообщений. Audit service не пишет в основную БД, а
+основное приложение не пишет напрямую в audit DB.
 
-```text
-auto_parking
-notification_service
-audit_service
-```
+## Основные потоки
 
-Смысл:
-
-```text
-event_bus = общий код и контракт
-Kafka     = реальный брокер сообщений
-```
-
-## Kafka Topics
-
-Topics описаны только в [event_bus/topics.py](/Users/vl.morozov/PycharmProjects/auto-parking/event_bus/topics.py).
+### Обычный HTTP-запрос
 
 ```text
-auto-parking.vehicle.events  partitions=3  key=vehicle_id
-auto-parking.audit.events    partitions=3  key=entity_id, fallback=event_id
-auto-parking.gps.events      partitions=6  key=vehicle_id
+browser / bot
+-> nginx или internal HTTP
+-> FastAPI controller
+-> service
+-> repository
+-> PostgreSQL / Redis / external integration
+-> response
 ```
 
-`kafka-init` создает эти topics при запуске. `KAFKA_AUTO_CREATE_TOPICS_ENABLE=false`, чтобы Kafka не создавала topic-и случайно с дефолтными настройками.
+Контроллер отвечает за HTTP-контракт и проверку доступа. Бизнес-сценарий живёт
+в `service/`, SQL и загрузка relations — в `repo/`.
 
-Consumer groups:
+### CRUD автомобиля и transactional outbox
 
 ```text
-auto-parking-notification-service
-auto-parking-audit-service
-auto-parking-gps-live-<pid>-<uuid>
+vehicle create/update/delete
+-> одна PostgreSQL transaction:
+     business change
+     + outbox row for vehicle topic
+     + outbox row for audit topic
+-> commit
+-> OutboxDispatcher
+-> Kafka
 ```
 
-## Основной Монолит
+HTTP-запрос не публикует vehicle event напрямую. Подробные гарантии и ограничения
+описаны в [Kafka-документации](kafka.md).
+
+### Telegram-уведомление и аудит
+
+```text
+vehicle event
+-> notification-service
+-> Redis lookup of telegram_chat_id
+-> Telegram Bot API
+-> notification audit event
+-> audit-service
+-> audit-db
+```
+
+Audit service подавляет повторную запись одного `event_id`. Notification
+service пока не хранит deduplication state, поэтому повторная Kafka-доставка
+может повторить Telegram-сообщение.
+
+### Live GPS
+
+```text
+track generator
+-> persist GPS point in main PostgreSQL
+-> direct Kafka GPS event
+-> one consumer per API worker
+-> process-local RxPY/WebSocket hub
+-> connected browser clients
+```
+
+У каждого API worker собственные WebSocket connections и уникальная Kafka
+consumer group. Поэтому каждый worker получает GPS stream и отправляет его своим
+клиентам. GPS publish не использует outbox: сохранённая точка останется в БД,
+даже если live-событие не удалось отправить.
+
+## Организация кода
+
+### Основное приложение
 
 ```text
 auto_parking/
-  api/              HTTP/WebSocket routes и Pydantic schemas
-  service/          бизнес-сценарии
-  repo/             SQLAlchemy-запросы
-  db/               engine, session, ORM-модели, SQLAdmin
-  deps/             сборка зависимостей FastAPI
-  ports/            re-export общих контрактов и протоколы внешних зависимостей
-  integrations/     Redis cache, Kafka adapter re-export, Geoapify, Prometheus
-  realtime/         live GPS consumer, RxPY pipeline, WebSocket broadcast
-  bot/              Telegram bot code
-  minor_utilities/  CLI-утилиты генерации машин и GPS-треков
-  observability/    access/performance logging
+  api/             HTTP/WebSocket routes и schemas
+  core/            config, security, errors, domain models
+  filter/          объекты фильтрации запросов
+  service/         бизнес-сценарии и outbox dispatcher
+  repo/            SQLAlchemy queries и persistence
+  db/              engine, ORM models, SQLAdmin, DB events
+  ports/           контракты cache, events и geocoding
+  integrations/    Redis, Kafka, Geoapify, Prometheus, OpenTelemetry
+  deps/            FastAPI dependency wiring / composition
+  realtime/        Kafka -> RxPY -> WebSocket GPS pipeline
+  bot/             Telegram client и сценарии
+  minor_utilities/ CLI и seed/smoke utilities
+  observability/   access/performance logging
 ```
 
-Правила слоя:
-
-1. Контроллеры не ходят напрямую в БД.
-2. Бизнес-логика живет в `service/`.
-3. SQL и relation loading живут в `repo/`.
-4. Внешняя инфраструктура подключается через `ports/` и `integrations/`.
-
-## Микросервисы
-
-Оба микросервиса имеют упрощенную структуру:
+Основное направление зависимостей:
 
 ```text
-<service_name>/
-  core/          settings
-  ports/         протоколы внешних возможностей
-  integrations/  Kafka/Redis/Telegram адаптеры по необходимости
-  db/            собственные ORM-модели, engine и session, если сервис владеет БД
-  repo/          SQLAlchemy-запись/чтение, если сервис владеет БД
-  service/       обработка события
-  main.py        composition root и запуск consumer-а
-  Dockerfile     отдельный image
+api -> service -> repo -> db
+          |
+          v
+        ports <- integrations
+
+deps собирает concrete implementations на границе приложения.
 ```
 
-### notification_service
+### Workers
 
-Назначение:
+`notification_service/` и `audit_service/` имеют собственные `core`,
+`ports`, `integrations`, `service` и `main.py`. Audit service дополнительно
+содержит собственные `db` и `repo`. Они могут импортировать `event_bus`, но
+не должны зависеть от FastAPI controllers, repositories или services основного
+приложения.
 
-1. Читает `auto-parking.vehicle.events`.
-2. Берет `manager_user_ids` из payload события.
-3. По Redis login registry получает `telegram chat_id`.
-4. Отправляет сообщение через Telegram API.
-5. Публикует результат отправки в общий `auto-parking.audit.events`.
-
-Схема:
-
-```mermaid
-flowchart LR
-    Kafka["Kafka<br/>vehicle.events"] --> Main["notification_service/main.py"]
-    Main --> Service["VehicleEventNotificationService"]
-    Service --> Registry["RedisTelegramSessionRegistry"]
-    Service --> Sender["TelegramBotSender"]
-    Registry --> Redis["Redis"]
-    Sender --> Telegram["Telegram API"]
-    Service --> AuditTopic["Kafka<br/>audit.events"]
-```
-
-`notification_service` не импортирует `auto_parking.repo`, `auto_parking.service` и не подключается к PostgreSQL.
-
-### audit_service
-
-Назначение:
-
-1. Читает общий `auto-parking.audit.events`.
-2. Сохраняет событие в собственную PostgreSQL БД `audit-db`.
-3. Не подключается к PostgreSQL основного приложения.
-
-Схема:
-
-```mermaid
-flowchart LR
-    Api["auto-parking API"] --> AuditTopic["Kafka<br/>audit.events"]
-    Notification["notification_service"] --> AuditTopic
-    AuditTopic --> AuditService["audit_service"]
-    AuditService --> AuditDb["audit-db<br/>audit_event"]
-```
-
-## Основные Потоки
-
-CRUD машины:
+### Общая библиотека событий
 
 ```text
-HTTP request
--> VehicleService.create/update/delete
--> PostgreSQL commit
--> Kafka auto-parking.vehicle.events
--> Kafka auto-parking.audit.events
--> notification-service
+event_bus/
+  contracts.py    EventEnvelope и protocols
+  kafka.py        AIOKafka producer/consumer adapters
+  topics.py       канонический catalog topics
+  init_topics.py  идемпотентная инициализация topics
 ```
 
-Audit:
+## Инфраструктурные варианты
 
-```text
-auto-parking API / notification-service
--> Kafka auto-parking.audit.events
--> audit-service
--> audit-db audit_event
-```
+- `docker-compose.yaml` — локальная разработка, observability и optional
+  profiles.
+- `docker-compose.e2e.yaml` — изолированный E2E-стенд со своими containers и
+  volumes.
+- `deploy/docker-compose.prod.yaml` — single-server deployment из готовых
+  images.
 
-Live GPS:
+Состав и команды этих окружений документируются отдельно:
+[local setup](../development/local-setup.md),
+[testing](../testing/README.md) и [deployment](../deployment.md).
 
-```text
-track_generator
--> PostgreSQL vehicle_gps_point / trip
--> Kafka auto-parking.gps.events
--> GpsRealtimeHub
--> RxPY filter/map/deduplicate pipeline
--> WebSocket clients
-```
+## Архитектурные ограничения
 
-Telegram login:
+- Локальная и production Compose-топология использует один Kafka broker с
+  replication factor 1; TLS/SASL не настроены.
+- Outbox даёт at-least-once publish, поэтому duplicates являются нормальным
+  сценарием.
+- Consumer retry policy и DLQ пока отсутствуют.
+- Published/failed outbox rows автоматически не очищаются и не replay-ятся.
+- WebSocket state находится в памяти API workers; Kafka обеспечивает fan-out
+  GPS-событий между workers, но не хранит клиентские подключения.
+- Notification и audit workers пока не имеют собственного полноценного
+  OpenTelemetry bootstrap.
 
-```text
-Telegram /login
--> telegram-bot
--> auto-parking API auth
--> Redis bot login registry
-```
+Эксплуатационные последствия и способы проверки вынесены в
+[operations](../operations/README.md) и
+[monitoring](../monitoring/README.md).
 
-Telegram notification:
+## Правила для изменений
 
-```text
-Kafka vehicle event
--> notification-service
--> manager_user_ids из payload
--> Redis chat lookup
--> Telegram API
--> Kafka auto-parking.audit.events
-```
-
-## Docker Compose
-
-Kafka-only режим для событий:
-
-```text
-kafka                 single-node broker
-kafka-init            создает topics из event_bus/topics.py
-audit-db              отдельная PostgreSQL БД audit-service
-auto-parking          depends_on db, redis, kafka-init
-telegram-bot          depends_on db, redis, kafka-init, auto-parking
-notification-service  depends_on redis, kafka-init
-audit-service         depends_on audit-db, kafka-init
-```
-
-В Docker Compose включен live GPS consumer основного API:
-
-```text
-GPS_CONSUMER_ENABLED=true
-KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-AUDIT_DATABASE_URL=postgresql+asyncpg://audit_user:...@audit-db:5432/audit_db
-```
-
-В тестовой среде live GPS consumer выключен, чтобы controller tests не требовали живую Kafka.
-
-Базовый запуск:
-
-```bash
-docker compose up -d --build kafka kafka-init auto-parking nginx frontend
-```
-
-С уведомлениями и аудитом:
-
-```bash
-docker compose --profile notifications --profile audit up -d --build
-```
-
-С ботом:
-
-```bash
-docker compose --profile bot up -d --build
-```
-
-## Наблюдаемость И Нагрузочные Тесты
-
-```text
-monitoring/prometheus.yml    Prometheus scrape config
-monitoring/grafana/          Grafana dashboards/provisioning
-monitoring/goaccess/         GoAccess configs
-logs/                        access/performance отчеты
-load_tests/locustfile.py     Locust-сценарии
-```
-
-## Правила Для Новых Изменений
-
-1. HTTP/WebSocket-слой держать тонким.
-2. Бизнес-логику размещать в `service/`.
-3. SQL, фильтрацию и relation loading держать в `repo/`.
-4. Для межсервисных событий использовать `event_bus`.
-5. Redis не использовать как брокер сообщений.
-6. Микросервисы не должны импортировать `auto_parking.repo`, `auto_parking.service` и FastAPI-контроллеры монолита.
-7. Агентские и IDE-служебные файлы не считать частью runtime-структуры проекта.
+1. Не переносить бизнес-логику в controllers.
+2. Не выполнять SQL вне repositories и специализированных persistence services.
+3. Для DB-bound событий основного API использовать transactional outbox.
+4. Сохранять межсервисные contracts в `event_bus` и версионировать payload.
+5. Выбирать стабильный Kafka key по сущности, порядок которой важен.
+6. Проектировать consumers с учётом повторной доставки.
+7. Не использовать Redis как замену Kafka.
+8. Не смешивать владение основной и audit DB.
