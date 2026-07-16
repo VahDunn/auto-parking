@@ -1,6 +1,6 @@
 from audit_service.core.config import Settings
 from audit_service.integrations.events.kafka import KafkaEventConsumer
-from audit_service.ports.events import EventConsumer
+from event_bus.contracts import EventConsumer
 
 
 def create_event_consumer(settings: Settings) -> EventConsumer:

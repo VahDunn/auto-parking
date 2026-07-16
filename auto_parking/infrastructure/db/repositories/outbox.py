@@ -4,8 +4,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auto_parking.app.ports.events import EventEnvelope
 from auto_parking.infrastructure.db.models import OutboxEvent
+from event_bus.contracts import EventEnvelope
 
 
 class OutboxRepository:

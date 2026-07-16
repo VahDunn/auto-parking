@@ -1,8 +1,8 @@
 from functools import lru_cache
 
-from auto_parking.app.ports.events import EventConsumer, EventProducer
 from auto_parking.core.config import settings
 from auto_parking.infrastructure.events import KafkaEventConsumer, KafkaEventProducer
+from event_bus.contracts import EventConsumer, EventProducer
 
 
 @lru_cache

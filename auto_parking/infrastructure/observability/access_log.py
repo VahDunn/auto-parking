@@ -20,7 +20,7 @@ def log_access_request(
         timestamp = int(_timestamp_from_duration(duration_seconds))
 
     logger.info(
-        "%s - - [%s] \"%s\" %s %s \"%s\" \"%s\" %s",
+        '%s - - [%s] "%s" %s %s "%s" "%s" %s',
         _client_host(request),
         timestamp,
         _request_line(request),

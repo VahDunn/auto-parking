@@ -764,9 +764,7 @@ async def generate_enterprise_live_tracks(
         vehicle_numbers = dict(
             (
                 await db.execute(
-                    select(Vehicle.id, Vehicle.vehicle_number).where(
-                        Vehicle.id.in_(vehicle_ids)
-                    )
+                    select(Vehicle.id, Vehicle.vehicle_number).where(Vehicle.id.in_(vehicle_ids))
                 )
             ).all()
         )
@@ -819,9 +817,7 @@ async def generate_enterprise_live_tracks(
                 break
 
             now_utc = datetime.now(UTC)
-            pending_insertions: list[
-                tuple[VehicleRouteState, VehicleGpsPoint, float, float]
-            ] = []
+            pending_insertions: list[tuple[VehicleRouteState, VehicleGpsPoint, float, float]] = []
 
             for i, state in enumerate(active_states):
                 if _is_route_limit_reached(state.completed_routes, routes_count):

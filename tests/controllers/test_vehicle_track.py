@@ -78,9 +78,7 @@ async def test_get_vehicle_track_json_success(
 
     vehicle = make_vehicle_stub(vehicle_id=1, enterprise_id=10)
     vehicle_service_mock.get_by_id.return_value = vehicle
-    enterprise_service_mock.get.return_value = [
-        SimpleNamespace(id=10, timezone="Europe/Moscow")
-    ]
+    enterprise_service_mock.get.return_value = [SimpleNamespace(id=10, timezone="Europe/Moscow")]
     vehicle_track_service_mock.get_track.return_value = make_track_points()
 
     response = await client.get(
@@ -124,9 +122,7 @@ async def test_get_vehicle_track_geojson_success(
 
     vehicle = make_vehicle_stub(vehicle_id=1, enterprise_id=10)
     vehicle_service_mock.get_by_id.return_value = vehicle
-    enterprise_service_mock.get.return_value = [
-        SimpleNamespace(id=10, timezone="Europe/Moscow")
-    ]
+    enterprise_service_mock.get.return_value = [SimpleNamespace(id=10, timezone="Europe/Moscow")]
     vehicle_track_service_mock.get_track.return_value = make_geojson_track()
 
     response = await client.get(
@@ -263,9 +259,7 @@ async def test_get_vehicle_track_json_returns_empty_list_when_no_points(
 
     vehicle = make_vehicle_stub(vehicle_id=1, enterprise_id=10)
     vehicle_service_mock.get_by_id.return_value = vehicle
-    enterprise_service_mock.get.return_value = [
-        SimpleNamespace(id=10, timezone="Europe/Moscow")
-    ]
+    enterprise_service_mock.get.return_value = [SimpleNamespace(id=10, timezone="Europe/Moscow")]
     vehicle_track_service_mock.get_track.return_value = []
 
     response = await client.get(
@@ -296,9 +290,7 @@ async def test_get_vehicle_track_geojson_returns_empty_feature_collection_when_n
 
     vehicle = make_vehicle_stub(vehicle_id=1, enterprise_id=10)
     vehicle_service_mock.get_by_id.return_value = vehicle
-    enterprise_service_mock.get.return_value = [
-        SimpleNamespace(id=10, timezone="Europe/Moscow")
-    ]
+    enterprise_service_mock.get.return_value = [SimpleNamespace(id=10, timezone="Europe/Moscow")]
     vehicle_track_service_mock.get_track.return_value = GeoJSONFeatureCollectionModel(
         type="FeatureCollection",
         features=[],

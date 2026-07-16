@@ -74,9 +74,7 @@ async def test_vehicle_crud_success(
     set_visible_ids_override(overrides, {10})
     set_vehicle_service_override(overrides, vehicle_service_mock)
     set_enterprise_service_override(overrides, enterprise_service_mock)
-    enterprise_service_mock.get.return_value = [
-        SimpleNamespace(id=10, timezone="Europe/Moscow")
-    ]
+    enterprise_service_mock.get.return_value = [SimpleNamespace(id=10, timezone="Europe/Moscow")]
     vehicle = vehicle_model()
     vehicle_service_mock.get_by_id.return_value = vehicle
     vehicle_service_mock.create.return_value = vehicle
@@ -226,9 +224,7 @@ async def test_get_vehicle_track_by_trips_success(
     set_vehicle_service_override(overrides, vehicle_service_mock)
     set_trip_track_service_override(overrides, trip_track_service_mock)
     vehicle_service_mock.get_by_id.return_value = vehicle_model()
-    enterprise_service_mock.get.return_value = [
-        SimpleNamespace(id=10, timezone="Europe/Moscow")
-    ]
+    enterprise_service_mock.get.return_value = [SimpleNamespace(id=10, timezone="Europe/Moscow")]
     point = VehicleTrackPointModel(
         id=1,
         recorded_at_utc=datetime(2026, 1, 1, 9, 0, tzinfo=UTC),

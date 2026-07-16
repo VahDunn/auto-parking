@@ -2,7 +2,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from audit_service.db.models import AuditEvent
-from audit_service.ports.events import EventEnvelope
+from event_bus.contracts import EventEnvelope
 
 
 class AuditEventRepository:

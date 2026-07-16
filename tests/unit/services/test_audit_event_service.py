@@ -3,8 +3,8 @@ from datetime import UTC
 
 import pytest
 
-from audit_service.ports.events import EventEnvelope
 from audit_service.service import AuditEventService
+from event_bus.contracts import EventEnvelope
 
 pytestmark = pytest.mark.asyncio
 

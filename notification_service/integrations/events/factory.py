@@ -1,6 +1,6 @@
+from event_bus.contracts import EventConsumer, EventProducer
 from notification_service.core.config import Settings
 from notification_service.integrations.events.kafka import KafkaEventConsumer, KafkaEventProducer
-from notification_service.ports.events import EventConsumer, EventProducer
 
 
 def create_event_producer(settings: Settings) -> EventProducer:

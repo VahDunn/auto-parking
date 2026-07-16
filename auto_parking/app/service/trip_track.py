@@ -56,11 +56,7 @@ class TripTrackService:
         )
 
         points_by_trip = await self._get_points_by_trip(vehicle_id, trips)
-        flat_rows = [
-            (row, trip.id)
-            for trip in trips
-            for row in points_by_trip[trip.id]
-        ]
+        flat_rows = [(row, trip.id) for trip in trips for row in points_by_trip[trip.id]]
 
         if format == TrackFormat.geojson:
             return GeoJSONFeatureCollectionModel(

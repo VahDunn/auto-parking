@@ -1,6 +1,6 @@
 import logging
 
-from notification_service.ports.events import AUDIT_EVENTS_TOPIC, EventEnvelope, EventProducer
+from event_bus.contracts import AUDIT_EVENTS_TOPIC, EventEnvelope, EventProducer
 from notification_service.ports.telegram import TelegramSender
 from notification_service.ports.telegram_sessions import TelegramSessionRegistry
 

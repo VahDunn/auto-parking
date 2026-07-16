@@ -217,9 +217,7 @@ class VehicleTrackService:
                 id=point["id"],
                 trip_id=point["trip_id"],
                 recorded_at_utc=datetime.fromisoformat(point["recorded_at_utc"]),
-                recorded_at_enterprise=datetime.fromisoformat(
-                    point["recorded_at_enterprise"]
-                ),
+                recorded_at_enterprise=datetime.fromisoformat(point["recorded_at_enterprise"]),
                 latitude=point["latitude"],
                 longitude=point["longitude"],
             )

@@ -44,9 +44,7 @@ class TripRepository:
 
     async def get(self, filter_obj: TripFilter) -> Sequence[Trip]:
         relation_options = (
-            self._base_options()
-            if filter_obj.load_relations
-            else self._without_relations_options()
+            self._base_options() if filter_obj.load_relations else self._without_relations_options()
         )
         stmt = select(Trip).options(*relation_options)
 

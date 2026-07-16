@@ -10,7 +10,7 @@ from fastapi import WebSocket
 from reactivex.subject import Subject
 
 from auto_parking.app.deps.events import get_event_consumer, get_event_producer
-from auto_parking.app.ports.events import (
+from event_bus.contracts import (
     GPS_EVENTS_TOPIC,
     EventConsumer,
     EventEnvelope,

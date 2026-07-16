@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING
 
 from auto_parking.app.filter import VehicleFilter
 from auto_parking.app.ports.cache import CacheClient
-from auto_parking.app.ports.events import (
+from auto_parking.core.domain.models import VehicleModel
+from auto_parking.infrastructure.observability.performance import log_cache_lookup
+from event_bus.contracts import (
     AUDIT_EVENTS_TOPIC,
     VEHICLE_EVENTS_TOPIC,
     EventEnvelope,
     EventProducer,
 )
-from auto_parking.core.domain.models import VehicleModel
-from auto_parking.infrastructure.observability.performance import log_cache_lookup
 
 if TYPE_CHECKING:
     from auto_parking.infrastructure.db.models import Vehicle

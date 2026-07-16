@@ -4,13 +4,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from auto_parking.app.ports.events import GPS_EVENTS_TOPIC, EventEnvelope
 from auto_parking.infrastructure.realtime.gps import (
     GPS_EVENT_TYPE,
     GpsPointEvent,
     GpsRealtimeHub,
     publish_gps_point,
 )
+from event_bus.contracts import GPS_EVENTS_TOPIC, EventEnvelope
 
 pytestmark = pytest.mark.asyncio
 

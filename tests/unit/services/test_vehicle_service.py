@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock
 import pytest
 
 from auto_parking.app.filter import VehicleFilter
-from auto_parking.app.ports.events import AUDIT_EVENTS_TOPIC, VEHICLE_EVENTS_TOPIC
 from auto_parking.app.service.vehicle import VehicleService
 from auto_parking.core.domain.models import VehicleModel
+from event_bus.contracts import AUDIT_EVENTS_TOPIC, VEHICLE_EVENTS_TOPIC
 
 pytestmark = pytest.mark.asyncio
 

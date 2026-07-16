@@ -4,8 +4,8 @@ from collections.abc import Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from auto_parking.app.ports.events import EventEnvelope, EventProducer
 from auto_parking.infrastructure.db.repositories.outbox import OutboxRepository
+from event_bus.contracts import EventEnvelope, EventProducer
 
 logger = logging.getLogger(__name__)
 

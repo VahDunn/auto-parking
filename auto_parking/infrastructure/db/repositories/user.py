@@ -21,9 +21,7 @@ class UserRepository:
             if not filter_obj.load_relations:
                 stmt = stmt.options(noload(User.enterprises))
             if filter_obj.enterprise_id is not None:
-                stmt = stmt.join(User.enterprises).where(
-                    Enterprise.id == filter_obj.enterprise_id
-                )
+                stmt = stmt.join(User.enterprises).where(Enterprise.id == filter_obj.enterprise_id)
             if filter_obj.ids:
                 stmt = stmt.where(User.id.in_(filter_obj.ids))
             if filter_obj.username:

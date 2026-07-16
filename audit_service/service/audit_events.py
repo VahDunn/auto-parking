@@ -1,7 +1,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from audit_service.ports.events import EventEnvelope
+from event_bus.contracts import EventEnvelope
 
 if TYPE_CHECKING:
     from audit_service.repo.audit import AuditEventRepository

@@ -3,10 +3,7 @@ from auto_parking.infrastructure.db.models.vehicle_to_driver import VehicleDrive
 
 
 def _indexes_by_name(table):
-    return {
-        index.name: [column.name for column in index.columns]
-        for index in table.indexes
-    }
+    return {index.name: [column.name for column in index.columns] for index in table.indexes}
 
 
 def test_vehicle_driver_assignment_has_reverse_lookup_index():

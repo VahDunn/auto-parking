@@ -1,6 +1,6 @@
 import pytest
 
-from notification_service.ports.events import AUDIT_EVENTS_TOPIC, EventEnvelope
+from event_bus.contracts import AUDIT_EVENTS_TOPIC, EventEnvelope
 from notification_service.service import VehicleEventNotificationService
 
 pytestmark = pytest.mark.asyncio
@@ -104,9 +104,7 @@ async def test_vehicle_event_notification_skips_events_without_managers():
         telegram_sender=sender,
     )
 
-    await service.handle(
-        vehicle_event(payload={"vehicle_id": 7, "vehicle_number": "А123ВС77"})
-    )
+    await service.handle(vehicle_event(payload={"vehicle_id": 7, "vehicle_number": "А123ВС77"}))
 
     assert registry.requested_user_ids == []
     assert sender.messages == []

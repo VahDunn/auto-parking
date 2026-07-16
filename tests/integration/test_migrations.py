@@ -46,18 +46,22 @@ async def test_alembic_upgrade_head_builds_schema_from_scratch(
     async with integration_sessionmaker() as session:
         version = await session.scalar(text("SELECT version_num FROM alembic_version"))
         vehicle_indexes = (
-            await session.execute(
-                text(
-                    """
+            (
+                await session.execute(
+                    text(
+                        """
                     SELECT indexname
                     FROM pg_indexes
                     WHERE schemaname = 'public'
                       AND tablename = 'vehicle'
                       AND indexname = 'ix_vehicle_vehicle_number_prefix'
                     """
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
     assert version == expected_head
     assert vehicle_indexes == ["ix_vehicle_vehicle_number_prefix"]

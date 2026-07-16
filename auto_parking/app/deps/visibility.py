@@ -50,9 +50,7 @@ def apply_enterprise_visibility(
     if enterprise_ids is None:
         return sorted(visible_enterprise_ids)
     return [
-        enterprise_id
-        for enterprise_id in enterprise_ids
-        if enterprise_id in visible_enterprise_ids
+        enterprise_id for enterprise_id in enterprise_ids if enterprise_id in visible_enterprise_ids
     ]
 
 

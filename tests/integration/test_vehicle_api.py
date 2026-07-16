@@ -5,12 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from auto_parking.app.deps.visibility import get_visible_enterprise_ids
-from auto_parking.app.ports.events import AUDIT_EVENTS_TOPIC, VEHICLE_EVENTS_TOPIC
 from auto_parking.app.service.outbox import OutboxDispatcher
 from auto_parking.infrastructure.db.models import Enterprise, OutboxEvent, Vehicle
 from auto_parking.infrastructure.db.models.vehicle_model import VehicleModel as VehicleModelOrm
 from auto_parking.infrastructure.db.repositories.vehicle_track import VehicleTrackRepository
 from auto_parking.main import app as fastapi_app
+from event_bus.contracts import AUDIT_EVENTS_TOPIC, VEHICLE_EVENTS_TOPIC
 
 pytestmark = [
     pytest.mark.asyncio,

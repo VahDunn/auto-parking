@@ -495,8 +495,7 @@ async def test_bot_service_caches_enterprise_mileage_summary():
     assert second == first
     assert cache.set_calls == [
         (
-            "bot:mileage:manager:enterprise:2:"
-            "2026-05-01T00:00:00+00:00:2026-06-01T00:00:00+00:00",
+            "bot:mileage:manager:enterprise:2:2026-05-01T00:00:00+00:00:2026-06-01T00:00:00+00:00",
             123,
         )
     ]
@@ -510,8 +509,7 @@ async def test_bot_service_does_not_return_cached_enterprise_summary_without_acc
     api_client.get_enterprise.return_value = None
     cache = FakeCacheClient()
     cache.values[
-        "bot:mileage:manager:enterprise:2:"
-        "2026-05-01T00:00:00+00:00:2026-06-01T00:00:00+00:00"
+        "bot:mileage:manager:enterprise:2:2026-05-01T00:00:00+00:00:2026-06-01T00:00:00+00:00"
     ] = (
         '{"title": "Предприятие #2", '
         '"date_from": "2026-05-01T00:00:00+00:00", '

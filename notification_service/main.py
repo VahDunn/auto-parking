@@ -3,11 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from event_bus.contracts import VEHICLE_EVENTS_TOPIC
 from notification_service.core.config import get_settings
 from notification_service.integrations.events import create_event_consumer, create_event_producer
 from notification_service.integrations.redis_sessions import RedisTelegramSessionRegistry
 from notification_service.integrations.telegram import TelegramBotSender
-from notification_service.ports.events import VEHICLE_EVENTS_TOPIC
 from notification_service.service import VehicleEventNotificationService
 
 logger = logging.getLogger(__name__)
