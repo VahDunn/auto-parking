@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from auto_parking.filter import TripFilter, VehicleTrackFilter
-from auto_parking.service.export import ExportService
+from auto_parking.app.filter import TripFilter, VehicleTrackFilter
+from auto_parking.app.service.export import ExportService
 
 pytestmark = pytest.mark.asyncio
 

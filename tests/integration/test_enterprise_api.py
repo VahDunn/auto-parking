@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from auto_parking.db.models import Enterprise
+from auto_parking.infrastructure.db.models import Enterprise
 
 pytestmark = [
     pytest.mark.asyncio,

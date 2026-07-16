@@ -1,8 +1,8 @@
 import pytest
 
+from auto_parking.app.filter import DriverFilter
 from auto_parking.core.domain.enums import UserRole
 from auto_parking.core.domain.models import DriverModel
-from auto_parking.filter import DriverFilter
 from tests.conftest import (
     set_actor_override,
     set_driver_service_override,

@@ -11,9 +11,9 @@ from geoalchemy2.elements import WKTElement
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auto_parking.db.engine import AsyncSessionLocal
-from auto_parking.db.models import Enterprise, Trip, Vehicle, VehicleGpsPoint
-from auto_parking.realtime.gps import (
+from auto_parking.infrastructure.db.engine import AsyncSessionLocal
+from auto_parking.infrastructure.db.models import Enterprise, Trip, Vehicle, VehicleGpsPoint
+from auto_parking.infrastructure.realtime.gps import (
     close_gps_event_producer,
     create_gps_event_producer,
     publish_gps_point,

@@ -4,8 +4,8 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from auto_parking.db.models import Enterprise, Trip, Vehicle, VehicleGpsPoint
-from auto_parking.db.models.vehicle_model import VehicleModel as VehicleModelOrm
+from auto_parking.infrastructure.db.models import Enterprise, Trip, Vehicle, VehicleGpsPoint
+from auto_parking.infrastructure.db.models.vehicle_model import VehicleModel as VehicleModelOrm
 
 pytestmark = [
     pytest.mark.asyncio,

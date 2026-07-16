@@ -4,12 +4,12 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException, status
 
+from auto_parking.app.deps.access import require_manager_or_higher
+from auto_parking.app.deps.services import dep_enterprise_service, dep_vehicle_service
+from auto_parking.app.deps.visibility import get_visible_enterprise_ids
 from auto_parking.core.domain.enums.user_role import UserRole
 from auto_parking.core.domain.models import VehicleModel
 from auto_parking.core.errors import ConflictError
-from auto_parking.deps.access import require_manager_or_higher
-from auto_parking.deps.services import dep_enterprise_service, dep_vehicle_service
-from auto_parking.deps.visibility import get_visible_enterprise_ids
 from auto_parking.main import app as fastapi_app
 
 pytestmark = pytest.mark.asyncio

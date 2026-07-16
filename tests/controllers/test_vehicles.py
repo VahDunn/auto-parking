@@ -3,9 +3,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from auto_parking.app.filter import VehicleFilter
 from auto_parking.core.domain.enums import TrackFormat, UserRole
 from auto_parking.core.domain.models import TripTrackGroupModel, VehicleTrackPointModel
-from auto_parking.filter import VehicleFilter
 from tests.conftest import (
     set_actor_override,
     set_enterprise_service_override,

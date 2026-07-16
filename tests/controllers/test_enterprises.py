@@ -1,8 +1,8 @@
 import pytest
 
+from auto_parking.app.filter import EnterpriseFilter
 from auto_parking.core.domain.enums import UserRole
 from auto_parking.core.errors import NotFoundError
-from auto_parking.filter import EnterpriseFilter
 from tests.conftest import (
     set_actor_override,
     set_enterprise_service_override,

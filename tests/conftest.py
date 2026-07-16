@@ -11,9 +11,8 @@ import pytest
 import pytest_asyncio
 from asgi_lifespan import LifespanManager
 
-from auto_parking.core.domain.enums.user_role import UserRole
-from auto_parking.deps.access import require_manager_or_higher
-from auto_parking.deps.services import (
+from auto_parking.app.deps.access import require_manager_or_higher
+from auto_parking.app.deps.services import (
     dep_driver_service,
     dep_enterprise_service,
     dep_export_service,
@@ -29,7 +28,8 @@ from auto_parking.deps.services import (
     dep_vehicle_service,
     dep_vehicle_track_service,
 )
-from auto_parking.deps.visibility import get_visible_enterprise_ids
+from auto_parking.app.deps.visibility import get_visible_enterprise_ids
+from auto_parking.core.domain.enums.user_role import UserRole
 from auto_parking.main import app as fastapi_app
 
 

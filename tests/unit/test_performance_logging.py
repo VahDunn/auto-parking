@@ -5,8 +5,8 @@ from unittest.mock import patch
 from starlette.datastructures import URL, Headers
 
 from auto_parking.core.logger import get_logging_config
-from auto_parking.observability.access_log import log_access_request
-from auto_parking.observability.performance import log_cache_lookup, log_http_request
+from auto_parking.infrastructure.observability.access_log import log_access_request
+from auto_parking.infrastructure.observability.performance import log_cache_lookup, log_http_request
 
 
 def test_logging_config_keeps_httpx_credentials_out_of_info_logs():
@@ -18,7 +18,7 @@ def test_logging_config_keeps_httpx_credentials_out_of_info_logs():
 
 
 def test_http_request_log_is_structured_json():
-    with patch("auto_parking.observability.performance.logger.info") as info:
+    with patch("auto_parking.infrastructure.observability.performance.logger.info") as info:
         log_http_request(
             method="GET",
             path="/api/vehicles/{id}/track",
@@ -36,7 +36,7 @@ def test_http_request_log_is_structured_json():
 
 
 def test_cache_lookup_log_contains_operation_and_result():
-    with patch("auto_parking.observability.performance.logger.info") as info:
+    with patch("auto_parking.infrastructure.observability.performance.logger.info") as info:
         log_cache_lookup(
             operation="vehicle_track_payload",
             result="hit",
@@ -65,7 +65,7 @@ def test_access_log_is_goaccess_parseable_and_redacts_query_tokens():
         scope={"http_version": "1.1", "time": 1780738445},
     )
 
-    with patch("auto_parking.observability.access_log.logger.info") as info:
+    with patch("auto_parking.infrastructure.observability.access_log.logger.info") as info:
         log_access_request(
             request=request,
             status=404,

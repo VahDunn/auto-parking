@@ -6,11 +6,11 @@ from datetime import UTC, datetime, timedelta
 from math import atan2, cos, radians, sin, sqrt
 from time import perf_counter
 
+from auto_parking.app.ports.cache import CacheClient
+from auto_parking.app.service.bot_session_registry import BotSessionRegistry
 from auto_parking.bot.api_client import AutoParkingApiClient
 from auto_parking.core.security.jwt import decode_access_token
-from auto_parking.observability.performance import log_cache_lookup
-from auto_parking.ports.cache import CacheClient
-from auto_parking.service.bot_session_registry import BotSessionRegistry
+from auto_parking.infrastructure.observability.performance import log_cache_lookup
 
 
 @dataclass(slots=True)

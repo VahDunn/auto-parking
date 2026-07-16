@@ -8,9 +8,9 @@ from faker import Faker
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auto_parking.api.schemas.vehicle import VehicleCreate, is_valid_plate
-from auto_parking.db.engine import AsyncSessionLocal
-from auto_parking.db.models import Driver, Enterprise, Vehicle, VehicleModel
+from auto_parking.app.schemas.vehicle import VehicleCreate, is_valid_plate
+from auto_parking.infrastructure.db.engine import AsyncSessionLocal
+from auto_parking.infrastructure.db.models import Driver, Enterprise, Vehicle, VehicleModel
 
 app = typer.Typer(help="Утилита генерации тестовых машин и водителей")
 

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 
+from auto_parking.app.deps.cache import get_cache_client
 from auto_parking.bot.api_client import AutoParkingApiClient
 from auto_parking.bot.client import TelegramLongPollingClient
 from auto_parking.bot.handlers import TelegramBotHandlers
 from auto_parking.bot.service import BotService
 from auto_parking.core.config import settings
 from auto_parking.core.logger import setup_logging
-from auto_parking.deps.cache import get_cache_client
 
 
 async def main() -> None:

@@ -7,8 +7,8 @@ import httpx
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from auto_parking.db.engine import engine
-from auto_parking.integrations.monitoring.database import setup_database_metrics
+from auto_parking.infrastructure.db.engine import engine
+from auto_parking.infrastructure.observability.database import setup_database_metrics
 
 _MISSING_ROUTE = "/api/__monitoring_smoke_missing__"
 _MISSING_TABLE_QUERY = "SELECT * FROM auto_parking_monitoring_smoke_missing_table"

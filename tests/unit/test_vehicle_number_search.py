@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from sqlalchemy.dialects import postgresql
 
-from auto_parking.filter import VehicleFilter
-from auto_parking.repo.vehicle import VehicleRepository
+from auto_parking.app.filter import VehicleFilter
+from auto_parking.infrastructure.db.repositories.vehicle import VehicleRepository
 
 pytestmark = pytest.mark.asyncio
 

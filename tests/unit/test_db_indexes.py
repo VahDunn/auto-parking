@@ -1,5 +1,5 @@
-from auto_parking.db.models import Driver, Notification, OutboxEvent, user_enterprise
-from auto_parking.db.models.vehicle_to_driver import VehicleDriverAssignment
+from auto_parking.infrastructure.db.models import Driver, Notification, OutboxEvent, user_enterprise
+from auto_parking.infrastructure.db.models.vehicle_to_driver import VehicleDriverAssignment
 
 
 def _indexes_by_name(table):

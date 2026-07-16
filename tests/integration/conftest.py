@@ -8,12 +8,12 @@ from asgi_lifespan import LifespanManager
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from auto_parking.app.deps.access import require_manager_or_higher
+from auto_parking.app.deps.commons import get_db
+from auto_parking.app.deps.visibility import get_visible_enterprise_ids
 from auto_parking.core.domain.enums.user_role import UserRole
-from auto_parking.db.models import Base
-from auto_parking.deps.access import require_manager_or_higher
-from auto_parking.deps.commons import get_db
-from auto_parking.deps.visibility import get_visible_enterprise_ids
-from auto_parking.integrations.cache.null import NullCacheClient
+from auto_parking.infrastructure.cache.null import NullCacheClient
+from auto_parking.infrastructure.db.models import Base
 from auto_parking.main import app as fastapi_app
 from tests.conftest import FakeActor
 
@@ -58,7 +58,7 @@ async def integration_sessionmaker() -> AsyncGenerator[async_sessionmaker[AsyncS
 def captured_event_producer(monkeypatch):
     producer = CapturingEventProducer()
     monkeypatch.setattr(
-        "auto_parking.deps.services.get_cache_client",
+        "auto_parking.app.deps.services.get_cache_client",
         lambda: NullCacheClient(),
     )
     return producer

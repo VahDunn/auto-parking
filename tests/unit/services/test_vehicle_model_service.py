@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from auto_parking.service.vehicle_model import VehicleModelService
+from auto_parking.app.service.vehicle_model import VehicleModelService
 
 pytestmark = pytest.mark.asyncio
 

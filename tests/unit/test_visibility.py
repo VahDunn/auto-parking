@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
+from auto_parking.app.deps.visibility import get_visible_enterprise_ids
 from auto_parking.core.domain.enums.user_role import UserRole
-from auto_parking.deps.visibility import get_visible_enterprise_ids
 
 pytestmark = pytest.mark.asyncio
 

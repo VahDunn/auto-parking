@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from auto_parking.core.config import settings
-from auto_parking.db.models import Base
+from auto_parking.infrastructure.db.models import Base
 
 config = context.config
 

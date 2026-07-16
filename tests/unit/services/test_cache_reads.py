@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from auto_parking.app.service.vehicle import VehicleService
+from auto_parking.app.service.vehicle_model import VehicleModelService
+from auto_parking.app.service.vehicle_track import VehicleTrackService
 from auto_parking.core.domain.enums import TrackFormat
-from auto_parking.service.vehicle import VehicleService
-from auto_parking.service.vehicle_model import VehicleModelService
-from auto_parking.service.vehicle_track import VehicleTrackService
 
 pytestmark = pytest.mark.asyncio
 

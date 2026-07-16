@@ -3,8 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from auto_parking.core.domain.enums.user_role import UserRole
 from auto_parking.core.security.passwords import hash_password
-from auto_parking.db.models import Enterprise, User, Vehicle
-from auto_parking.db.models.vehicle_model import VehicleModel as VehicleModelOrm
+from auto_parking.infrastructure.db.models import Enterprise, User, Vehicle
+from auto_parking.infrastructure.db.models.vehicle_model import VehicleModel as VehicleModelOrm
 
 pytestmark = [
     pytest.mark.asyncio,

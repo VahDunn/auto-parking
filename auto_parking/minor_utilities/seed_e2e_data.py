@@ -2,7 +2,7 @@ import asyncio
 
 from sqlalchemy import text
 
-from auto_parking.db.engine import AsyncSessionLocal
+from auto_parking.infrastructure.db.engine import AsyncSessionLocal
 
 SUPERMAN_PASSWORD_HASH = "$2b$12$UiPAu7oiyKPU.7a5dwyVWuksXQbHI76zH8nFOR3KQMg93RWtE5vV2"
 

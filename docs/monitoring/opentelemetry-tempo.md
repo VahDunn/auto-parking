@@ -21,9 +21,7 @@ SQLAlchemy, Redis, HTTPX и AIOKafka instrumentors. Notification- и audit-servi
 или Kafka consumer; фоновые SQL/Redis/HTTPX/Kafka producer операции сами по себе
 не создают поток разрозненных root traces.
 
-Transactional outbox отделяет HTTP transaction от поздней публикации Kafka.
-Без явного сохранения trace context в outbox payload сквозной parent-child trace
-через эту границу не гарантируется.
+Outbox отделяет HTTP транзакцию от публикации Kafka.
 
 ## Конфигурация
 
@@ -75,7 +73,7 @@ curl -fsS http://localhost:3200/ready
 curl -fsS -u admin:admin http://localhost:3000/api/datasources/uid/tempo
 ```
 
-Создать trace с предсказуемым ID и получить его из Tempo:
+Создать трейс с предсказуемым ID и получить его из Tempo:
 
 ```bash
 curl -fsS -o /dev/null \

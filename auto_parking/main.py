@@ -3,22 +3,22 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from auto_parking.api.router import api_router
+from auto_parking.app.api.router import api_router
+from auto_parking.app.deps.events import close_event_producer, get_event_producer
+from auto_parking.app.service.outbox import OutboxDispatcher
 from auto_parking.core.config import settings
 from auto_parking.core.handlers import register_exception_handlers
 from auto_parking.core.logger import setup_logging
-from auto_parking.db.admin import setup_admin
-from auto_parking.db.engine import AsyncSessionLocal, engine
-from auto_parking.db.events import register_listeners
-from auto_parking.deps.events import close_event_producer, get_event_producer
-from auto_parking.integrations.monitoring import (
+from auto_parking.infrastructure.db.admin import setup_admin
+from auto_parking.infrastructure.db.engine import AsyncSessionLocal, engine
+from auto_parking.infrastructure.db.events import register_listeners
+from auto_parking.infrastructure.observability import (
     setup_database_metrics,
     setup_metrics,
     setup_tracing,
     shutdown_tracing,
 )
-from auto_parking.realtime.gps import gps_realtime_hub
-from auto_parking.service.outbox import OutboxDispatcher
+from auto_parking.infrastructure.realtime.gps import gps_realtime_hub
 
 outbox_dispatcher = OutboxDispatcher(
     sessionmaker=AsyncSessionLocal,

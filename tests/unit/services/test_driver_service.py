@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from auto_parking.filter import DriverFilter
-from auto_parking.service.driver import DriverService
+from auto_parking.app.filter import DriverFilter
+from auto_parking.app.service.driver import DriverService
 
 pytestmark = pytest.mark.asyncio
 

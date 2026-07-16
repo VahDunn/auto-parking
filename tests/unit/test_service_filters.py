@@ -5,12 +5,12 @@ from unittest.mock import AsyncMock
 import pytest
 from geoalchemy2.elements import WKTElement
 
-from auto_parking.api.schemas.vehicle_track import TrackFormat
-from auto_parking.filter import EnterpriseFilter, TripFilter, VehicleFilter, VehicleTrackFilter
-from auto_parking.service.export import ExportService
-from auto_parking.service.gpx_import import GpxImportService
-from auto_parking.service.trip import TripService
-from auto_parking.service.trip_track import TripTrackService
+from auto_parking.app.filter import EnterpriseFilter, TripFilter, VehicleFilter, VehicleTrackFilter
+from auto_parking.app.schemas.vehicle_track import TrackFormat
+from auto_parking.app.service.export import ExportService
+from auto_parking.app.service.gpx_import import GpxImportService
+from auto_parking.app.service.trip import TripService
+from auto_parking.app.service.trip_track import TripTrackService
 
 pytestmark = pytest.mark.asyncio
 

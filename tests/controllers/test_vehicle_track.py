@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from auto_parking.app.filter import EnterpriseFilter
 from auto_parking.core.domain.enums.user_role import UserRole
 from auto_parking.core.domain.models import (
     GeoJSONFeatureCollectionModel,
@@ -10,7 +11,6 @@ from auto_parking.core.domain.models import (
     GeoJSONGeometryModel,
     VehicleTrackPointModel,
 )
-from auto_parking.filter import EnterpriseFilter
 from tests.conftest import (
     set_actor_override,
     set_enterprise_service_override,

@@ -6,10 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from auto_parking.core.domain.enums import NotificationType, UserRole
 from auto_parking.core.security.passwords import hash_password
-from auto_parking.db.models import Enterprise, Notification, Trip, User, Vehicle
-from auto_parking.db.models.vehicle_model import VehicleModel as VehicleModelOrm
-from auto_parking.repo.notification import NotificationRepository
-from auto_parking.repo.vehicle_track import VehicleTrackRepository
+from auto_parking.infrastructure.db.models import Enterprise, Notification, Trip, User, Vehicle
+from auto_parking.infrastructure.db.models.vehicle_model import VehicleModel as VehicleModelOrm
+from auto_parking.infrastructure.db.repositories.notification import NotificationRepository
+from auto_parking.infrastructure.db.repositories.vehicle_track import VehicleTrackRepository
 
 pytestmark = [
     pytest.mark.asyncio,

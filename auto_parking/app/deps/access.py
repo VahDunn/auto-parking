@@ -1,0 +1,12 @@
+from fastapi import HTTPException, status
+
+from auto_parking.app.deps.commons import dep_actor
+from auto_parking.core.domain.enums.user_role import UserRole
+
+
+async def require_manager_or_higher(
+    actor=dep_actor,
+) -> set[int] | None:
+    if actor.role in (UserRole.admin, UserRole.manager):
+        return actor
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")

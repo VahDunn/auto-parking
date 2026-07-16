@@ -1,0 +1,2 @@
+from auto_parking.infrastructure.realtime.gps import gps_realtime_hub as gps_realtime_hub
+

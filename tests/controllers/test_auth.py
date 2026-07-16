@@ -9,7 +9,7 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_auth_login_success_sets_cookie(client, overrides, user_service_mock, monkeypatch):
-    monkeypatch.setattr("auto_parking.api.v1.auth.verify_password", lambda *_: True)
+    monkeypatch.setattr("auto_parking.app.api.v1.auth.verify_password", lambda *_: True)
     set_user_service_override(overrides, user_service_mock)
     user_service_mock.get.return_value = [
         SimpleNamespace(
@@ -37,7 +37,7 @@ async def test_auth_login_returns_401_for_bad_password(
     user_service_mock,
     monkeypatch,
 ):
-    monkeypatch.setattr("auto_parking.api.v1.auth.verify_password", lambda *_: False)
+    monkeypatch.setattr("auto_parking.app.api.v1.auth.verify_password", lambda *_: False)
     set_user_service_override(overrides, user_service_mock)
     user_service_mock.get.return_value = [
         SimpleNamespace(

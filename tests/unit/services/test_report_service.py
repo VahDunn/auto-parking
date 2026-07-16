@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from auto_parking.app.filter import TripFilter
+from auto_parking.app.service.report import ReportService
 from auto_parking.core.domain.enums import ReportPeriod, ReportType
 from auto_parking.core.domain.models import ReportModel
-from auto_parking.filter import TripFilter
-from auto_parking.service.report import ReportService
 
 pytestmark = pytest.mark.asyncio
 

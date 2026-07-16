@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from auto_parking.app.deps import commons
 from auto_parking.core.domain.models import VehicleModel
-from auto_parking.deps import commons
-from auto_parking.repo.vehicle import VehicleRepository
+from auto_parking.infrastructure.db.repositories.vehicle import VehicleRepository
 
 
 class FakeSessionContext:

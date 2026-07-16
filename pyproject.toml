@@ -89,7 +89,7 @@ exclude = [
     'dist',
     '**/node_modules',
     '**/__pycache__',
-    'auto_parking/db/admin.py'
+    'auto_parking/infrastructure/db/admin.py'
 ]
 ignore = [
     'tests/**',

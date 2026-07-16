@@ -116,7 +116,7 @@ async def test_get_unread_count(client, overrides, notification_service_mock):
 
 def test_notifications_websocket_authenticates_from_cookie(monkeypatch):
     monkeypatch.setattr(
-        "auto_parking.api.v1.notifications.fetch_unread_notifications_for_websocket",
+        "auto_parking.app.api.v1.notifications.fetch_unread_notifications_for_websocket",
         AsyncMock(return_value=[]),
     )
     token = create_access_token(actor_type=UserRole.manager.value, actor_id=12)
@@ -129,7 +129,7 @@ def test_notifications_websocket_authenticates_from_cookie(monkeypatch):
 
 def test_notifications_websocket_rejects_query_token(monkeypatch):
     monkeypatch.setattr(
-        "auto_parking.api.v1.notifications.fetch_unread_notifications_for_websocket",
+        "auto_parking.app.api.v1.notifications.fetch_unread_notifications_for_websocket",
         AsyncMock(return_value=[]),
     )
     token = create_access_token(actor_type=UserRole.manager.value, actor_id=12)

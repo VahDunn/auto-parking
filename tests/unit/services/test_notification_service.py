@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from auto_parking.app.filter import UserFilter
+from auto_parking.app.service.notification import NotificationService
 from auto_parking.core.domain.enums import NotificationType
-from auto_parking.filter import UserFilter
-from auto_parking.service.notification import NotificationService
 
 pytestmark = pytest.mark.asyncio
 

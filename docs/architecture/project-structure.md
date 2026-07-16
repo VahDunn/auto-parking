@@ -5,7 +5,7 @@
 [руководстве по локальной разработке](../development/local-setup.md), а
 production-процедуры — в [руководстве по деплою](../deployment.md).
 
-## Система в одном абзаце
+## Кратко
 
 Auto Parking состоит из основного FastAPI-приложения, статического frontend,
 Telegram-бота и двух Kafka consumers: сервиса уведомлений и сервиса аудита.
@@ -14,7 +14,7 @@ Telegram-привязки — в Redis, межпроцессные событи�
 владеет отдельной PostgreSQL базой. Nginx является единой HTTP/WebSocket точкой
 входа.
 
-## Runtime-топология
+## Структура
 
 ```mermaid
 flowchart TB
@@ -93,19 +93,64 @@ browser / bot
 
 ### CRUD автомобиля и transactional outbox
 
+Для create/update/delete автомобиля основной API выполняет в одной PostgreSQL
+транзакции:
+
 ```text
-vehicle create/update/delete
--> одна PostgreSQL transaction:
-     business change
-     + outbox row for vehicle topic
-     + outbox row for audit topic
--> commit
--> OutboxDispatcher
--> Kafka
+INSERT/UPDATE/DELETE vehicle
++ INSERT outbox_event(topic=vehicle.events)
++ INSERT outbox_event(topic=audit.events)
+COMMIT
 ```
 
-HTTP-запрос не публикует vehicle event напрямую. Подробные гарантии и ограничения
-описаны в [Kafka-документации](kafka.md).
+Обе outbox rows содержат один business `EventEnvelope` и один `event_id`, но разные
+topics. Unique constraint `(topic, event_id)` защищает от повторной строки для той же
+пары, но не отменяет возможности повторной публикации в Kafka.
+
+HTTP-запрос не публикует vehicle event напрямую и не ждёт Kafka. Если broker
+недоступен, business transaction всё равно сохраняется, а pending event остаётся в
+основной БД. `OutboxDispatcher` разбирает такие строки батчами через
+`FOR UPDATE SKIP LOCKED`, что позволяет безопасно запускать несколько workers
+параллельно. Повторная публикация возможна, если Kafka приняла message, а process
+завершился до commit статуса `published` — это нормальная at-least-once семантика
+outbox.
+
+Outbox — не общая обёртка для любого producer. Audit events от `notification-service`
+и GPS events от track generator публикуются напрямую: у них durable-гарантии нет и
+потеря live-события допустима.
+
+### Topics и envelope
+
+Каталог топиков — в [`event_bus/topics.py`](../../event_bus/topics.py),
+контракт события — в [`event_bus/contracts.py`](../../event_bus/contracts.py).
+
+| Topic | Message key | Producers | Consumers |
+| --- | --- | --- | --- |
+| `auto-parking.vehicle.events` | `vehicle_id` | Outbox dispatcher основного API | `notification-service` |
+| `auto-parking.audit.events` | Идентификатор сущности; для notification events — `manager_id` | Outbox dispatcher, `notification-service` | `audit-service` |
+| `auto-parking.gps.events` | `vehicle_id` | Track generator | Live GPS consumers API |
+
+Все сервисы обмениваются `EventEnvelope`:
+
+| Поле | Назначение |
+| --- | --- |
+| `event_id` | UUID события и ключ идемпотентности |
+| `event_type` | Тип события, например `vehicle.updated` |
+| `version` | Версия payload contract |
+| `occurred_at` | UTC timestamp возникновения события |
+| `producer` | Логическое имя producer |
+| `entity` / `entity_id` | Связанная доменная сущность |
+| `correlation_id` | Связь с исходным бизнес-событием, если есть |
+| `payload` | JSON-совместимые данные события |
+
+Envelope сериализуется в UTF-8 JSON. Секреты, JWT и пароли в payload помещать
+нельзя. Изменение обязательных полей payload требует новой версии contract и
+backward-compatible consumer либо согласованной миграции всех участников.
+
+At-least-once producer требует, чтобы consumers переносили duplicates. Audit
+repository делает `ON CONFLICT DO NOTHING` по `event_id`; notification service
+processed-state не хранит, поэтому duplicate vehicle event может привести к
+повторному Telegram-сообщению.
 
 ### Telegram-уведомление и аудит
 
@@ -219,13 +264,6 @@ event_bus/
 [operations](../operations/README.md) и
 [monitoring](../monitoring/README.md).
 
-## Правила для изменений
 
-1. Не переносить бизнес-логику в controllers.
-2. Не выполнять SQL вне repositories и специализированных persistence services.
-3. Для DB-bound событий основного API использовать transactional outbox.
-4. Сохранять межсервисные contracts в `event_bus` и версионировать payload.
-5. Выбирать стабильный Kafka key по сущности, порядок которой важен.
-6. Проектировать consumers с учётом повторной доставки.
-7. Не использовать Redis как замену Kafka.
-8. Не смешивать владение основной и audit DB.
+
+![img.png](../../assets/sample_images/realtime_img.png)

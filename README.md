@@ -1,41 +1,54 @@
 # Auto Parking
 
-Auto Parking — сервис управления автопарком на FastAPI. Проект включает
+Auto Parking — учебный проект сервиса управления автопарком на FastAPI. Проект включает
 REST/WebSocket API, статический веб-интерфейс, Telegram-бота, событийное
-взаимодействие через Kafka, PostgreSQL/PostGIS, Redis и локальный стек
-наблюдаемости.
+взаимодействие через Kafka, PostgreSQL/PostGIS, Redis и мониторинг (Prometheus, Grafana, OpenTel).
 
-## Возможности
 
-- управление предприятиями, автомобилями, водителями, поездками и отчётами;
-- импорт и экспорт данных, GPS-треки и live-обновления карты;
-- ролевой доступ и Telegram-интерфейс;
-- уведомления и аудит через отдельные Kafka consumers;
-- метрики, трассировки, дашборды и operational alerts;
-- unit, integration, E2E и нагрузочные тесты.
-
-## С чего начать
-
-Каноническая карта документации находится в
-[`docs/README.md`](docs/README.md).
-
-- Локальный запуск: [`docs/development/local-setup.md`](docs/development/local-setup.md)
-- Архитектура: [`docs/architecture/project-structure.md`](docs/architecture/project-structure.md)
-- Конфигурация: [`docs/configuration.md`](docs/configuration.md)
-- Тестирование: [`docs/testing/README.md`](docs/testing/README.md)
-- CI: [`docs/ci-cd.md`](docs/ci-cd.md)
-- Деплой и откат: [`docs/deployment.md`](docs/deployment.md)
-
-После запуска API публикует интерактивную OpenAPI-документацию на `/docs`.
-Адреса локальных сервисов, команды запуска и проверок намеренно собраны в
-руководстве по локальной разработке, чтобы README не становился второй копией
-эксплуатационной документации.
-
-## Основные технологии
+## Стек
 
 Python 3.12, FastAPI, SQLAlchemy, PostgreSQL/PostGIS, Redis, Kafka, Docker
 Compose, Alembic, Prometheus, OpenTelemetry, Tempo, Grafana, Pytest, Playwright
 и Locust.
 
-Проектная топология и её текущие ограничения описаны в
-[`docs/architecture/project-structure.md`](docs/architecture/project-structure.md).
+## Features 
+
+- управление предприятиями, автомобилями, водителями, поездками и отчётами;
+     - ![Предприятие](assets/sample_images/enterprise_img.png)
+- импорт и экспорт данных, GPS-треки и live-обновления карты;
+     - ![Трекинг](assets/sample_images/track_image.png)
+     - ![Геопозиция в реальном времени](assets/sample_images/realtime_img.png)
+- доступ c ролями и Telegram-интерфейс;
+- уведомления и аудит через отдельные микросервисы;
+- метрики, трассировки, дашборды и operational alerts;
+
+## Docker-образы
+
+Образы автоматически собираются и публикуются в GitHub Container Registry при
+push в `main` (см. [CI/CD](docs/ci-cd.md)). Все образы публичные — тянутся без логина:
+
+```bash
+docker pull ghcr.io/vahdunn/auto-parking/app:latest
+docker pull ghcr.io/vahdunn/auto-parking/notification-service:latest
+docker pull ghcr.io/vahdunn/auto-parking/audit-service:latest
+docker pull ghcr.io/vahdunn/auto-parking/frontend:latest
+```
+
+Каждый образ также тегируется по SHA коммита. Список пакетов:
+[github.com/VahDunn/auto-parking/pkgs/container](https://github.com/VahDunn?tab=packages&repo_name=auto-parking).
+
+## Карта документации
+
+- [Локальная разработка](docs/development/local-setup.md)
+- [Конфигурация](docs/configuration.md)
+- [Архитектурный обзор](docs/architecture/project-structure.md)
+- [Тестирование](docs/testing/README.md)
+- [CI](docs/ci-cd.md)
+- [Деплой](docs/deployment.md)
+- [Мониторинг](docs/monitoring/README.md)
+- [Миграции, live-tracking и пр.](docs/operations/README.md)
+
+После запуска API публикует интерактивную OpenAPI-документацию на `/docs`.
+Адреса локальных сервисов, команды запуска и проверок намеренно собраны в
+руководстве по локальной разработке.
+

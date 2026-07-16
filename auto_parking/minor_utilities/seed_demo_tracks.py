@@ -9,8 +9,8 @@ from geoalchemy2.elements import WKTElement
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auto_parking.db.engine import AsyncSessionLocal
-from auto_parking.db.models import Trip, Vehicle, VehicleGpsPoint
+from auto_parking.infrastructure.db.engine import AsyncSessionLocal
+from auto_parking.infrastructure.db.models import Trip, Vehicle, VehicleGpsPoint
 
 app = typer.Typer(help="Генератор demo-данных: поездки и GPS-точки")
 

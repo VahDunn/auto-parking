@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from audit_service.integrations.events import factory as audit_factory
-from auto_parking.deps import events as api_events
+from auto_parking.app.deps import events as api_events
 from event_bus.kafka import KafkaEventConsumer, KafkaEventProducer
 from event_bus.topics import (
     AUDIT_EVENTS_TOPIC,
