@@ -83,6 +83,10 @@ docker pull ghcr.io/vahdunn/auto-parking/frontend:latest
 - [Миграции, live-tracking и пр.](docs/operations/README.md)
 
 После запуска API публикует интерактивную OpenAPI-документацию на `/docs`.
-Адреса локальных сервисов, команды запуска и проверок намеренно собраны в
+
+Пример:
+
+- ![Документация](assets/sample_images/docs_img.png)
+Адреса локальных сервисов, команды запуска и проверок собраны в
 руководстве по локальной разработке.
 
