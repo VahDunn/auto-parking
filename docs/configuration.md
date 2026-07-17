@@ -1,7 +1,7 @@
 # Конфигурация
 
 Приложение получает настройки из переменных окружения. Этот документ описывает
-их назначение; актуальные имена и значения по умолчанию определены в коде и
+их назначение. Актуальные имена и значения по умолчанию определены в коде и
 Compose-файлах.
 
 ## Шаблоны окружений
@@ -28,18 +28,18 @@ Compose-файлах.
 
 `DATABASE_URL` внутри Compose должен использовать имя сервиса `db`, а не
 `localhost`. Для локального процесса вне Docker укажите адрес, доступный с host.
-Production Compose собирает `AUDIT_DATABASE_URL` из трёх `AUDIT_POSTGRES_*`;
-явный URL нужен при запуске audit-service вне Compose и в тестах.
+Production Compose собирает `AUDIT_DATABASE_URL` из трёх `AUDIT_POSTGRES_*`.
+Явный URL нужен при запуске audit-service вне Compose и в тестах.
 
 ## Настройки приложения
 
-Канонический список находится в
+Список находится в
 [`auto_parking/core/config.py`](../auto_parking/core/config.py). Наиболее важные
 группы:
 
 - `APP_ENV`, `DEBUG`, `LOG_LEVEL` — режим и логирование;
 - `ENTITY_CACHE_TTL_SECONDS`, `VEHICLE_MODEL_CACHE_TTL_SECONDS`,
-  `VEHICLE_TRACK_CACHE_TTL_SECONDS` — TTL cache;
+  `VEHICLE_TRACK_CACHE_TTL_SECONDS` — TTL кэша
 - `GPS_CONSUMER_ENABLED` — Kafka consumer live GPS;
 - `OUTBOX_DISPATCHER_*` — batch, polling и retry transactional outbox;
 - `PERFORMANCE_LOG_*`, `APP_ACCESS_LOG_PATH` — локальные JSONL/access logs;
@@ -53,13 +53,13 @@ Production Compose собирает `AUDIT_DATABASE_URL` из трёх `AUDIT_PO
 
 В Git нельзя сохранять:
 
-- production-пароли БД и `JWT_SECRET_KEY`;
-- Telegram token и chat ID;
-- SSH private key и GHCR token;
+- production-пароли БД и `JWT_SECRET_KEY`.
+- Telegram token и chat ID.
+- SSH private key и GHCR token.
 - реальные `.env` файлы.
 
 В локальном окружении допустимы демонстрационные значения из `.env.example`.
-Production `.env` создаётся непосредственно на сервере; GitHub Actions получает
+Production `.env` создаётся непосредственно на сервере. GitHub Actions получает
 только секреты, необходимые для SSH и скачивания images. Подробности разделены
 между [CI/CD](ci-cd.md) и [деплоем](deployment.md).
 

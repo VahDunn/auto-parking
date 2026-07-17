@@ -5,7 +5,7 @@ GoAccess строит локальные HTML-отчёты из двух нез�
 
 ## Лог приложения
 
-FastAPI пишет `logs/app-access.log` в формате с Unix timestamp и дополнительной
+FastAPI пишет `logs/app-access.log` в формате с таймштампом и дополнительной
 длительностью запроса в миллисекундах.
 
 ```bash
@@ -35,4 +35,4 @@ goaccess logs/nginx-access.log \
 ```
 
 Форматы хранятся в `monitoring/goaccess`. Отчёты и исходные логи находятся в
-gitignored-каталоге `logs` и не являются постоянным monitoring storage.
+gitignored-каталоге `logs`.

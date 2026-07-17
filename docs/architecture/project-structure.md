@@ -1,4 +1,4 @@
-# Архитектура Auto Parking
+# Архитектура
 
 Документ описывает текущее устройство системы: runtime-компоненты, владение
 данными, основные потоки и границы кода. Команды запуска находятся в
@@ -46,30 +46,29 @@ flowchart TB
     API -->|"WebSocket"| Browser
 ```
 
-`event_bus/` на схеме не показан как процесс: это общая Python-библиотека с
+Модуль `event_bus/` на схеме не показан: это общая Python-библиотека с
 контрактами и Kafka adapters, которую импортируют приложение и workers.
 
 ## Компоненты и ответственность
 
-| Компонент | Ответственность | Что ему не принадлежит |
-| --- | --- | --- |
-| `nginx` | HTTP/WebSocket ingress, маршрутизация к frontend и API | Бизнес-логика и данные |
-| `frontend` | Статический браузерный интерфейс | Прямой доступ к БД |
-| `auto-parking` | REST/WebSocket API, авторизация, бизнес-сценарии, outbox dispatcher, live GPS consumer | Audit DB |
-| `telegram-bot` | Long polling, диалоги, вызовы основного HTTP API, привязка Telegram chat | Прямые SQL-запросы к бизнес-БД |
-| `notification-service` | Обработка vehicle events и отправка Telegram-уведомлений | Основная PostgreSQL и audit DB |
-| `audit-service` | Идемпотентное сохранение audit events | Основная PostgreSQL |
-| `event_bus` | Event envelope, topic catalog, producer/consumer adapters, topic init | Собственный runtime и хранилище |
-| Monitoring stack | Метрики, traces, dashboards, alerts | Бизнес-данные |
-
+| Компонент | Назначение                                                                                                 |
+|---|------------------------------------------------------------------------------------------------------------|
+| `nginx` | HTTP/WebSocket ingress, маршрутизация запросов к frontend и API                                            |
+| `frontend` | Статический браузерный интерфейс пользователя                                                              |
+| `auto-parking` | REST/WebSocket API, авторизация, бизнес-логика, управление парковками, outbox dispatcher, live GPS consumer |
+| `telegram-bot` | Некоторые ручки и уведомления через Telegram-чат                                                           |
+| `notification-service` | Обработка vehicle events и отправка уведомлений через бот                                                  |
+| `audit-service` | Идемпотентное сохранение audit events                                                                      |
+| `event_bus` | Библиотека для шины событий, каталог топиков, producer/consumer, инициализация топиков             |
+| Monitoring | Сбор метрик, трассировка, дашборды и алертинг                                                              |
 ## Владение данными
 
-| Хранилище | Владелец | Данные |
-| --- | --- | --- |
-| Main PostgreSQL/PostGIS | `auto-parking` | Пользователи, предприятия, машины, водители, поездки, GPS-точки, отчёты, уведомления и `outbox_event` |
-| Audit PostgreSQL | `audit-service` | Неизменяемая проекция Kafka audit events с уникальным `event_id` |
-| Redis | Основное приложение, bot и notification service | Кэш сущностей/отчётов и registry `user_id -> telegram_chat_id` |
-| Kafka | Общий transport | Vehicle, audit и live GPS event streams |
+| Хранилище | Владелец                                        | Данные                                                                                                |
+| --- |-------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| Main PostgreSQL/PostGIS | `auto-parking`                                  | Пользователи, предприятия, машины, водители, поездки, GPS-точки, отчёты, уведомления и `outbox_event` |
+| Audit PostgreSQL | `audit-service`                                 | Неизменяемое хранилище аудита с уникальным `event_id`                                                 |
+| Redis | Основное приложение, bot и notification service | Кэш сущностей/отчётов и registry `user_id -> telegram_chat_id`                                        |
+| Kafka | Общая транспортная шина                         | Бизнес-сущности, аудит и live GPS event стримы                                                        |
 
 Redis не является брокером сообщений. Audit service не пишет в основную БД, а
 основное приложение не пишет напрямую в audit DB.
@@ -103,11 +102,11 @@ INSERT/UPDATE/DELETE vehicle
 COMMIT
 ```
 
-Обе outbox rows содержат один business `EventEnvelope` и один `event_id`, но разные
-topics. Unique constraint `(topic, event_id)` защищает от повторной строки для той же
-пары, но не отменяет возможности повторной публикации в Kafka.
+Обе outbox rows содержат один `EventEnvelope` и один `event_id`, но разные
+топики. Констрейнт `(topic, event_id)` защищает от повторной записи той же
+пары, но не озащищает повторной публикации в Kafka (трейдофф).
 
-HTTP-запрос не публикует vehicle event напрямую и не ждёт Kafka. Если broker
+HTTP-запрос не публикует vehicle event напрямую и не ждёт Kafka. Если брокер
 недоступен, business transaction всё равно сохраняется, а pending event остаётся в
 основной БД. `OutboxDispatcher` разбирает такие строки батчами через
 `FOR UPDATE SKIP LOCKED`, что позволяет безопасно запускать несколько workers
@@ -115,8 +114,8 @@ HTTP-запрос не публикует vehicle event напрямую и не
 завершился до commit статуса `published` — это нормальная at-least-once семантика
 outbox.
 
-Outbox — не общая обёртка для любого producer. Audit events от `notification-service`
-и GPS events от track generator публикуются напрямую: у них durable-гарантии нет и
+Outbox — не общая обёртка для любого. Audit events от `notification-service`
+и GPS events от track generator публикуются напрямую: у них гарантии нет и
 потеря live-события допустима.
 
 ### Topics и envelope
@@ -144,12 +143,12 @@ Outbox — не общая обёртка для любого producer. Audit ev
 | `payload` | JSON-совместимые данные события |
 
 Envelope сериализуется в UTF-8 JSON. Секреты, JWT и пароли в payload помещать
-нельзя. Изменение обязательных полей payload требует новой версии contract и
-backward-compatible consumer либо согласованной миграции всех участников.
+нельзя. Изменение обязательных полей payload требует новой версии контрактов и
+и обратной совместимости консьюмера либо согласованной миграции всех участников.
 
-At-least-once producer требует, чтобы consumers переносили duplicates. Audit
+At-least-once продюсер требует, чтобы консьюмеры переносили дупликацию. Audit
 repository делает `ON CONFLICT DO NOTHING` по `event_id`; notification service
-processed-state не хранит, поэтому duplicate vehicle event может привести к
+processed-state не хранит, поэтому дубликат эвента может привести к
 повторному Telegram-сообщению.
 
 ### Telegram-уведомление и аудит
@@ -179,7 +178,7 @@ track generator
 -> connected browser clients
 ```
 
-У каждого API worker собственные WebSocket connections и уникальная Kafka
+У каждого API worker собственные WebSocket и уникальная Kafka
 consumer group. Поэтому каждый worker получает GPS stream и отправляет его своим
 клиентам. GPS publish не использует outbox: сохранённая точка останется в БД,
 даже если live-событие не удалось отправить.
@@ -230,18 +229,17 @@ deps собирает concrete implementations на границе прилож�
 event_bus/
   contracts.py    EventEnvelope и protocols
   kafka.py        AIOKafka producer/consumer adapters
-  topics.py       канонический catalog topics
+  topics.py       каталог топиков
   init_topics.py  идемпотентная инициализация topics
 ```
 
-## Инфраструктурные варианты
+## Варианты compose 
 
-- `docker-compose.yaml` — локальная разработка, observability и optional
-  profiles.
-- `docker-compose.e2e.yaml` — изолированный E2E-стенд со своими containers и
-  volumes.
+- `docker-compose.yaml` — локальная разработка, observability, опции.
+- `docker-compose.e2e.yaml` — изолированный E2E-стенд со своими контейнерами и
+  томами.
 - `deploy/docker-compose.prod.yaml` — single-server deployment из готовых
-  images.
+  образов.
 
 Состав и команды этих окружений документируются отдельно:
 [local setup](../development/local-setup.md),
@@ -251,16 +249,16 @@ event_bus/
 
 - Локальная и production Compose-топология использует один Kafka broker с
   replication factor 1; TLS/SASL не настроены.
-- Outbox даёт at-least-once publish, поэтому duplicates являются нормальным
+- Outbox даёт at-least-once publish, поэтому дубликаты являются нормальным
   сценарием.
-- Consumer retry policy и DLQ пока отсутствуют.
-- Published/failed outbox rows автоматически не очищаются и не replay-ятся.
-- WebSocket state находится в памяти API workers; Kafka обеспечивает fan-out
-  GPS-событий между workers, но не хранит клиентские подключения.
-- Notification и audit workers пока не имеют собственного полноценного
-  OpenTelemetry bootstrap.
+- Consumer retry policy и DLQ отсутствуют.
+- Published/failed outbox rows автоматически не очищаются, реплея также нет.
+- WebSocket state находится в памяти API workers; Kafka обеспечивает оборот
+  GPS-событий между воркерами, но не хранит клиентские подключения.
+- Notification и audit воркеры пока не имеют собственного полноценного
+  OpenTelemetry.
 
-Эксплуатационные последствия и способы проверки вынесены в
+Эксплуатационные особенности и способы проверки вынесены в
 [operations](../operations/README.md) и
 [monitoring](../monitoring/README.md).
 

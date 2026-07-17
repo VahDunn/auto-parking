@@ -18,21 +18,21 @@
 | Prometheus rules | `monitoring/tests/alerts.test.yml` | срабатывание alert rules на синтетических рядах | `promtool` из Docker image |
 | Load | `load_tests/locustfile.py` | пропускную способность и latency работающего стенда | поднятое приложение и тестовые данные |
 
-Marker `integration` зарегистрирован в `pyproject.toml`. Если
-`RUN_INTEGRATION` не равен `1`, collection hook помечает такие тесты как
-пропущенные. У unit и controller тестов отдельных markers нет — они выбираются
+Метка `integration` зарегистрирована в `pyproject.toml`. Если
+`RUN_INTEGRATION` не равен `1`, хук помечает такие тесты как
+пропущенные. У юнитов и controller-тестов отдельных меток нет — они выбираются
 по каталогам.
 
 ## Подготовка Python-окружения
 
-Проект поддерживает Python `>=3.12,<4`; Docker images и GitHub Actions используют
+Проект поддерживает Python `>=3.12,<4`. Docker и GitHub Actions используют
 Python 3.12. Установить приложение и dev-зависимости:
 
 ```bash
 poetry install --with dev --no-interaction
 ```
 
-При импорте приложения нужны валидные обязательные settings. Обычно они уже
+При импорте приложения нужны валидные обязательные параметры. Обычно они уже
 заданы в локальном `.env`. Для чистого shell достаточно тестовых значений:
 
 ```bash
@@ -45,8 +45,7 @@ export GPS_CONSUMER_ENABLED=false
 export OTEL_TRACING_ENABLED=false
 ```
 
-Для unit и controller тестов сервер по этому адресу не требуется: обращения к
-БД и другим внешним системам подменены. Integration-тестам нужна реальная
+Для юнитов и controller-тестов зависимости мокнуты. Интеграционникам нужна реальная
 отдельная БД, описанная ниже.
 
 ## Unit и controller тесты
@@ -65,13 +64,13 @@ poetry run pytest tests/controllers
 ```
 
 Обычная команда для всего Python-набора тоже безопасна без PostGIS, пока
-`RUN_INTEGRATION` не равен `1`: integration-тесты будут собраны и пропущены.
+`RUN_INTEGRATION` не равен `1`: интеграционники будут собраны и пропущены.
 
 ```bash
 poetry run pytest tests
 ```
 
-Для точечного запуска передайте путь к файлу или test node:
+Для точечного запуска нужен путь к файлу или test node:
 
 ```bash
 poetry run pytest tests/unit/services/test_vehicle_service.py
@@ -79,10 +78,10 @@ poetry run pytest \
   tests/controllers/test_vehicles.py::test_get_vehicles_builds_filter_and_respects_visibility
 ```
 
-## Integration-тесты
+## Интеграционное тестирование
 
-> Integration fixture удаляет и заново создаёт таблицы перед каждым тестом, а
-> тест миграций пересоздаёт schema `public`. Никогда не указывайте рабочую или
+> Фикстура удаляет и заново создаёт таблицы перед каждым тестом, а
+> тест миграций пересоздаёт схему `public`. Не указывайте рабочую или
 > общую локальную БД.
 
 Поднять одноразовый PostGIS-контейнер:
@@ -101,7 +100,7 @@ until docker exec auto-parking-it-postgis \
 done
 ```
 
-Запустить integration-набор:
+Запустить интеграционники:
 
 ```bash
 RUN_INTEGRATION=1 \
@@ -121,12 +120,12 @@ poetry run pytest tests/integration
 docker stop auto-parking-it-postgis
 ```
 
-Integration-тесты используют настоящий Postgres/PostGIS, но не требуют Kafka,
-Redis или Telegram: соответствующие границы заменены in-memory/fake-реализациями.
+Используется настоящий Postgres/PostGIS, но не Kafka,
+Redis или Telegram: соответствующие границы заменены моками.
 
-## Prometheus rule tests
+## Prometheus
 
-Файл `monitoring/tests/alerts.test.yml` проверяется отдельным `promtool` image.
+Файл `monitoring/tests/alerts.test.yml` проверяется отдельным `promtool` образом.
 Compose-контейнер Prometheus не монтирует каталог с тестами, поэтому команда
 запускает одноразовый контейнер:
 
@@ -143,7 +142,7 @@ GitHub Actions её сейчас не запускает.
 
 ## Lint, format, type checking и coverage
 
-Единственный обязательный статический gate в текущем CI и локальном commit hook:
+Единственная обязательная проверка в текущем CI и локальном хуке:
 
 ```bash
 poetry run ruff check .
@@ -173,8 +172,8 @@ poetry run ruff check .
 poetry run pytest tests
 ```
 
-Таким образом, CI запускает unit, controller и integration тесты. Он не
-запускает browser E2E, Prometheus rule tests, Locust, coverage, type checking и
+Таким образом, CI запускает юниты и интеграционные тесты. Он не
+запускает E2E, Prometheus-тесты, Locust, coverage, MYPY и
 Ruff format check.
 
 ## Выбор проверки перед pull request
@@ -187,6 +186,6 @@ Ruff format check.
 | Alert rules | дополнительно `promtool test rules` |
 | Производительность критического пути | выбранный Locust-профиль на отдельном стенде |
 
-Нагрузочные и мутационные browser-тесты запускайте только на специально
+Нагрузочные и мутационные browser-тесты запускаются только на специально
 подготовленных данных. Их ограничения и cleanup описаны в соответствующих
 руководствах.

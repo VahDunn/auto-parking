@@ -1,6 +1,6 @@
 # Telegram-бот и уведомления
 
-`telegram-bot` — отдельный процесс из основного image. Он обращается к FastAPI
+`telegram-bot` — отдельный процесс из основного образа. Он обращается к FastAPI
 по HTTP и после `/login` сохраняет связь `user_id -> chat_id` в Redis.
 `notification-service` читает события машин из Kafka и использует эту связь для
 отправки уведомлений.
@@ -52,8 +52,3 @@ docker compose exec redis \
 Если сообщения после vehicle event не приходят, проверьте, что пользователь
 выполнил `/login`, consumer подключился к Kafka и у него совпадает
 `KAFKA_NOTIFICATION_CONSUMER_GROUP`.
-
-Тот же `TELEGRAM_BOT_TOKEN` локально может использовать Alertmanager. Для
-получения `chat_id` через `getUpdates` временно остановите long polling бота или
-используйте отдельный bot token. Alert routing описан в
-[Alerting](../monitoring/alerting.md).

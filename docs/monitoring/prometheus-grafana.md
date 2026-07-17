@@ -2,7 +2,7 @@
 
 Документ описывает метрики, dashboards и диагностику. Запуск всего локального
 стека находится в [локальной разработке](../development/local-setup.md), alerts
-и доставка — в отдельном [runbook](alerting.md).
+и доставка — в отдельном [alerting](alerting.md).
 
 ## Поток данных
 
@@ -13,7 +13,7 @@ Collector /metrics ------------------> Prometheus
 Tempo /metrics ----------------------> Prometheus
 ```
 
-Prometheus обращается к API по Docker DNS `auto-parking:8000`. Synthetic probe
+Prometheus обращается к API по Docker DNS `auto-parking:8000`. Синтетическая проба
 проходит через Nginx и тем самым проверяет не только процесс FastAPI, но и
 пользовательский маршрут до `/api/health`.
 
@@ -29,23 +29,23 @@ Prometheus обращается к API по Docker DNS `auto-parking:8000`. Synt
 | `auto_parking_sql_events_total` | counter | `severity`, `operation`, `category` | детализация SQL errors/messages |
 | `auto_parking_sql_query_duration_seconds` | histogram | `operation` | latency SQL |
 
-HTTP paths нормализуются по шаблону FastAPI route, чтобы ID сущностей не
-создавали неограниченную cardinality. SQL statements и тексты ошибок не
+HTTP пути нормализуются по шаблону FastAPI route, чтобы ID сущностей не
+создавали лишнего. SQL statements и тексты ошибок не
 помещаются в labels.
 
-Локальный API работает с несколькими Uvicorn workers, поэтому включён режим
+Локальный API работает с несколькими Uvicorn воркерами, поэтому включён режим
 `PROMETHEUS_MULTIPROC_DIR`. Startup-команда очищает этот каталог перед запуском;
 при ручном изменении workers контейнер нужно пересоздать.
 
-## Synthetic health
+## Health (синтетический)
 
 Blackbox Exporter публикует:
 
-- `probe_success` — `1`, если Nginx вернул ожидаемый HTTP status;
+- `probe_success` — `1`, если Nginx вернул ожидаемый HTTP статус;
 - `probe_duration_seconds` — полная длительность проверки;
-- `probe_http_status_code` — фактический status.
+- `probe_http_status_code` — фактический статус.
 
-Health requests исключены из пользовательских RPS/latency panels и traces.
+Health-запросы исключены из пользовательских RPS/latency панелей и трейсов.
 
 ## Provisioned dashboards
 
@@ -57,7 +57,7 @@ Health requests исключены из пользовательских RPS/lat
 | Auto Parking Alerts | `auto-parking-alerts` | firing alerts, SQL/HTTP signals и baseline |
 
 JSON хранится в `monitoring/grafana/dashboards`, provisioning — в
-`monitoring/grafana/provisioning`. Provisioned dashboard следует менять в JSON;
+`monitoring/grafana/provisioning`. Provision-дашборды следует менять в JSON;
 изменение только через UI не является постоянным.
 
 ## Проверка
@@ -71,7 +71,7 @@ curl -fsS -u admin:admin \
   http://localhost:3000/api/dashboards/uid/auto-parking-api
 ```
 
-Проверка synthetic route:
+Проверка:
 
 ```bash
 curl -fsS --get \

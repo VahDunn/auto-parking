@@ -1,12 +1,11 @@
 # CI/CD
 
-В проекте настроены два независимых GitHub Actions workflow:
+В проекте настроены два независимых GitHub Actions:
 
-- `CI` проверяет Python-код и после успешного push в `main` публикует Docker images;
+- `CI` проверяет код и после успешного push в `main` публикует Docker images;
 - `Deploy` вручную разворачивает выбранный тег images на одном сервере по SSH.
 
-Автоматического deployment после merge нет. Ручной workflow не является gate для
-CI и не связан с конкретным запуском сборки.
+Автоматического deployment после мержа нет. 
 
 ## Источники конфигурации
 
@@ -46,16 +45,12 @@ flowchart LR
 poetry run ruff check .
 ```
 
-Hook не включается автоматически после clone. Для его активации один раз выполните:
+Хук не включается автоматически после клонирования. Для его активации один раз выполните:
 
 ```bash
 git config core.hooksPath githooks
 chmod +x githooks/pre-commit
 ```
-
-Это локальная вспомогательная проверка, а не серверный gate: пользователь может не
-включить hook или обойти его. Канонический результат проверок даёт job `checks` в
-GitHub Actions.
 
 ## Workflow `CI`
 
@@ -63,11 +58,10 @@ GitHub Actions.
 
 `CI` запускается на:
 
-- каждый `push` в любую ветку;
-- каждый `pull_request`.
+- каждый пуш в любую ветку;
+- каждый МР/ПР.
 
-Фильтров по веткам и путям нет. Поэтому изменения только документации также запускают
-Python-проверки, а push в любую feature-ветку запускает `checks`.
+Фильтров по веткам и путям нет. Любые изменения запускают проверки кода.
 
 ### Job `checks`
 
@@ -85,35 +79,34 @@ poetry run pytest tests
 ```
 
 Workflow задаёт `RUN_INTEGRATION=1` и `TEST_DATABASE_URL`, поэтому команда Pytest
-включает помеченные `integration` тесты, а не только unit-тесты. Для основного
-приложения, тестовых fixtures и audit-подключения используется один PostGIS service
-container.
+включает помеченные как интеграционные тесты, а не только юниты. Для основного
+приложения, тестовых фикстур и подключения аудита используется один PostGIS контейнер.
 
 ### Gate публикации images
 
-Job `images` имеет `needs: checks` и запускается только при одновременном выполнении
+Джоба `images` живет с `needs: checks` и запускается только при одновременном выполнении
 двух условий:
 
 1. `checks` завершился успешно;
 2. событие — `push` в `refs/heads/main`.
 
-На pull request и push в другие ветки images не собираются и не публикуются.
+На пуллреквест и пуш в другие ветки образы не собираются и не публикуются.
 
-Сам workflow не настраивает GitHub branch protection и не доказывает, что merge
-заблокирован при красном `checks`. Required status checks настраиваются отдельно в
+Сам workflow не настраивает защиту веток и не доказывает, что мердж
+заблокирован при красном `checks`. Это настраивается отдельно в
 параметрах репозитория.
 
 ## Docker images
 
-После успешного push в `main` Buildx последовательно собирает и публикует четыре
-image в GHCR:
+После успешного пуша в main Buildx последовательно собирает и публикует четыре
+образа в GHCR:
 
-| Image | Build context | Dockerfile | Процессы в production |
-| --- | --- | --- | --- |
-| `app` | `.` | `Dockerfile` | API, Telegram bot, Alembic, `kafka-init` |
-| `notification-service` | `.` | `notification_service/Dockerfile` | отправка Telegram-уведомлений |
-| `audit-service` | `.` | `audit_service/Dockerfile` | запись audit events |
-| `frontend` | `./frontend` | `frontend/Dockerfile` | статические файлы через Nginx |
+| Образ                  | Контекст     | Dockerfile | Процессы |
+|------------------------|--------------| --- | --- |
+| `app`                  | `.`          | `Dockerfile` | API, Telegram bot, Alembic, `kafka-init` |
+| `notification-service` | `.`          | `notification_service/Dockerfile` | отправка Telegram-уведомлений |
+| `audit-service`        | `.`          | `audit_service/Dockerfile` | запись audit events |
+| `frontend`             | `./frontend` | `frontend/Dockerfile` | статические файлы через Nginx |
 
 Namespace формируется из lowercase-владельца репозитория:
 
@@ -126,32 +119,29 @@ ghcr.io/<github-owner>/auto-parking/<image>
 - полный `GITHUB_SHA` — для точного выбора версии при deployment;
 - `latest` — указатель на последний успешно собранный push в `main`.
 
-`latest` изменяемый. Для контролируемого deployment и rollback используйте SHA.
-Buildx cache хранится в GitHub Actions cache отдельно для каждого image.
+`latest` изменяемый. Для контролируемого deployment и rollback используется SHA.
+Buildx кэш хранится в GitHub Actions кэше отдельно для каждого образа.
 
-Публикация четырёх images не атомарна: каждый build step сразу обновляет свой SHA-tag
-и `latest`. Если следующий step упадёт или два запуска `CI` пересекутся, часть
-`latest` может указывать на другой commit. Перед deployment по SHA проверяйте успех
-всего job `images`; `latest` не гарантирует согласованный release из четырёх images.
+Публикация четырёх образов не атомарна: каждый этап сразу обновляет свой SHA-tag
+и `latest`. Если следующий этап упадёт или два запуска `CI` пересекутся, часть
+`latest` может указывать на другой коммит. Перед деплоем по SHA нужно проверять успех
+всей джобы `images`. `latest` не гарантирует согласованный релиз из четырёх images.
 
 Для публикации используется автоматически выданный `GITHUB_TOKEN`. Workflow имеет
 `contents: read` и `packages: write`; отдельный PAT для CI-сборки не нужен.
 
 ## Workflow `Deploy`
 
-`Deploy` запускается только через `workflow_dispatch` и принимает два input:
+`Deploy` запускается только через `workflow_dispatch` и принимает две вводные:
 
-| Input | Default | Назначение |
-| --- | --- | --- |
-| `image_tag` | `latest` | единый тег всех четырёх application images |
-| `deploy_path` | `/opt/auto-parking` | каталог Compose stack на сервере |
+| Input | Default | Назначение                       |
+| --- | --- |----------------------------------|
+| `image_tag` | `latest` | единый тег всех четырёх образов  |
+| `deploy_path` | `/opt/auto-parking` | каталог Compose стека на сервере |
 
-Workflow не проверяет, что `image_tag` был создан текущим commit или успешным
+Workflow не проверяет, что `image_tag` был создан текущим коммитом или успешным
 запуском `CI`. Несуществующий или недоступный тег обнаружится только на этапе
 `docker compose pull`.
-
-Job не использует GitHub `environment`, поэтому в YAML нет environment-specific
-approval, protection rules или сериализации deployment.
 
 ## GitHub secrets
 
@@ -165,20 +155,18 @@ approval, protection rules или сериализации deployment.
 | `GHCR_USERNAME` | пользователь для `docker login ghcr.io` |
 | `GHCR_TOKEN` | token с доступом на чтение private GHCR packages |
 
-Для `GHCR_TOKEN` нужен как минимум доступ `read:packages`; для private repository
-могут потребоваться дополнительные права, зависящие от visibility package и
-репозитория.
+Для `GHCR_TOKEN` нужен как минимум доступ `read:packages`;
 
 ### Опциональные
 
-| Secret | Default | Назначение |
-| --- | --- | --- |
-| `DEPLOY_PORT` | `22` | порт для команд `ssh` и `scp` |
+| Secret | Дефолт                        | Назначение |
+| --- |-------------------------------| --- |
+| `DEPLOY_PORT` | `22`                          | порт для команд `ssh` и `scp` |
 | `IMAGE_NAMESPACE` | `<github-owner>/auto-parking` | переопределение GHCR namespace |
 
-Текущее ограничение нестандартного SSH-порта: шаг `ssh-keyscan` обращается к
+Шаг `ssh-keyscan` обращается к
 `DEPLOY_HOST` без `DEPLOY_PORT`. Если порт `22` недоступен, workflow может завершиться
-до первого `ssh`, даже если `DEPLOY_PORT` задан правильно.
+до первого ssh, даже если `DEPLOY_PORT` задан правильно.
 
 Production-пароли PostgreSQL, `JWT_SECRET_KEY`, `TELEGRAM_BOT_TOKEN` и остальные
 runtime secrets workflow не получает. Они хранятся в `.env` на сервере.
@@ -187,26 +175,12 @@ runtime secrets workflow не получает. Они хранятся в `.env
 
 Текущий workflow не запускает:
 
-- Playwright E2E-тесты;
+- E2E-тесты;
 - Locust-нагрузочные тесты;
-- Mypy или Pyright;
-- `ruff format --check`;
-- сборку Docker images на pull request;
-- `docker compose config` или smoke test собранных images;
-- vulnerability scan, SBOM или подпись images;
-- frontend lint/test;
-- deployment в staging или production.
+- Mypy и ruff;
+- сборку Docker образов на МР;
+- `docker compose config` или smoke test собранных образов;
+-  линт/тест фронтенда;
+- деплой в стейдж/прод.
 
 Эти проверки нельзя считать пройденными только на основании зелёного `CI`.
-
-## Ограничения воспроизводимости
-
-- Poetry устанавливается без фиксированной версии.
-- Dockerfiles используют version ranges из `pyproject.toml` или явных `pip install`;
-  `poetry.lock` при сборке application images не используется.
-- Base images и GitHub Actions указаны по изменяемым tags, а не по digest/commit SHA.
-- Повторная сборка одного commit в другое время может получить другие patch-версии
-  зависимостей или base image.
-- Публикация набора images не атомарна, а SHA-tags не защищены от перезаписи.
-- В workflow нет `concurrency`, поэтому параллельные ручные deployments не
-  сериализуются.

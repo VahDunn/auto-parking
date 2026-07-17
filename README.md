@@ -5,11 +5,45 @@ REST/WebSocket API, статический веб-интерфейс, Telegram-�
 взаимодействие через Kafka, PostgreSQL/PostGIS, Redis и мониторинг (Prometheus, Grafana, OpenTel).
 
 
-## Стек
+## Технологический стек
 
-Python 3.12, FastAPI, SQLAlchemy, PostgreSQL/PostGIS, Redis, Kafka, Docker
-Compose, Alembic, Prometheus, OpenTelemetry, Tempo, Grafana, Pytest, Playwright
-и Locust.
+Backend
+
+* Python 3.12
+* FastAPI
+* SQLAlchemy + Alembic 
+
+Хранение данных
+
+* PostgreSQL
+* PostGIS
+* Redis
+
+Асинхронная обработка и интеграции
+
+* Apache Kafka
+
+Инфраструктура
+
+* Docker
+* Docker Compose
+
+Мониторинг и наблюдаемость
+
+* Prometheus
+* OpenTelemetry
+* Grafana
+* Grafana Tempo
+
+Тестирование
+
+* Pytest — модульное и интеграционное тестирование
+* Playwright — end-to-end тестирование
+* Locust — нагрузочное тестирование
+
+Интеграцировано с Telegram Bot API.
+
+Версии и зависимости зафиксированы в pyproject и poetry.
 
 ## Features 
 
@@ -41,7 +75,7 @@ docker pull ghcr.io/vahdunn/auto-parking/frontend:latest
 
 - [Локальная разработка](docs/development/local-setup.md)
 - [Конфигурация](docs/configuration.md)
-- [Архитектурный обзор](docs/architecture/project-structure.md)
+- [Архитектура](docs/architecture/project-structure.md)
 - [Тестирование](docs/testing/README.md)
 - [CI](docs/ci-cd.md)
 - [Деплой](docs/deployment.md)

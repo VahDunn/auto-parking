@@ -13,7 +13,7 @@ FastAPI -> OTLP/HTTP -> OpenTelemetry Collector -> OTLP/gRPC -> Tempo -> Grafana
 | `tempo` | хранит и индексирует локальные traces |
 | `grafana` | ищет и показывает traces через datasource `tempo` |
 
-Сейчас instrumented только основной API process. Подключены FastAPI,
+Сейчас инструментирован только основной API process. Подключены FastAPI,
 SQLAlchemy, Redis, HTTPX и AIOKafka instrumentors. Notification- и audit-service
 не отправляют traces в Collector.
 

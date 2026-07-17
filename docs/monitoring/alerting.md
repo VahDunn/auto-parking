@@ -11,7 +11,7 @@ application metrics -> Prometheus rules -> Alertmanager -> Telegram + email
 
 ## Запуск доставки
 
-Rules загружаются Prometheus в базовом стеке. Для уведомлений задайте в `.env`:
+Правила загружаются Prometheus в базовом стеке. Для уведомлений задайте в `.env`:
 
 ```dotenv
 TELEGRAM_BOT_TOKEN=<bot-token>
@@ -72,17 +72,17 @@ Baseline использует предыдущий час со смещение�
 | `AutoParkingPublic4xxBurst` | не менее 20 внешних 4xx за 10 минут |
 | `AutoParkingExternal5xxBurst` | не менее 3 внешних 5xx за 5 минут |
 
-Внутренний caller определяется доверенным заголовком
+Внутренний коллер определяется доверенным заголовком
 `X-Auto-Parking-Service`; Nginx очищает одноимённый заголовок внешнего клиента.
 
-## Расследование
+## Расследование инцидентов
 
-1. Зафиксируйте `alertname`, время, timezone, severity и диагностические labels.
+1. Зафиксируйте `alertname`, время, timezone, severity и диагностические метки (labels).
 2. Проверьте rule в <http://localhost:9090/alerts> и группу в
    <http://localhost:9093>.
 3. Откройте dashboard
    <http://localhost:3000/d/auto-parking-alerts/auto-parking-alerts>.
-4. Сопоставьте окно времени с traces в Grafana Explore → Tempo.
+4. Сопоставьте окно времени с трейсами в Grafana Explore → Tempo.
 
 Полезные запросы:
 
@@ -173,7 +173,5 @@ docker compose exec -T prometheus \
 
 ## Production
 
-Перед production замените Mailpit на реальный SMTP, вынесите secrets во внешний
-secret manager, ограничьте доступ к UI, откалибруйте thresholds по SLO и
-baseline, настройте HA/retention и регулярно проверяйте путь firing → delivery →
-investigation → resolved.
+Перед выкаткой в прод замените Mailpit на реальный SMTP, вынесите секреты во внешний
+secret manager, ограничьте доступ к UI.

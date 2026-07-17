@@ -1,7 +1,7 @@
 # Production deployment
 
 Production разворачивается на одном сервере через Docker Compose. GitHub Actions
-копирует на сервер Compose-файл и Nginx config, скачивает заранее собранные images из
+копирует на сервер Compose-файл и Nginx config, скачивает заранее собранные образы из
 GHCR, применяет миграции и запускает stack.
 
 Это single-server deployment без оркестратора и автоматического failover.
@@ -14,7 +14,7 @@ GHCR, применяет миграции и запускает stack.
 | `deploy/docker-compose.prod.yaml` | production services, profiles, volumes и env |
 | `deploy/.env.prod.example` | шаблон серверного `.env` |
 | `nginx/nginx.conf` | внешний HTTP reverse proxy |
-| `docs/ci-cd.md` | CI, images, inputs и GitHub secrets |
+| `docs/ci-cd.md` | CI, образы, inputs и GitHub secrets |
 
 При расхождении документа с workflow или Compose источником истины являются YAML-файлы.
 
@@ -61,7 +61,7 @@ Nginx принимает обычный HTTP. TLS termination, домен и с�
 - Docker Compose v2 (`docker compose`);
 - `curl`;
 - SSH-пользователь с доступом к Docker;
-- достаточно места для images и persistent volumes.
+- достаточно места для образов и постоянных томов.
 
 Пример начальной подготовки каталога:
 
@@ -93,21 +93,21 @@ chmod 600 /opt/auto-parking/.env
 
 Замените все `change-me`. Как минимум проверьте:
 
-| Группа | Переменные |
-| --- | --- |
-| Images | `IMAGE_REGISTRY`, `IMAGE_NAMESPACE`, `IMAGE_TAG` |
-| Основная БД | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `DATABASE_URL` |
-| Audit DB | `AUDIT_POSTGRES_DB`, `AUDIT_POSTGRES_USER`, `AUDIT_POSTGRES_PASSWORD` |
-| Security | `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `JWT_ACCESS_TTL_MINUTES` |
-| Runtime | `APP_ENV=prod`, `DEBUG=false`, `LOG_LEVEL`, `WEB_CONCURRENCY` |
+| Группа       | Переменные |
+|--------------| --- |
+| Образы       | `IMAGE_REGISTRY`, `IMAGE_NAMESPACE`, `IMAGE_TAG` |
+| Основная БД  | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `DATABASE_URL` |
+| Audit DB     | `AUDIT_POSTGRES_DB`, `AUDIT_POSTGRES_USER`, `AUDIT_POSTGRES_PASSWORD` |
+| Security     | `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `JWT_ACCESS_TTL_MINUTES` |
+| Runtime      | `APP_ENV=prod`, `DEBUG=false`, `LOG_LEVEL`, `WEB_CONCURRENCY` |
 | Integrations | `REDIS_URL`, Kafka consumer groups, `TELEGRAM_BOT_TOKEN` |
-| Network | `HTTP_PORT` |
+| Network      | `HTTP_PORT` |
 
 Пароль внутри `DATABASE_URL` должен совпадать с `POSTGRES_PASSWORD`. Значение
 `IMAGE_NAMESPACE` имеет вид `<github-owner>/auto-parking`, без `ghcr.io/` и без
 суффикса `/app`.
 
-## Приоритет image-настроек
+## Приоритет настроек образов
 
 Во время автоматического deployment workflow перед каждой изменяющей stack командой
 задаёт inline environment:
@@ -123,15 +123,13 @@ IMAGE_TAG=<workflow input image_tag>
 
 Следствия:
 
-- `IMAGE_NAMESPACE` в server `.env` не выбирает images автоматического deployment;
-- `IMAGE_TAG` в server `.env` не переопределяет input workflow;
-- `IMAGE_REGISTRY` в server `.env` не меняет hardcoded `ghcr.io`;
-- server `.env` всё равно должен содержать корректный namespace для последующего
-  `docker compose ps` и ручных команд, которые workflow запускает без inline image env.
+- `IMAGE_NAMESPACE` в серверном `.env` не выбирает образы автоматического деплоя;
+- `IMAGE_REGISTRY` в серверном `.env` не меняет `ghcr.io`;
+- серверный `.env` в любом случае должен содержать корректный namespace для последующего
+  `docker compose ps` и ручных команд, которые workflow запускает без переменной.
 
-Все application secrets и runtime-параметры по-прежнему читаются из server `.env`.
-Compose также поддерживает `${APP_ENV_FILE:-.env}`, но workflow не задаёт отдельный
-`APP_ENV_FILE`, поэтому штатный путь — `.env` рядом с Compose-файлом.
+Все секреты и рантайм-параметры читаются из server `.env`.
+Штатный путь — `.env` рядом с compose-файлом.
 
 ## GitHub configuration
 
@@ -147,7 +145,7 @@ Compose также поддерживает `${APP_ENV_FILE:-.env}`, но workfl
 
 ## Первый deployment
 
-1. Выполните успешный push в `main` и убедитесь, что все четыре images с нужным SHA
+1. Выполните успешный push в `main` и убедитесь, что все четыре образа с нужным SHA
    появились в GHCR.
 2. Подготовьте серверный каталог и `.env`.
 3. Создайте GitHub secrets из `ci-cd.md`.
@@ -156,34 +154,28 @@ Compose также поддерживает `${APP_ENV_FILE:-.env}`, но workfl
 
 Workflow выполняет следующую последовательность:
 
-1. Checkout репозитория и вычисление default image namespace.
-2. Создание временного SSH key и добавление результата `ssh-keyscan` в
+1. Проверка репо и вычисление default image namespace.
+2. Создание временного SSH ключа и добавление результата `ssh-keyscan` в
    `known_hosts`.
 3. Создание `${deploy_path}` и `${deploy_path}/logs` на сервере.
 4. Копирование:
    - `deploy/docker-compose.prod.yaml` в `${deploy_path}/docker-compose.yaml`;
    - `nginx/nginx.conf` в `${deploy_path}/nginx.conf`.
 5. `docker login ghcr.io` с `GHCR_USERNAME` и `GHCR_TOKEN`.
-6. Pull base services и profiles `bot`, `notifications`, `audit`.
-7. Явный one-off запуск `docker compose run --rm kafka-init`.
-8. One-off запуск `docker compose --profile migrate run --rm migrate`.
+6. Пулл `bot`, `notifications`, `audit`.
+7. Запуск `docker compose run --rm kafka-init`.
+8. Запуск `docker compose --profile migrate run --rm migrate`.
 9. `docker compose --profile bot --profile notifications --profile audit up -d`.
 10. `docker compose ps`.
 11. Один запрос `curl -fsS http://localhost/api/health`.
 
-Deployment считается успешным только если все команды, включая финальный health
-request, завершились с кодом `0`.
+Деплой считается успешным только если все команды, включая health запрос,
+завершились с кодом `0`.
 
-### Повторный `kafka-init`
 
-`kafka-init` не имеет profile. Workflow сначала запускает его явно как one-off, а
-затем `docker compose ... up -d` создаёт штатный `kafka-init` ещё раз, потому что от
-него зависит API. Текущая реализация init идемпотентна: она создаёт отсутствующие
-topics и может увеличить число partitions, но не уменьшает их.
-
-Это фактическое поведение текущего workflow, а не два разных этапа инициализации.
-
-### Health check и `HTTP_PORT`
+Кафка формально запускается дважды (из-за сложной последовательности раскатки),
+на второй раз создаёт отсутствующие
+топики и может увеличить число партиций, второй проход ничего не убирает.
 
 Compose публикует Nginx через `${HTTP_PORT:-80}`, но workflow всегда проверяет
 `http://localhost/api/health`, то есть порт `80`.
@@ -195,7 +187,7 @@ Compose публикует Nginx через `${HTTP_PORT:-80}`, но workflow в
 но не полной готовности API, а `curl` выполняется один раз без retry. Медленный старт
 может дать ложное падение deployment.
 
-## Проверка после deployment
+## Проверка после
 
 На сервере:
 
@@ -213,7 +205,7 @@ docker compose logs --tail=100 telegram-bot notification-service audit-service
 docker compose logs --tail=100 kafka kafka-init
 ```
 
-Проверка topics:
+Проверка топиков:
 
 ```bash
 docker compose exec kafka \
@@ -224,8 +216,8 @@ docker compose exec kafka \
 
 ## Ручное обновление
 
-Штатный путь — workflow `Deploy`. Если требуется повторить его вручную на сервере,
-явно задайте те же image values:
+Штатный путь — `Deploy`. Если требуется повторить его вручную на сервере, нужно
+явно задать те же образы:
 
 ```bash
 cd /opt/auto-parking
@@ -240,7 +232,7 @@ docker compose --profile bot --profile notifications --profile audit up -d
 curl -fsS http://localhost/api/health
 ```
 
-Не запускайте обычный `up -d` как замену deployment: production API не зависит от
+Не надо запускать обычный `up -d` как замену deployment: production API не зависит от
 service `migrate`, поэтому такая команда сама по себе не применяет Alembic migrations.
 
 ## Rollback
@@ -248,38 +240,31 @@ service `migrate`, поэтому такая команда сама по себ
 Автоматического rollback нет. Для возврата application images можно повторно запустить
 workflow `Deploy` и указать предыдущий рабочий SHA.
 
-Такой rollback безопасен только при совместимой схеме БД. Workflow всегда выполняет
-`alembic upgrade head` из выбранного image и никогда не выполняет `alembic downgrade`:
+Это безопасно только при совместимой схеме БД. Всегда выполняется
+`alembic upgrade head` из выбранного образа и никогда не выполняется `alembic downgrade` - 
+уже применённые миграции автоматически не откатываются. Именно поэтому миграции нужно писать
+с осторожностью и возможностью роллбека в одну команду, также перед изменениями схемы нужен бэкап и план восстановления.
+Все миграции нужно проверять на тестовой базе перед деплоем. 
 
-- уже применённые миграции не откатываются;
-- старый image может не знать revision, записанный более новым deployment, и migration
-  step завершится ошибкой;
-- несовместимое изменение schema может сделать старый код неработоспособным даже при
-  успешном запуске containers.
-
-Перед изменениями schema нужны backup и план восстановления. Используйте
-backward-compatible expand/contract migrations. Restore или Alembic downgrade должны
-быть отдельной проверенной операцией, а не частью обычного image rollback.
-
-## Troubleshooting
+## Возможные проблемы
 
 ### Workflow падает на `ssh-keyscan`
 
 Проверьте `DEPLOY_HOST`, DNS и доступность SSH на порту `22`. Текущий `ssh-keyscan`
-не использует `DEPLOY_PORT`; сервер только с нестандартным SSH-портом этим workflow
-полностью не поддержан без изменения шага настройки SSH.
+не использует `DEPLOY_PORT` (сервер с нестандартным SSH-портом
+полностью не поддерживается без изменения шага настройки SSH).
 
 Workflow доверяет ключу, который вернул `ssh-keyscan` во время запуска, и не сверяет
-его с заранее сохранённым fingerprint.
+его с заранее сохранённым отпечатком.
 
 ### `ssh` или `scp` не подключается
 
-Проверьте `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PORT`, `authorized_keys`, права на
+Проверить `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PORT`, `authorized_keys`, права на
 `deploy_path` и доступ пользователя к Docker socket.
 
 ### `docker login` или `pull` падает
 
-Проверьте:
+Проверить:
 
 - `GHCR_USERNAME` и срок действия `GHCR_TOKEN`;
 - право `read:packages` и visibility package;
@@ -287,7 +272,7 @@ Workflow доверяет ключу, который вернул `ssh-keyscan` 
 - наличие всех четырёх images с выбранным тегом.
 
 `docker login` сохраняет credentials в Docker config пользователя на сервере. Их
-нужно отдельно ротировать или удалить при отзыве deploy-доступа.
+нужно отдельно ротировать или удалить при отзыве доступа.
 
 ### Compose не читает конфигурацию
 
@@ -299,22 +284,18 @@ cd /opt/auto-parking
 docker compose config -q
 ```
 
-Если изменились пароли БД после создания persistent volume, изменение `.env` не
-переинициализирует существующую PostgreSQL автоматически.
+Если изменились пароли БД после создания постоянного тома, изменение `.env` не
+пересоздаст существующую PostgreSQL автоматически.
 
 ### Миграции падают
 
-Смотрите полный output шага `migrate` в GitHub Actions. One-off container запускается
-с `--rm`, поэтому после завершения его logs могут не сохраниться как обычный Compose
-service container.
-
-Для диагностики проверьте `DATABASE_URL`, доступность `db` и совместимость Alembic
-revision с выбранным image. Не запускайте downgrade без backup и отдельного плана.
+Для диагностики можно посмотреть `DATABASE_URL`, доступность `db` и совместимость Alembic
+revision с выбранным image. Не стоит запускать downgrade без backup и отдельного плана.
 
 ### Containers запущены, а workflow красный
 
-Проверьте `HTTP_PORT`. Финальный request всегда идёт на port `80`. Также возможна гонка
-готовности API, потому что request выполняется сразу и без retry:
+Проверить `HTTP_PORT`. Финальный request всегда идёт на port `80`. Также возможна гонка
+готовности API, потому что запрос выполняется сразу и без ретраев:
 
 ```bash
 docker compose ps
@@ -322,23 +303,9 @@ docker compose logs --tail=100 auto-parking nginx
 curl -v http://localhost/api/health
 ```
 
-### Telegram services не работают
+### Telegram не работает
 
-Проверьте `TELEGRAM_BOT_TOKEN`, `REDIS_URL`, Kafka bootstrap servers и consumer groups,
-затем логи `telegram-bot` и `notification-service`. Workflow включает оба profile при
-каждом deployment.
-
-## Текущие эксплуатационные ограничения
-
-- один сервер и один экземпляр каждого stateful service;
-- Kafka без TLS/SASL и с replication factor `1`;
-- PostgreSQL, Redis и Kafka работают в том же Compose stack, что и приложение;
-- нет автоматических backup/restore и проверки backup перед миграциями;
-- нет zero-downtime/blue-green/canary deployment;
-- нет автоматического rollback при ошибке после миграции или частичном `up`;
-- нет production monitoring, tracing и alerting stack;
-- нет TLS termination в поставляемом Nginx config;
-- нет resource limits и healthchecks для application services;
-- нет очистки старых images и контроля заполнения диска;
-- нет `concurrency` lock для параллельных запусков `Deploy`.
+Проверить `TELEGRAM_BOT_TOKEN`, `REDIS_URL`, Kafka bootstrap servers и consumer groups,
+затем логи `telegram-bot` и `notification-service`. Workflow включает оба профиля при
+каждом деплое.
 
